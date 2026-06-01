@@ -25,7 +25,6 @@ function ProtectedRoute({ children, requireSector, requireAdmin }) {
 }
 
 function AppRoutes() {
-  const { user } = useAuth();
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
