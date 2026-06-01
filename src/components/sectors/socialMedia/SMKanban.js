@@ -1,5 +1,5 @@
 import React from 'react';
-import { differenceInDays, format, parseISO } from 'date-fns';
+import { differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ExternalLink, AlertTriangle } from 'lucide-react';
 import { SM_COLUMNS } from '../../../lib/firebase';
@@ -30,7 +30,6 @@ function PostCard({ post, onStatusChange }) {
           <ExternalLink size={11} /> Ver arte
         </a>
       )}
-      {/* Move buttons */}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {SM_COLUMNS.filter(c => c.id !== post.status).map(col => (
           <button
