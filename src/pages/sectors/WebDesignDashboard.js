@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../../components/shared/Toast';
@@ -19,7 +18,6 @@ const NAV = [
 ];
 
 export default function WebDesignDashboard() {
-  const { user } = useAuth();
   const { toast } = useToast();
   const { clients, loading, addClient, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, deleteClient } = useClients();
   const { collaborators } = useCollaborators('webdesign');
