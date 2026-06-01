@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../../components/shared/Toast';
-import Sidebar from '../../components/shared/Sidebar';
 import AdminOverview from '../../components/admin/AdminOverview';
 import AdminFeed from '../../components/admin/AdminFeed';
 import AdminCharts from '../../components/admin/AdminCharts';
@@ -22,7 +21,12 @@ const NAV = [
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const { clients, loading: loadingClients, addClient, updateClient, deleteClient, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdMoveStatus, smUpdatePostStatus } = useClients();
+  const {
+    clients, loading: loadingClients,
+    addClient, updateClient, deleteClient,
+    wdMoveToProduction, wdMoveBackToOnboarding,
+    wdUpdateChecklist, wdMoveStatus,
+  } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
   const [page, setPage] = useState('overview');
 
@@ -55,12 +59,10 @@ export default function AdminDashboard() {
     return res;
   };
 
-  // custom sidebar for admin (no sector color, uses neon)
   const navItems = NAV.map(n => ({ ...n, badge: 0 }));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {/* Custom admin sidebar */}
       <aside style={S.sidebar}>
         <div style={S.logo}>
           <div style={S.logoIcon}><span style={{ fontSize: 20 }}>👑</span></div>
