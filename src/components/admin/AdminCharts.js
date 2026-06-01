@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { REQUESTING_SECTORS } from '../../lib/firebase';
 
 const COLORS = ['#EE3363','#a78bfa','#38bdf8','#fb923c','#22c55e','#f59e0b'];
 
