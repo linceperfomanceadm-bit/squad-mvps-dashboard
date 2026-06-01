@@ -1,24 +1,23 @@
 import React, { useState } from 'react';
-import { differenceInDays, format, subDays, startOfDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { differenceInDays } from 'date-fns';
 import { ExternalLink } from 'lucide-react';
 import { SLA_DAYS, SM_COLUMNS, APPROVAL_STATUS } from '../../lib/firebase';
 
 const DATE_FILTERS = [
-  { key: 'today',  label: 'Hoje' },
+  { key: 'today',     label: 'Hoje' },
   { key: 'yesterday', label: 'Ontem' },
-  { key: '7days', label: 'Últimos 7 dias' },
-  { key: 'month', label: 'Este mês' },
+  { key: '7days',     label: 'Últimos 7 dias' },
+  { key: 'month',     label: 'Este mês' },
 ];
 
 function inRange(dateStr, filter) {
   if (!dateStr) return false;
   const d = new Date(dateStr);
   const now = new Date();
-  if (filter === 'today') return differenceInDays(now, d) === 0;
+  if (filter === 'today')     return differenceInDays(now, d) === 0;
   if (filter === 'yesterday') return differenceInDays(now, d) === 1;
-  if (filter === '7days') return differenceInDays(now, d) <= 7;
-  if (filter === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  if (filter === '7days')     return differenceInDays(now, d) <= 7;
+  if (filter === 'month')     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   return true;
 }
 
@@ -37,13 +36,14 @@ export default function AdminFeed({ clients, collaborators }) {
   const [collabFilter, setCollabFilter] = useState('');
   const [sectorTab, setSectorTab] = useState('design');
 
-  // Build deliveries
   const allDeliveries = [];
   clients.forEach(c => {
     const process = (items, sector) => (items || []).forEach(d => {
       if (inRange(d.deliveryDate || d.createdAt, dateFilter)) {
         if (!collabFilter || d.responsible === collabFilter) {
-          const days = d.requestDate && d.deliveryDate ? differenceInDays(new Date(d.deliveryDate), new Date(d.requestDate)) : null;
+          const days = d.requestDate && d.deliveryDate
+            ? differenceInDays(new Date(d.deliveryDate), new Date(d.requestDate))
+            : null;
           allDeliveries.push({ ...d, clientName: c.name, sector, slaDays: days });
         }
       }
@@ -52,7 +52,6 @@ export default function AdminFeed({ clients, collaborators }) {
     process(c.video?.deliveries, 'video');
   });
 
-  // Build SM posts
   const allPosts = [];
   clients.forEach(c => {
     (c.sm?.posts || []).forEach(p => {
@@ -65,7 +64,7 @@ export default function AdminFeed({ clients, collaborators }) {
   });
 
   const designDeliveries = allDeliveries.filter(d => d.sector === 'design');
-  const videoDeliveries = allDeliveries.filter(d => d.sector === 'video');
+  const videoDeliveries  = allDeliveries.filter(d => d.sector === 'video');
 
   const TABLE_COLS_CREATIVE = ['Colaborador', 'Cliente', 'Task', 'Setor Solicitante', 'Status', 'Tempo de Produção', 'Link'];
 
@@ -76,7 +75,9 @@ export default function AdminFeed({ clients, collaborators }) {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {TABLE_COLS_CREATIVE.map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>)}
+                {TABLE_COLS_CREATIVE.map(h => (
+                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -95,7 +96,11 @@ export default function AdminFeed({ clients, collaborators }) {
                       {d.slaDays !== null ? <SLABadge days={d.slaDays} /> : '—'}
                     </td>
                     <td style={{ padding: '10px 12px' }}>
-                      {d.link ? <a href={d.link} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 12 }}><ExternalLink size={12} /> Ver</a> : '—'}
+                      {d.link
+                        ? <a href={d.link} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 12 }}>
+                            <ExternalLink size={12} /> Ver
+                          </a>
+                        : '—'}
                     </td>
                   </tr>
                 );
@@ -131,7 +136,11 @@ export default function AdminFeed({ clients, collaborators }) {
 
       {/* Sector tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
-        {[{ key: 'design', label: '🎨 Design', count: designDeliveries.length }, { key: 'video', label: '🎬 VideoMaker', count: videoDeliveries.length }, { key: 'sm', label: '📱 Social Media', count: allPosts.length }].map(t => (
+        {[
+          { key: 'design', label: '🎨 Design',       count: designDeliveries.length },
+          { key: 'video',  label: '🎬 VideoMaker',    count: videoDeliveries.length },
+          { key: 'sm',     label: '📱 Social Media',  count: allPosts.length },
+        ].map(t => (
           <button key={t.key} onClick={() => setSectorTab(t.key)}
             style={{ background: sectorTab === t.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '7px 16px', color: sectorTab === t.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {t.label}
@@ -142,7 +151,7 @@ export default function AdminFeed({ clients, collaborators }) {
 
       <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '4px 0', overflow: 'hidden' }}>
         {sectorTab === 'design' && renderCreativeTable(designDeliveries)}
-        {sectorTab === 'video' && renderCreativeTable(videoDeliveries)}
+        {sectorTab === 'video'  && renderCreativeTable(videoDeliveries)}
         {sectorTab === 'sm' && (
           allPosts.length === 0
             ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma atividade no período.</p>
@@ -150,7 +159,9 @@ export default function AdminFeed({ clients, collaborators }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Colaborador', 'Cliente', 'Post', 'Status'].map(h => <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' }}>{h}</th>)}
+                      {['Colaborador', 'Cliente', 'Post', 'Status'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' }}>{h}</th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody>
