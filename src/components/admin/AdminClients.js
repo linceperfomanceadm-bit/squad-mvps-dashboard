@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, X, Search, Edit2, Trash2, Check } from 'lucide-react';
+import { Plus, X, Search, Trash2, Check } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
 
 function AddClientModal({ collaborators, onClose, onAdd }) {
