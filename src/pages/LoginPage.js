@@ -10,7 +10,7 @@ const SECTOR_CONFIG = {
   videomaker:  { label: 'Videomaker',  color: '#a78bfa', logo: '/videomaker.png', emoji: '🎬' },
   socialmedia: { label: 'Social Media',color: '#E91E63', logo: '/socialmedia.png', emoji: '📱' },
   design:      { label: 'Design',      color: '#8E959F', logo: '/design.png', emoji: '🎨' },
-  admin:       { label: 'Admin',       color: '#EE3363', logo: null, emoji: '👑' },
+  admin:       { label: 'Admin',       color: '#EE3363', logo: '/admin.png', emoji: '👑' },
 };
 
 export default function LoginPage() {
