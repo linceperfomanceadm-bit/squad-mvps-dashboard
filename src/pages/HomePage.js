@@ -8,7 +8,7 @@ const SECTORS = [
     route: '/login/webdesign',
     color: '#EE3363',
     // Substitua o src abaixo pelo caminho da sua logo: ex: '/logos/webdesign.png'
-    logo: null,
+    logo: '/webdesign.png',
     emoji: '🌐',
   },
   {
@@ -16,7 +16,7 @@ const SECTORS = [
     label: 'Videomaker',
     route: '/login/videomaker',
     color: '#a78bfa',
-    logo: null,
+    logo: '/videomaker.png',
     emoji: '🎬',
   },
   {
@@ -24,7 +24,7 @@ const SECTORS = [
     label: 'Social Media',
     route: '/login/socialmedia',
     color: '#38bdf8',
-    logo: null,
+    logo: '/socialmedia.png',
     emoji: '📱',
   },
   {
@@ -32,7 +32,7 @@ const SECTORS = [
     label: 'Design',
     route: '/login/design',
     color: '#fb923c',
-    logo: null,
+    logo: '/design.png',
     emoji: '🎨',
   },
 ];
