@@ -8,8 +8,8 @@ import { useAuth } from '../contexts/AuthContext';
 const SECTOR_CONFIG = {
   webdesign:   { label: 'WebDesign',   color: '#EE3363', logo: '/webdesign.png', emoji: '🌐' },
   videomaker:  { label: 'Videomaker',  color: '#a78bfa', logo: '/videomaker.png', emoji: '🎬' },
-  socialmedia: { label: 'Social Media',color: '#38bdf8', logo: '/socialmedia.png', emoji: '📱' },
-  design:      { label: 'Design',      color: '#fb923c', logo: '/design.png', emoji: '🎨' },
+  socialmedia: { label: 'Social Media',color: '#E91E63', logo: '/socialmedia.png', emoji: '📱' },
+  design:      { label: 'Design',      color: '#8E959F', logo: '/design.png', emoji: '🎨' },
   admin:       { label: 'Admin',       color: '#EE3363', logo: null, emoji: '👑' },
 };
 
