@@ -6,10 +6,10 @@ import { useAuth } from '../contexts/AuthContext';
 // ─── Sector config ─────────────────────────────────────────────
 // Para trocar o logo: coloque o arquivo em /public/logos/ e atualize o campo `logo`
 const SECTOR_CONFIG = {
-  webdesign:   { label: 'WebDesign',   color: '#EE3363', logo: null, emoji: '🌐' },
-  videomaker:  { label: 'Videomaker',  color: '#a78bfa', logo: null, emoji: '🎬' },
-  socialmedia: { label: 'Social Media',color: '#38bdf8', logo: null, emoji: '📱' },
-  design:      { label: 'Design',      color: '#fb923c', logo: null, emoji: '🎨' },
+  webdesign:   { label: 'WebDesign',   color: '#EE3363', logo: '/webdesign.png', emoji: '🌐' },
+  videomaker:  { label: 'Videomaker',  color: '#a78bfa', logo: '/videomaker.png', emoji: '🎬' },
+  socialmedia: { label: 'Social Media',color: '#38bdf8', logo: '/socialmedia.png', emoji: '📱' },
+  design:      { label: 'Design',      color: '#fb923c', logo: '/design.png', emoji: '🎨' },
   admin:       { label: 'Admin',       color: '#EE3363', logo: null, emoji: '👑' },
 };
 
