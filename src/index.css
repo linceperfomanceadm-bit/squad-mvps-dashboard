@@ -1,0 +1,96 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --neon: #EE3363;
+  --neon-dim: rgba(238,51,99,0.12);
+  --neon-border: rgba(238,51,99,0.28);
+  --bg: #07070e;
+  --bg2: #0c0c18;
+  --surface: rgba(255,255,255,0.03);
+  --border: rgba(255,255,255,0.07);
+  --border-h: rgba(255,255,255,0.14);
+  --text: #eaeaf5;
+  --muted: #52526e;
+  --green: #22c55e;
+  --green-dim: rgba(34,197,94,0.12);
+  --green-b: rgba(34,197,94,0.3);
+  --amber: #f59e0b;
+  --amber-dim: rgba(245,158,11,0.12);
+  --amber-b: rgba(245,158,11,0.3);
+  --purple: #a78bfa;
+  --purple-dim: rgba(167,139,250,0.12);
+  --purple-b: rgba(167,139,250,0.3);
+  --blue: #38bdf8;
+  --blue-dim: rgba(56,189,248,0.12);
+  --blue-b: rgba(56,189,248,0.3);
+  --orange: #fb923c;
+  --orange-dim: rgba(251,146,60,0.12);
+  --orange-b: rgba(251,146,60,0.3);
+  --f: 'Outfit', sans-serif;
+  --fm: 'JetBrains Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body, #root { height: 100%; }
+body { background: var(--bg); color: var(--text); font-family: var(--f); font-size: 14px; -webkit-font-smoothing: antialiased; }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(238,51,99,0.25); border-radius: 2px; }
+
+button { font-family: var(--f); cursor: pointer; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+input, textarea { font-family: var(--f); }
+
+/* ── Select global fix ───────────────────────────────────────── */
+select {
+  font-family: var(--f);
+  background-color: #12121f;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 13px;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2352526e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+  transition: border-color 0.2s;
+}
+
+select:focus {
+  border-color: var(--neon-border);
+}
+
+select option {
+  background-color: #12121f;
+  color: var(--text);
+  padding: 8px;
+}
+
+select option:checked,
+select option:hover {
+  background-color: #1e1e35;
+  color: #fff;
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+@keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+@keyframes spin { to { transform:rotate(360deg); } }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+@keyframes glow { 0%,100%{filter:drop-shadow(0 0 12px currentColor)} 50%{filter:drop-shadow(0 0 24px currentColor)} }
+
+.fade-up { animation: fadeUp .3s ease both; }
+.fade-in { animation: fadeIn .2s ease both; }
+.spinner { width:20px; height:20px; border:2px solid rgba(238,51,99,.2); border-top-color:var(--neon); border-radius:50%; animation:spin .7s linear infinite; }
+
+/* Toast */
+.toast-wrap { position:fixed; bottom:24px; right:24px; z-index:9999; display:flex; flex-direction:column; gap:8px; }
+.toast { background:var(--bg2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; font-size:13px; display:flex; align-items:center; gap:8px; box-shadow:0 8px 32px rgba(0,0,0,.5); animation:fadeUp .3s ease; max-width:300px; }
+.toast.s { border-color:var(--green-b); color:var(--green); }
+.toast.e { border-color:var(--neon-border); color:var(--neon); }
