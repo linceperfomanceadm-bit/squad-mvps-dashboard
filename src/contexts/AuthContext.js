@@ -52,28 +52,52 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Admin login (separate)
+  // Admin login (via /login/admin or env vars)
   const loginAdmin = async (loginId, password) => {
     const ADMIN_ID = process.env.REACT_APP_ADMIN_ID || 'admin';
     const ADMIN_PASS = process.env.REACT_APP_ADMIN_PASSWORD || 'Dash@2026';
 
-    // Check env-based admin first
+    // Check env-based master admin
     if (loginId === ADMIN_ID && password === ADMIN_PASS) {
-      const sessionUser = { id: 'admin', name: 'Admin', loginId, sector: null, role: 'superadmin', isAdmin: true };
+      const sessionUser = {
+        id: 'admin',
+        name: 'Admin',
+        loginId,
+        sector: null,
+        role: 'superadmin',
+        isAdmin: true,
+        firstAccess: false,
+      };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
       setUser(sessionUser);
       return { success: true };
     }
 
-    // Check Firestore admins
+    // Check Firestore admins (any sector)
     try {
-      const q = query(collection(db, 'collaborators'), where('loginId', '==', loginId), where('isAdmin', '==', true));
+      const q = query(
+        collection(db, 'collaborators'),
+        where('loginId', '==', loginId),
+        where('isAdmin', '==', true)
+      );
       const snap = await getDocs(q);
       if (snap.empty) return { success: false, error: 'Credenciais inválidas.' };
+
       const docData = snap.docs[0];
       const collab = { id: docData.id, ...docData.data() };
+
       if (collab.password !== password) return { success: false, error: 'Senha incorreta.' };
-      const sessionUser = { id: collab.id, name: collab.name, loginId: collab.loginId, sector: collab.sector, role: 'admin', isAdmin: true, firstAccess: collab.firstAccess || false };
+      if (!collab.active) return { success: false, error: 'Conta desativada.' };
+
+      const sessionUser = {
+        id: collab.id,
+        name: collab.name,
+        loginId: collab.loginId,
+        sector: collab.sector,
+        role: 'admin',
+        isAdmin: true,
+        firstAccess: collab.firstAccess || false,
+      };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
       setUser(sessionUser);
       return { success: true, firstAccess: collab.firstAccess };
@@ -84,9 +108,12 @@ export function AuthProvider({ children }) {
 
   // Change password on first access
   const changePassword = async (newPassword) => {
-    if (!user) return { success: false };
+    if (!user || user.id === 'admin') return { success: false, error: 'Admin master não pode redefinir senha aqui.' };
     try {
-      await updateDoc(doc(db, 'collaborators', user.id), { password: newPassword, firstAccess: false });
+      await updateDoc(doc(db, 'collaborators', user.id), {
+        password: newPassword,
+        firstAccess: false,
+      });
       const updated = { ...user, firstAccess: false };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
       setUser(updated);
