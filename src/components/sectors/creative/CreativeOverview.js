@@ -1,7 +1,7 @@
 import React from 'react';
 import { differenceInDays } from 'date-fns';
-import { Package, Clock, Star } from 'lucide-react';
-import { APPROVAL_STATUS, SECTORS } from '../../../lib/firebase';
+import { Package, Clock, Star, Kanban } from 'lucide-react';
+import { SECTORS, TASK_PRIORITIES } from '../../../lib/firebase';
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
   return (
@@ -21,29 +21,32 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
   );
 }
 
-export default function CreativeOverview({ myDeliveries, sectorId }) {
+export default function CreativeOverview({ tasks, myTasks, sectorId }) {
   const color = SECTORS[sectorId]?.color || 'var(--neon)';
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
-  const monthDeliveries = myDeliveries.filter(d => {
-    const date = new Date(d.deliveryDate || d.createdAt);
-    return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
+  const doneTasks = tasks.filter(t => t.status === 'done');
+
+  const monthDone = doneTasks.filter(t => {
+    const d = new Date(t.completedAt || t.createdAt);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
 
-  const firstApproval = myDeliveries.filter(d => d.approvalStatus === 'first');
-  const pctFirst = myDeliveries.length > 0 ? Math.round((firstApproval.length / myDeliveries.length) * 100) : 0;
+  const firstApproval = doneTasks.filter(t => t.reworkCount === 0);
+  const pctFirst = doneTasks.length > 0 ? Math.round((firstApproval.length / doneTasks.length) * 100) : 0;
 
   const avgDays = (() => {
-    const withDates = myDeliveries.filter(d => d.requestDate && d.deliveryDate);
+    const withDates = doneTasks.filter(t => t.startedAt && t.completedAt);
     if (!withDates.length) return 0;
-    const total = withDates.reduce((sum, d) => sum + Math.max(0, differenceInDays(new Date(d.deliveryDate), new Date(d.requestDate))), 0);
+    const total = withDates.reduce((sum, t) => sum + Math.max(0, differenceInDays(new Date(t.completedAt), new Date(t.startedAt))), 0);
     return (total / withDates.length).toFixed(1);
   })();
 
-  // Hall da Fama - first approval deliveries
-  const hallOfFame = myDeliveries.filter(d => d.approvalStatus === 'first').slice(0, 8);
+  // My active tasks
+  const myActiveTasks = (myTasks || []).filter(t => t.status !== 'done');
+  const pendingApproval = (myTasks || []).filter(t => t.status === 'approval');
 
   return (
     <div className="fade-up">
@@ -53,54 +56,40 @@ export default function CreativeOverview({ myDeliveries, sectorId }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 28 }}>
-        <StatCard icon={Package} label="Entregas no Mês" value={monthDeliveries.length} color={color} />
+        <StatCard icon={Package} label="Entregas no Mês" value={monthDone.length} color={color} />
         <StatCard icon={Clock} label="Tempo Médio" value={`${avgDays}d`} sub="por entrega" color={color} />
-        <StatCard icon={Star} label="Aprovação de Primeira" value={`${pctFirst}%`} sub={`${firstApproval.length} entregas`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
+        <StatCard icon={Star} label="Aprovação de Primeira" value={`${pctFirst}%`} sub={`${firstApproval.length} tasks`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
+        <StatCard icon={Kanban} label="Pendentes Aprovação" value={pendingApproval.length} sub="aguardando ok" color={pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)'} />
       </div>
 
-      {/* Hall da Fama */}
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px', marginBottom: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-          <span style={{ fontSize: 20 }}>🏆</span>
-          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>Hall da Fama</h2>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>— aprovadas de primeira</span>
-        </div>
-        {hallOfFame.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Nenhuma entrega aprovada de primeira ainda.</p>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 10 }}>
-            {hallOfFame.map(d => (
-              <div key={d.id} style={{ background: 'linear-gradient(135deg,rgba(34,197,94,.08),rgba(34,197,94,.04))', border: '1px solid var(--green-b)', borderRadius: 10, padding: '12px 14px' }}>
-                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</p>
-                <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>{d.clientName}</p>
-                {d.link && (
-                  <a href={d.link} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--green)', textDecoration: 'none' }}>Ver material →</a>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Recent deliveries */}
+      {/* My active tasks */}
       <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Últimas Entregas</h2>
-        {myDeliveries.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Nenhuma entrega cadastrada ainda.</p>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
+        {myActiveTasks.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
+            Nenhuma task ativa no momento. 🎉
+          </p>
         ) : (
-          myDeliveries.slice(0, 10).map(d => {
-            const status = APPROVAL_STATUS.find(s => s.id === d.approvalStatus);
+          myActiveTasks.slice(0, 8).map(t => {
+            const priority = TASK_PRIORITIES.find(p => p.id === t.priority);
+            const isOverdue = t.deadline && differenceInDays(now, new Date(t.deadline)) > 0;
             return (
-              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+              <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.clientName} · {d.requestingSector}</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                    {t.isRework && <span style={{ fontSize: 9, color: 'var(--amber)', fontFamily: 'var(--fm)', fontWeight: 700 }}>🔄 AJUSTE</span>}
+                    <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</p>
+                  </div>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>{t.clientName}</p>
                 </div>
-                {status && (
-                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${status.color}15`, color: status.color, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>
-                    {status.label}
-                  </span>
-                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  {priority && (
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `${priority.color}15`, color: priority.color, fontFamily: 'var(--fm)' }}>
+                      {priority.label}
+                    </span>
+                  )}
+                  {isOverdue && <span style={{ fontSize: 10, color: 'var(--neon)', fontWeight: 700, fontFamily: 'var(--fm)' }}>ATRASADA</span>}
+                </div>
               </div>
             );
           })
