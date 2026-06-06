@@ -20,7 +20,6 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
     if (!form.sector) { setError('Selecione o setor.'); return; }
     if (!form.loginId.trim()) { setError('Defina o ID de acesso.'); return; }
     if (!form.password.trim() || form.password.length < 4) { setError('Senha provisória deve ter pelo menos 4 caracteres.'); return; }
-    // Check duplicate loginId
     if (collaborators.some(c => c.loginId === form.loginId.trim())) { setError('Este ID já está em uso.'); return; }
     setLoading(true);
     const res = await onAdd({ ...form, loginId: form.loginId.trim() });
@@ -30,7 +29,8 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
   };
 
   const handleEdit = async (id) => {
-    await onUpdate(id, { name: editForm.name, phone: editForm.phone, sector: editForm.sector, isAdmin: editForm.isAdmin });
+    if (!editForm.name?.trim() || !editForm.role?.trim === undefined) {}
+    await onUpdate(id, { name: editForm.name, phone: editForm.phone || '', sector: editForm.sector, isAdmin: editForm.isAdmin || false });
     setEditId(null);
   };
 
@@ -44,13 +44,14 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Colaboradores</h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{collaborators.filter(c => c.active).length} ativos · {collaborators.length} total</p>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{collaborators.filter(c => c.active).length} ativo{collaborators.filter(c => c.active).length !== 1 ? 's' : ''} · {collaborators.length} total</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           {showForm ? <><X size={15} /> Cancelar</> : <><UserPlus size={15} /> Novo Colaborador</>}
         </button>
       </div>
 
+      {/* Add form */}
       {showForm && (
         <div style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--neon-border)', borderRadius: 14, padding: 22, marginBottom: 20 }} className="fade-up">
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Cadastrar Colaborador</h3>
@@ -61,7 +62,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
             </div>
             <div style={S.field}>
               <label style={S.label}>SETOR *</label>
-              <select style={S.input} value={form.sector} onChange={e => set('sector', e.target.value)}>
+              <select style={S.select} value={form.sector} onChange={e => set('sector', e.target.value)}>
                 <option value="">Selecionar setor</option>
                 {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
               </select>
@@ -105,27 +106,30 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
         const sectorCollabs = collaborators.filter(c => c.sector === sector.id);
         if (!sectorCollabs.length) return null;
         return (
-          <div key={sector.id} style={{ marginBottom: 20 }}>
+          <div key={sector.id} style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               <span style={{ fontSize: 16 }}>{sector.emoji}</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: sector.color }}>{sector.label}</span>
               <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{sectorCollabs.length}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 10 }}>
-              {sectorCollabs.map(c => (
+              {sectorCollabs.map(collab => (
                 <CollabCard
-                  key={c.id} collab={c} sector={sector}
-                  isEditing={editId === c.id} editForm={editForm}
-                  onEdit={() => { setEditId(c.id); setEditForm({ name: c.name, phone: c.phone || '', sector: c.sector, isAdmin: c.isAdmin || false }); }}
-                  onSaveEdit={() => handleEdit(c.id)}
+                  key={collab.id}
+                  collab={collab}
+                  sector={sector}
+                  isEditing={editId === collab.id}
+                  editForm={editForm}
+                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false }); }}
+                  onSaveEdit={() => handleEdit(collab.id)}
                   onCancelEdit={() => setEditId(null)}
                   onEditFormChange={(k, v) => setEditForm(f => ({ ...f, [k]: v }))}
-                  onToggleActive={() => onUpdate(c.id, { active: !c.active })}
-                  onDelete={() => setDelConfirm(c.id)}
-                  onConfirmDelete={() => { onDelete(c.id); setDelConfirm(null); }}
+                  onToggleActive={() => onUpdate(collab.id, { active: !collab.active })}
+                  onDelete={() => setDelConfirm(collab.id)}
+                  onConfirmDelete={() => { onDelete(collab.id); setDelConfirm(null); }}
                   onCancelDelete={() => setDelConfirm(null)}
-                  confirmDelete={delConfirm === c.id}
-                  onResetPassword={(pw) => handleResetPassword(c.id, pw)}
+                  confirmDelete={delConfirm === collab.id}
+                  onResetPassword={(pw) => handleResetPassword(collab.id, pw)}
                 />
               ))}
             </div>
@@ -146,7 +150,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input style={S.input} value={editForm.name} onChange={e => onEditFormChange('name', e.target.value)} placeholder="Nome" />
           <input style={S.input} value={editForm.phone} onChange={e => onEditFormChange('phone', e.target.value)} placeholder="Telefone" />
-          <select style={S.input} value={editForm.sector} onChange={e => onEditFormChange('sector', e.target.value)}>
+          <select style={S.select} value={editForm.sector} onChange={e => onEditFormChange('sector', e.target.value)}>
             {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
           </select>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
@@ -154,7 +158,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
             Permissões de Admin
           </label>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button style={{ ...S.iconBtnGreen, flex: 1, justifyContent: 'center', gap: 6, padding: '7px' }} onClick={onSaveEdit}><Check size={14} /> Salvar</button>
+            <button style={{ ...S.iconBtnGreen, flex: 1, justifyContent: 'center', gap: 6, padding: 7 }} onClick={onSaveEdit}><Check size={14} /> Salvar</button>
             <button style={{ ...S.iconBtn, padding: '7px 12px' }} onClick={onCancelEdit}><X size={14} /></button>
           </div>
         </div>
@@ -181,24 +185,21 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
             </div>
           </div>
           {collab.phone && <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>📱 {collab.phone}</p>}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: collab.active ? 'var(--green-dim)' : 'var(--surface)', color: collab.active ? 'var(--green)' : 'var(--muted)', border: `1px solid ${collab.active ? 'var(--green-b)' : 'var(--border)'}`, fontFamily: 'var(--fm)' }}>
               {collab.active ? '● Ativo' : '○ Inativo'}
             </span>
             {collab.isAdmin && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)', fontFamily: 'var(--fm)' }}>👑 Admin</span>}
             {collab.firstAccess && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>1º Acesso pendente</span>}
           </div>
-          {/* Reset password */}
-          <div style={{ marginTop: 10 }}>
-            {showReset
-              ? <div style={{ display: 'flex', gap: 6 }}>
-                  <input style={{ ...S.input, flex: 1, fontSize: 12, padding: '6px 10px' }} placeholder="Nova senha provisória" value={resetPw} onChange={e => setResetPw(e.target.value)} />
-                  <button style={{ ...S.iconBtnGreen, padding: '6px 10px' }} onClick={() => { onResetPassword(resetPw); setResetPw(''); setShowReset(false); }}><Check size={13} /></button>
-                  <button style={{ ...S.iconBtn, padding: '6px 8px' }} onClick={() => setShowReset(false)}><X size={13} /></button>
-                </div>
-              : <button style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textDecoration: 'underline', textUnderlineOffset: 2 }} onClick={() => setShowReset(true)}>Redefinir senha</button>
-            }
-          </div>
+          {showReset
+            ? <div style={{ display: 'flex', gap: 6 }}>
+                <input style={{ ...S.input, flex: 1, fontSize: 12, padding: '6px 10px' }} placeholder="Nova senha provisória" value={resetPw} onChange={e => setResetPw(e.target.value)} />
+                <button style={{ ...S.iconBtnGreen, padding: '6px 10px' }} onClick={() => { onResetPassword(resetPw); setResetPw(''); setShowReset(false); }}><Check size={13} /></button>
+                <button style={{ ...S.iconBtn, padding: '6px 8px' }} onClick={() => setShowReset(false)}><X size={13} /></button>
+              </div>
+            : <button style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textDecoration: 'underline', textUnderlineOffset: 2 }} onClick={() => setShowReset(true)}>Redefinir senha</button>
+          }
         </>
       )}
     </div>
@@ -209,8 +210,9 @@ const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
   input: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
   submitBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '9px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
-  iconBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13 },
+  iconBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   iconBtnGreen: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 6, padding: '5px 7px', color: 'var(--green)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
 };

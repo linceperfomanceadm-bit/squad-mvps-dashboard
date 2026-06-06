@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { differenceInDays } from 'date-fns';
+import { differenceInDays, format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { ExternalLink } from 'lucide-react';
-import { SLA_DAYS, SM_COLUMNS, APPROVAL_STATUS } from '../../lib/firebase';
+import { SLA_DAYS, SM_COLUMNS, TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
 
 const DATE_FILTERS = [
   { key: 'today',     label: 'Hoje' },
@@ -25,96 +26,45 @@ function SLABadge({ days }) {
   const ok = days <= SLA_DAYS;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, fontFamily: 'var(--fm)' }}>
-      <span style={{ fontSize: 14 }}>{ok ? '🟢' : '🔴'}</span>
-      {days}d
+      <span style={{ fontSize: 14 }}>{ok ? '🟢' : '🔴'}</span>{days}d
     </span>
   );
 }
 
-export default function AdminFeed({ clients, collaborators }) {
+export default function AdminFeed({ clients, collaborators, tasks = [] }) {
   const [dateFilter, setDateFilter] = useState('today');
   const [collabFilter, setCollabFilter] = useState('');
-  const [sectorTab, setSectorTab] = useState('design');
+  const [sectorTab, setSectorTab] = useState('tasks');
 
-  const allDeliveries = [];
-  clients.forEach(c => {
-    const process = (items, sector) => (items || []).forEach(d => {
-      if (inRange(d.deliveryDate || d.createdAt, dateFilter)) {
-        if (!collabFilter || d.responsible === collabFilter) {
-          const days = d.requestDate && d.deliveryDate
-            ? differenceInDays(new Date(d.deliveryDate), new Date(d.requestDate))
-            : null;
-          allDeliveries.push({ ...d, clientName: c.name, sector, slaDays: days });
-        }
-      }
-    });
-    process(c.design?.deliveries, 'design');
-    process(c.video?.deliveries, 'video');
+  // Filter tasks
+  const filteredTasks = tasks.filter(t => {
+    const date = t.completedAt || t.createdAt;
+    if (!inRange(date, dateFilter)) return false;
+    if (collabFilter && t.responsibleName !== collabFilter && t.requestedBy !== collabFilter) return false;
+    return true;
   });
 
+  // SM posts
   const allPosts = [];
   clients.forEach(c => {
     (c.sm?.posts || []).forEach(p => {
-      if (inRange(p.updatedAt || p.createdAt, dateFilter)) {
-        if (!collabFilter || p.responsible === collabFilter) {
-          allPosts.push({ ...p, clientName: c.name });
-        }
-      }
+      const date = p.updatedAt || p.createdAt;
+      if (!inRange(date, dateFilter)) return;
+      if (collabFilter && p.responsible !== collabFilter) return;
+      allPosts.push({ ...p, clientName: c.name });
     });
   });
 
-  const designDeliveries = allDeliveries.filter(d => d.sector === 'design');
-  const videoDeliveries  = allDeliveries.filter(d => d.sector === 'video');
-
-  const TABLE_COLS_CREATIVE = ['Colaborador', 'Cliente', 'Task', 'Setor Solicitante', 'Status', 'Tempo de Produção', 'Link'];
-
-  const renderCreativeTable = (items) => (
-    items.length === 0
-      ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma entrega no período.</p>
-      : <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                {TABLE_COLS_CREATIVE.map(h => (
-                  <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {items.map(d => {
-                const status = APPROVAL_STATUS.find(s => s.id === d.approvalStatus);
-                return (
-                  <tr key={d.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                    <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500 }}>{d.responsible || '—'}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{d.clientName}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.name}</td>
-                    <td style={{ padding: '10px 12px', color: 'var(--muted)' }}>{d.requestingSector || '—'}</td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {status && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${status.color}15`, color: status.color }}>{status.label}</span>}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {d.slaDays !== null ? <SLABadge days={d.slaDays} /> : '—'}
-                    </td>
-                    <td style={{ padding: '10px 12px' }}>
-                      {d.link
-                        ? <a href={d.link} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 12 }}>
-                            <ExternalLink size={12} /> Ver
-                          </a>
-                        : '—'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-  );
+  const sectorTabs = [
+    { key: 'tasks', label: '📋 Tasks', count: filteredTasks.length },
+    { key: 'sm',    label: '📱 Social Media', count: allPosts.length },
+  ];
 
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Extrato de Produção</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Atividades do time de criação</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Atividades do time</p>
       </div>
 
       {/* Filters */}
@@ -122,25 +72,21 @@ export default function AdminFeed({ clients, collaborators }) {
         <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4 }}>
           {DATE_FILTERS.map(f => (
             <button key={f.key} onClick={() => setDateFilter(f.key)}
-              style={{ background: dateFilter === f.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '6px 14px', color: dateFilter === f.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' }}>
+              style={{ background: dateFilter === f.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '6px 14px', color: dateFilter === f.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
               {f.label}
             </button>
           ))}
         </div>
         <select value={collabFilter} onChange={e => setCollabFilter(e.target.value)}
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: collabFilter ? 'var(--text)' : 'var(--muted)', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
+          style={{ background: '#12121f', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: collabFilter ? 'var(--text)' : 'var(--muted)', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
           <option value="">Todos os colaboradores</option>
           {collaborators.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
       </div>
 
-      {/* Sector tabs */}
+      {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
-        {[
-          { key: 'design', label: '🎨 Design',       count: designDeliveries.length },
-          { key: 'video',  label: '🎬 VideoMaker',    count: videoDeliveries.length },
-          { key: 'sm',     label: '📱 Social Media',  count: allPosts.length },
-        ].map(t => (
+        {sectorTabs.map(t => (
           <button key={t.key} onClick={() => setSectorTab(t.key)}
             style={{ background: sectorTab === t.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '7px 16px', color: sectorTab === t.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {t.label}
@@ -149,9 +95,68 @@ export default function AdminFeed({ clients, collaborators }) {
         ))}
       </div>
 
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '4px 0', overflow: 'hidden' }}>
-        {sectorTab === 'design' && renderCreativeTable(designDeliveries)}
-        {sectorTab === 'video'  && renderCreativeTable(videoDeliveries)}
+      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+        {sectorTab === 'tasks' && (
+          filteredTasks.length === 0
+            ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma task no período.</p>
+            : <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      {['Responsável', 'Cliente', 'Task', 'Setor', 'Prioridade', 'Status', 'Tempo', 'Ajustes', 'Links'].map(h => (
+                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.map(t => {
+                      const priority = TASK_PRIORITIES.find(p => p.id === t.priority);
+                      const sector = SECTORS[t.responsibleSector];
+                      const slaDays = t.startedAt && t.completedAt
+                        ? differenceInDays(new Date(t.completedAt), new Date(t.startedAt))
+                        : null;
+                      const statusColors = { todo: 'var(--muted)', doing: 'var(--blue)', approval: 'var(--amber)', done: 'var(--green)' };
+                      const statusLabels = { todo: 'Não Iniciada', doing: 'Em Produção', approval: 'Em Aprovação', done: 'Concluída' };
+                      return (
+                        <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)', background: t.isRework ? 'rgba(245,158,11,.03)' : 'transparent' }}>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                            {t.isRework && <span style={{ fontSize: 9, color: 'var(--amber)', fontFamily: 'var(--fm)', marginRight: 4 }}>🔄</span>}
+                            {t.responsibleName || '—'}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{t.clientName}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {sector && <span style={{ fontSize: 11, color: sector.color }}>{sector.emoji} {sector.label}</span>}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {priority && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `${priority.color}15`, color: priority.color }}>{priority.label}</span>}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `${statusColors[t.status]}15`, color: statusColors[t.status] }}>
+                              {statusLabels[t.status]}
+                            </span>
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {slaDays !== null ? <SLABadge days={slaDays} /> : '—'}
+                          </td>
+                          <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : 'var(--muted)', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
+                            {t.reworkCount || 0}
+                          </td>
+                          <td style={{ padding: '10px 12px' }}>
+                            {t.links?.length > 0
+                              ? <a href={t.links[0]} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 12 }}>
+                                  <ExternalLink size={12} /> Ver
+                                </a>
+                              : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+        )}
+
         {sectorTab === 'sm' && (
           allPosts.length === 0
             ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma atividade no período.</p>
@@ -159,7 +164,7 @@ export default function AdminFeed({ clients, collaborators }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Colaborador', 'Cliente', 'Post', 'Status'].map(h => (
+                      {['Colaborador', 'Cliente', 'Post', 'Data', 'Status'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' }}>{h}</th>
                       ))}
                     </tr>
@@ -172,6 +177,9 @@ export default function AdminFeed({ clients, collaborators }) {
                           <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500 }}>{p.responsible || '—'}</td>
                           <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.clientName}</td>
                           <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.name}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 11, fontFamily: 'var(--fm)' }}>
+                            {p.date ? format(new Date(p.date), 'dd/MM/yy', { locale: ptBR }) : '—'}
+                          </td>
                           <td style={{ padding: '10px 12px' }}>
                             {col && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${col.color}15`, color: col.color }}>{col.label}</span>}
                           </td>

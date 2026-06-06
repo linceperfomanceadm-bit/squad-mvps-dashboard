@@ -1,6 +1,6 @@
 import React from 'react';
 import { differenceInDays } from 'date-fns';
-import { Activity, TrendingUp, Calendar, AlertTriangle, Users } from 'lucide-react';
+import { Activity, TrendingUp, Calendar, AlertTriangle, Users, Kanban } from 'lucide-react';
 import { SECTORS } from '../../lib/firebase';
 
 function StatCard({ icon: Icon, label, value, sub, color }) {
@@ -21,48 +21,45 @@ function StatCard({ icon: Icon, label, value, sub, color }) {
   );
 }
 
-export default function AdminOverview({ clients, collaborators, onNavigate }) {
+export default function AdminOverview({ clients, collaborators, tasks = [], onNavigate }) {
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
-  const allDeliveries = [];
-  clients.forEach(c => {
-    (c.design?.deliveries || []).forEach(d => allDeliveries.push({ ...d, sector: 'design' }));
-    (c.video?.deliveries || []).forEach(d => allDeliveries.push({ ...d, sector: 'video' }));
+  // Tasks metrics
+  const doneTasks = tasks.filter(t => t.status === 'done');
+  const monthDone = doneTasks.filter(t => {
+    const d = new Date(t.completedAt || t.createdAt);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
-  const monthDeliveries = allDeliveries.filter(d => {
-    const date = new Date(d.deliveryDate || d.createdAt);
-    return date.getMonth() === thisMonth && date.getFullYear() === thisYear;
-  });
-  const firstApproval = allDeliveries.filter(d => d.approvalStatus === 'first');
-  const globalApprovalRate = allDeliveries.length > 0 ? Math.round((firstApproval.length / allDeliveries.length) * 100) : 0;
+  const firstApproval = doneTasks.filter(t => t.reworkCount === 0);
+  const globalApprovalRate = doneTasks.length > 0 ? Math.round((firstApproval.length / doneTasks.length) * 100) : 0;
+  const pendingApproval = tasks.filter(t => t.status === 'approval').length;
+  const reworkTasks = tasks.filter(t => t.isRework && t.status !== 'done').length;
 
+  // Social Media posts
   const allPosts = [];
   clients.forEach(c => (c.sm?.posts || []).forEach(p => allPosts.push({ ...p, clientName: c.name })));
   const publishedPosts = allPosts.filter(p => p.status === 'published' || p.status === 'scheduled');
 
+  // WD overdue onboarding
   const wdClients = clients.filter(c => c.wd?.status);
   const overdueOnboarding = wdClients.filter(c => {
     if (c.wd.status !== 'onboarding' || !c.wd.onboardingStartedAt) return false;
     return differenceInDays(now, new Date(c.wd.onboardingStartedAt)) > 7;
   });
 
+  // Stuck SM posts
   const stuckPosts = allPosts.filter(p => {
     if (p.status !== 'client') return false;
     return differenceInDays(now, new Date(p.updatedAt || p.createdAt)) >= 3;
   });
 
+  // Sector breakdown
   const sectorData = Object.values(SECTORS).map(s => {
     const collabCount = collaborators.filter(c => c.sector === s.id && c.active).length;
-    const clientCount = clients.filter(c => {
-      if (s.id === 'webdesign')   return c.wd?.status && c.wd.status !== 'finished' && c.wd.status !== 'inactive';
-      if (s.id === 'socialmedia') return (c.sm?.posts || []).length > 0;
-      if (s.id === 'design')      return (c.design?.deliveries || []).length > 0;
-      if (s.id === 'videomaker')  return (c.video?.deliveries || []).length > 0;
-      return false;
-    }).length;
-    return { ...s, collabCount, clientCount };
+    const activeTasks = tasks.filter(t => t.responsibleSector === s.id && t.status !== 'done').length;
+    return { ...s, collabCount, activeTasks };
   });
 
   return (
@@ -73,16 +70,24 @@ export default function AdminOverview({ clients, collaborators, onNavigate }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12, marginBottom: 20 }}>
-        <StatCard icon={Activity}      label="Entregas (Criação)"          value={monthDeliveries.length}    sub="Design + VideoMaker"  color="var(--neon)" />
-        <StatCard icon={TrendingUp}    label="Taxa de Aprovação Global"     value={`${globalApprovalRate}%`}  sub="De primeira"          color={globalApprovalRate >= 70 ? 'var(--green)' : globalApprovalRate >= 40 ? 'var(--amber)' : 'var(--neon)'} />
-        <StatCard icon={Calendar}      label="Posts Publicados/Agendados"   value={publishedPosts.length}     sub="Social Media"         color="var(--blue)" />
-        <StatCard icon={AlertTriangle} label="Onboardings em Atraso"        value={overdueOnboarding.length}  sub="WebDesign"            color={overdueOnboarding.length > 0 ? 'var(--neon)' : 'var(--green)'} />
-        <StatCard icon={Users}         label="Time Ativo"                   value={collaborators.filter(c => c.active).length} sub="Colaboradores" color="var(--purple)" />
+        <StatCard icon={Activity}      label="Entregas no Mês"          value={monthDone.length}          sub="Tasks concluídas"        color="var(--neon)" />
+        <StatCard icon={TrendingUp}    label="Taxa de Aprovação Global"  value={`${globalApprovalRate}%`}  sub="De primeira"             color={globalApprovalRate >= 70 ? 'var(--green)' : globalApprovalRate >= 40 ? 'var(--amber)' : 'var(--neon)'} />
+        <StatCard icon={Kanban}        label="Aguard. Aprovação"         value={pendingApproval}           sub="Em todos os setores"     color={pendingApproval > 0 ? 'var(--amber)' : 'var(--green)'} />
+        <StatCard icon={Calendar}      label="Posts Social Media"        value={publishedPosts.length}     sub="Publicados/Agendados"    color="var(--blue)" />
+        <StatCard icon={AlertTriangle} label="Onboardings em Atraso"     value={overdueOnboarding.length}  sub="WebDesign"               color={overdueOnboarding.length > 0 ? 'var(--neon)' : 'var(--green)'} />
+        <StatCard icon={Users}         label="Time Ativo"                value={collaborators.filter(c => c.active).length} sub="Colaboradores" color="var(--purple)" />
       </div>
 
-      {(overdueOnboarding.length > 0 || stuckPosts.length > 0) && (
+      {/* Alerts */}
+      {(overdueOnboarding.length > 0 || stuckPosts.length > 0 || reworkTasks > 0) && (
         <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
           <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--neon)', marginBottom: 12 }}>⚠ Alertas</p>
+          {reworkTasks > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
+              <p style={{ fontSize: 13, color: 'var(--text)' }}>Tasks em ajuste/refação</p>
+              <span style={{ fontSize: 11, color: 'var(--amber)', background: 'rgba(245,158,11,.12)', padding: '2px 8px', borderRadius: 6, fontFamily: 'var(--fm)', fontWeight: 600 }}>{reworkTasks}</span>
+            </div>
+          )}
           {overdueOnboarding.map(c => (
             <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
               <div>
@@ -108,9 +113,10 @@ export default function AdminOverview({ clients, collaborators, onNavigate }) {
         </div>
       )}
 
+      {/* Sector cards */}
       <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Setores</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
           {sectorData.map(s => (
             <div key={s.id} style={{ background: `${s.color}08`, border: `1px solid ${s.color}25`, borderRadius: 12, padding: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -123,8 +129,8 @@ export default function AdminOverview({ clients, collaborators, onNavigate }) {
                   <p style={{ fontSize: 11, color: 'var(--muted)' }}>colaboradores</p>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{s.clientCount}</p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>clientes ativos</p>
+                  <p style={{ fontSize: 22, fontWeight: 800, color: s.activeTasks > 0 ? s.color : '#fff' }}>{s.activeTasks}</p>
+                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>tasks ativas</p>
                 </div>
               </div>
             </div>
