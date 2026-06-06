@@ -1,0 +1,167 @@
+import React, { useState } from 'react';
+import { X, Plus, Trash2 } from 'lucide-react';
+import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
+
+export default function CreateTaskModal({ clients, collaborators, currentUser, currentUserSector, onClose, onSave }) {
+  const [form, setForm] = useState({
+    name: '',
+    clientId: '',
+    deadline: '',
+    priority: 'medium',
+    responsibleSector: '',
+    responsibleName: '',
+    comment: '',
+  });
+  const [links, setLinks] = useState(['']);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active);
+
+  const handleAddLink = () => setLinks(l => [...l, '']);
+  const handleLinkChange = (i, v) => setLinks(l => l.map((x, idx) => idx === i ? v : x));
+  const handleRemoveLink = (i) => setLinks(l => l.filter((_, idx) => idx !== i));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) { setError('Preencha o nome da task.'); return; }
+    if (!form.clientId) { setError('Selecione o cliente.'); return; }
+    if (!form.responsibleSector) { setError('Selecione o setor responsável.'); return; }
+    if (!form.responsibleName) { setError('Selecione o colaborador responsável.'); return; }
+    setLoading(true);
+    const client = clients.find(c => c.id === form.clientId);
+    const validLinks = links.filter(l => l.trim());
+    const res = await onSave({
+      ...form,
+      clientName: client?.name || '',
+      links: validLinks,
+      requestedBy: currentUser,
+      requestedBySector: currentUserSector,
+    });
+    setLoading(false);
+    if (res.success) onClose();
+    else setError(res.error || 'Erro ao criar task.');
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={e => e.stopPropagation()} className="fade-up">
+        <div style={S.header}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={S.icon}><Plus size={18} color="var(--neon)" /></div>
+            <h2 style={S.title}>Nova Task</h2>
+          </div>
+          <button style={S.closeBtn} onClick={onClose}><X size={16} color="var(--muted)" /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} style={S.body}>
+          {/* Name */}
+          <div style={S.field}>
+            <label style={S.label}>NOME DA TASK *</label>
+            <input style={S.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Criar banner para campanha de Black Friday" autoFocus />
+          </div>
+
+          {/* Client + Deadline */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={S.field}>
+              <label style={S.label}>CLIENTE *</label>
+              <select style={S.select} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
+                <option value="">Selecionar cliente</option>
+                {clients.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>PRAZO</label>
+              <input style={S.input} type="date" value={form.deadline} onChange={e => set('deadline', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Priority */}
+          <div style={S.field}>
+            <label style={S.label}>PRIORIDADE *</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {TASK_PRIORITIES.map(p => (
+                <button type="button" key={p.id}
+                  style={{ flex: 1, background: form.priority === p.id ? `${p.color}18` : 'var(--surface)', border: `1px solid ${form.priority === p.id ? `${p.color}40` : 'var(--border)'}`, borderRadius: 8, padding: '8px 6px', color: form.priority === p.id ? p.color : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' }}
+                  onClick={() => set('priority', p.id)}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sector + Responsible */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div style={S.field}>
+              <label style={S.label}>SETOR RESPONSÁVEL *</label>
+              <select style={S.select} value={form.responsibleSector} onChange={e => { set('responsibleSector', e.target.value); set('responsibleName', ''); }}>
+                <option value="">Selecionar setor</option>
+                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+              </select>
+            </div>
+            <div style={S.field}>
+              <label style={S.label}>COLABORADOR RESPONSÁVEL *</label>
+              <select style={S.select} value={form.responsibleName} onChange={e => set('responsibleName', e.target.value)} disabled={!form.responsibleSector}>
+                <option value="">Selecionar colaborador</option>
+                {sectorCollabs(form.responsibleSector).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Links */}
+          <div style={S.field}>
+            <label style={S.label}>LINKS DO MATERIAL (OPCIONAL)</label>
+            {links.map((link, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                <input style={{ ...S.input, flex: 1 }} value={link} onChange={e => handleLinkChange(i, e.target.value)} placeholder="https://drive.google.com/..." />
+                {links.length > 1 && (
+                  <button type="button" style={{ background: 'rgba(238,51,99,.08)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => handleRemoveLink(i)}>
+                    <Trash2 size={13} />
+                  </button>
+                )}
+              </div>
+            ))}
+            <button type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 7, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }} onClick={handleAddLink}>
+              <Plus size={13} /> Adicionar link
+            </button>
+          </div>
+
+          {/* Comment */}
+          <div style={S.field}>
+            <label style={S.label}>COMENTÁRIO INICIAL (OPCIONAL)</label>
+            <textarea style={{ ...S.input, minHeight: 72, resize: 'vertical' }} value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="Descreva detalhes, referências ou instruções para o responsável..." />
+          </div>
+
+          {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
+
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+            <button type="button" style={S.cancelBtn} onClick={onClose}>Cancelar</button>
+            <button type="submit" style={S.submitBtn} disabled={loading}>
+              {loading
+                ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} />
+                : 'Criar Task'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+const S = {
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 },
+  modal: { background: '#0e0e1c', border: '1px solid var(--neon-border)', borderRadius: 18, width: '100%', maxWidth: 580, maxHeight: '92vh', overflow: 'auto', boxShadow: '0 24px 80px rgba(0,0,0,.7)' },
+  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' },
+  icon: { width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 18, fontWeight: 700, color: '#fff' },
+  closeBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  body: { padding: 22, display: 'flex', flexDirection: 'column', gap: 16 },
+  field: { display: 'flex', flexDirection: 'column', gap: 7 },
+  label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
+  input: { background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
+  submitBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
+};
