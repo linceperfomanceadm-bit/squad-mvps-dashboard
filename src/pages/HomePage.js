@@ -81,7 +81,7 @@ export default function HomePage() {
 
       <div style={S.content}>
         <div style={{ textAlign: 'center' }}>
-          <h1 style={S.title}>Squad <span style={{ color: 'var(--neon)' }}>MVPs</span></h1>
+          <img src="/agencia.png" alt="Logo" style={{ width: 180, objectFit: 'contain', marginBottom: 8 }} />
           <p style={S.sub}>Selecione seu setor para acessar o dashboard</p>
         </div>
 
