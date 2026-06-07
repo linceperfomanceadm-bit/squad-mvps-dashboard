@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Plus, Trash2, ExternalLink, Check, AlertTriangle } from 'lucide-react';
+import { X, Send, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
@@ -27,8 +27,8 @@ function CompletionPopup({ task, onClose }) {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 24 }}>
           {[
-            { label: 'Criada', value: created?.at ? format(new Date(created.at), "dd/MM HH:mm") : '—' },
-            { label: 'Iniciada', value: started?.at ? format(new Date(started.at), "dd/MM HH:mm") : '—' },
+            { label: 'Criada',    value: created?.at   ? format(new Date(created.at),   "dd/MM HH:mm") : '—' },
+            { label: 'Iniciada',  value: started?.at   ? format(new Date(started.at),   "dd/MM HH:mm") : '—' },
             { label: 'Concluída', value: completed?.at ? format(new Date(completed.at), "dd/MM HH:mm") : '—' },
           ].map(item => (
             <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 8px' }}>
@@ -72,7 +72,6 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const chatEndRef = useRef(null);
 
   const isResponsible = task.responsibleName === currentUser;
-  const isRequester = task.requestedBy === currentUser;
   const priority = TASK_PRIORITIES.find(p => p.id === task.priority);
   const responsibleSector = SECTORS[task.responsibleSector];
 
@@ -149,7 +148,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               </p>
             </div>
             <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-              {(isRequester || currentUser === 'admin') && task.status !== 'done' && (
+              {(task.requestedBy === currentUser || currentUser === 'admin') && task.status !== 'done' && (
                 <button style={S.deleteBtn} onClick={() => setShowDeleteConfirm(true)}><Trash2 size={14} /></button>
               )}
               <button style={S.closeBtn} onClick={onClose}><X size={16} /></button>
@@ -159,7 +158,6 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
           <div style={S.body}>
             {/* Left column */}
             <div style={S.left}>
-              {/* Info grid */}
               <div style={S.infoGrid}>
                 <div style={S.infoItem}>
                   <span style={S.infoLabel}>RESPONSÁVEL</span>
@@ -213,14 +211,12 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <p style={S.secLabel}>AÇÕES</p>
 
-                  {/* Move to production */}
                   {task.status === 'todo' && isResponsible && (
                     <button style={S.actionBtn('#38bdf8')} onClick={() => onMoveToProduction(task.id, links)}>
                       ▶ Iniciar — Mover para Em Produção
                     </button>
                   )}
 
-                  {/* Send for approval */}
                   {task.status === 'doing' && isResponsible && !showApprovalForm && (
                     <button style={S.actionBtn('#f59e0b')} onClick={() => setShowApprovalForm(true)}>
                       ✓ Concluí — Enviar para Aprovação
@@ -242,25 +238,18 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                           </select>
                         )}
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button style={{ ...S.actionBtn('#f59e0b'), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>
-                            Confirmar Envio
-                          </button>
+                          <button style={{ ...S.actionBtn('#f59e0b'), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>Confirmar Envio</button>
                           <button style={S.cancelBtn} onClick={() => setShowApprovalForm(false)}>Cancelar</button>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Approve or reject */}
                   {task.status === 'approval' && isResponsible && (
                     <>
-                      <button style={S.actionBtn('#22c55e')} onClick={handleApprove}>
-                        ✓ Aprovar e Concluir Task
-                      </button>
+                      <button style={S.actionBtn('#22c55e')} onClick={handleApprove}>✓ Aprovar e Concluir Task</button>
                       {!showRejectForm && (
-                        <button style={S.actionBtn('#EE3363')} onClick={() => setShowRejectForm(true)}>
-                          ✕ Reprovar — Solicitar Ajuste
-                        </button>
+                        <button style={S.actionBtn('#EE3363')} onClick={() => setShowRejectForm(true)}>✕ Reprovar — Solicitar Ajuste</button>
                       )}
                     </>
                   )}
@@ -268,12 +257,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   {showRejectForm && (
                     <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14 }}>
                       <p style={{ fontSize: 12, color: 'var(--neon)', marginBottom: 10, fontWeight: 600 }}>Descreva o que precisa ser ajustado *</p>
-                      <textarea
-                        style={{ ...S.input, minHeight: 80, resize: 'vertical', marginBottom: 10 }}
-                        value={reworkNote}
-                        onChange={e => setReworkNote(e.target.value)}
-                        placeholder="Explique detalhadamente o que precisa ser alterado..."
-                      />
+                      <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical', marginBottom: 10 }} value={reworkNote} onChange={e => setReworkNote(e.target.value)} placeholder="Explique detalhadamente o que precisa ser alterado..." />
                       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Quem vai fazer o ajuste?</p>
                       <select style={{ ...S.select, marginBottom: 8 }} value={newResponsible.sector} onChange={e => setNewResponsible({ sector: e.target.value, name: '' })}>
                         <option value="">Selecionar setor</option>
@@ -286,9 +270,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                         </select>
                       )}
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={handleReject} disabled={!reworkNote.trim() || !newResponsible.name}>
-                          Enviar para Ajuste
-                        </button>
+                        <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={handleReject} disabled={!reworkNote.trim() || !newResponsible.name}>Enviar para Ajuste</button>
                         <button style={S.cancelBtn} onClick={() => setShowRejectForm(false)}>Cancelar</button>
                       </div>
                     </div>
@@ -296,14 +278,11 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 </div>
               )}
 
-              {/* Delete confirm */}
               {showDeleteConfirm && (
                 <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 10 }}>
                   <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>
-                      Sim, excluir
-                    </button>
+                    <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
                     <button style={S.cancelBtn} onClick={() => setShowDeleteConfirm(false)}>Não</button>
                   </div>
                 </div>
@@ -318,12 +297,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Nenhum comentário ainda.</p>
                 )}
                 {(task.comments || []).map(c => (
-                  <div key={c.id} style={{
-                    marginBottom: 10,
-                    background: c.isRework ? 'rgba(245,158,11,.06)' : 'var(--surface)',
-                    border: `1px solid ${c.isRework ? 'var(--amber-b)' : 'var(--border)'}`,
-                    borderRadius: 8, padding: '9px 12px',
-                  }}>
+                  <div key={c.id} style={{ marginBottom: 10, background: c.isRework ? 'rgba(245,158,11,.06)' : 'var(--surface)', border: `1px solid ${c.isRework ? 'var(--amber-b)' : 'var(--border)'}`, borderRadius: 8, padding: '9px 12px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: c.isRework ? 'var(--amber)' : 'var(--neon)' }}>{c.author}</span>
                       <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
@@ -336,16 +310,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 <div ref={chatEndRef} />
               </div>
               <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                <input
-                  style={{ ...S.input, flex: 1 }}
-                  value={comment}
-                  onChange={e => setComment(e.target.value)}
-                  placeholder="Escreva um comentário..."
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendComment()}
-                />
-                <button style={S.sendBtn} onClick={handleSendComment} disabled={!comment.trim()}>
-                  <Send size={15} />
-                </button>
+                <input style={{ ...S.input, flex: 1 }} value={comment} onChange={e => setComment(e.target.value)} placeholder="Escreva um comentário..." onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendComment()} />
+                <button style={S.sendBtn} onClick={handleSendComment} disabled={!comment.trim()}><Send size={15} /></button>
               </div>
             </div>
           </div>
