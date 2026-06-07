@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Kanban, Users } from 'lucide-react';
+import { LayoutDashboard, Kanban } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -27,13 +27,12 @@ function GenericOverview({ myTasks, sectorId }) {
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>{SECTORS[sectorId]?.label}</p>
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Tasks Ativas',        value: active.length,          color },
-          { label: 'Aguard. Aprovação',    value: pendingApproval.length, color: pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)' },
-          { label: 'Concluídas',          value: done.length,            color: 'var(--green)' },
-          { label: 'Em Ajuste',           value: rework.length,          color: rework.length > 0 ? 'var(--amber)' : 'var(--muted)' },
+          { label: 'Tasks Ativas',       value: active.length,          color },
+          { label: 'Aguard. Aprovação',   value: pendingApproval.length, color: pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)' },
+          { label: 'Concluídas',         value: done.length,            color: 'var(--green)' },
+          { label: 'Em Ajuste',          value: rework.length,          color: rework.length > 0 ? 'var(--amber)' : 'var(--muted)' },
         ].map(s => (
           <div key={s.label} style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${s.color},transparent)` }} />
@@ -43,7 +42,6 @@ function GenericOverview({ myTasks, sectorId }) {
         ))}
       </div>
 
-      {/* My active tasks list */}
       <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
         {active.length === 0 ? (
@@ -80,7 +78,6 @@ function GenericOverview({ myTasks, sectorId }) {
   );
 }
 
-// Used for CS, Trafego, Comercial
 export default function GenericSectorDashboard({ sectorId }) {
   const { user } = useAuth();
   const { toast } = useToast();
