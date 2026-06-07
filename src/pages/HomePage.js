@@ -9,9 +9,9 @@ const SECTORS = [
   { id: 'videomaker',  label: 'VideoMaker',   route: '/login/videomaker',  color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
   { id: 'socialmedia', label: 'Social Media', route: '/login/socialmedia', color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
   { id: 'design',      label: 'Design',       route: '/login/design',      color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
-  { id: 'cs',          label: 'CS',           route: '/login/cs',          color: '#22c55e', emoji: '🎧', logo: '/logos/cs.png' },
-  { id: 'trafego',     label: 'Tráfego Pago', route: '/login/trafego',     color: '#f59e0b', emoji: '📊', logo: '/logos/trafego.png' },
-  { id: 'comercial',   label: 'Comercial',    route: '/login/comercial',   color: '#e879f9', emoji: '💼', logo: '/logos/comercial.png' },
+  { id: 'cs',          label: 'CS',           route: '/login/cs',          color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
+  { id: 'trafego',     label: 'Tráfego Pago', route: '/login/trafego',     color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
+  { id: 'comercial',   label: 'Comercial',    route: '/login/comercial',   color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
 ];
 
 export default function HomePage() {
