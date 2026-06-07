@@ -8,10 +8,10 @@ import { useAuth } from '../contexts/AuthContext';
 // 1. Coloque o arquivo PNG em /public/logos/ (ex: /public/logos/webdesign.png)
 // 2. Atualize o campo `logo` abaixo (ex: logo: '/logos/webdesign.png')
 const SECTOR_CONFIG = {
-  webdesign:   { label: 'WebDesign',    color: '#EE3363', emoji: '🌐', logo: '/logos/webdesign.png' },
-  design:      { label: 'Design',       color: '#a78bfa', emoji: '🎨', logo: '/logos/design.png' },
-  socialmedia: { label: 'Social Media', color: '#38bdf8', emoji: '📱', logo: '/logos/socialmedia.png' },
-  videomaker:  { label: 'VideoMaker',   color: '#fb923c', emoji: '🎬', logo: '/logos/videomaker.png' },
+  webdesign:   { label: 'WebDesign',    color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
+  design:      { label: 'Design',       color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
+  socialmedia: { label: 'Social Media', color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
+  videomaker:  { label: 'VideoMaker',   color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
   cs:          { label: 'CS',           color: '#22c55e', emoji: '🎧', logo: '/logos/cs.png' },
   trafego:     { label: 'Tráfego Pago', color: '#f59e0b', emoji: '📊', logo: '/logos/trafego.png' },
   comercial:   { label: 'Comercial',    color: '#e879f9', emoji: '💼', logo: '/logos/comercial.png' },
