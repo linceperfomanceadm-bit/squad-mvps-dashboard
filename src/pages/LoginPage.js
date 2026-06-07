@@ -8,14 +8,14 @@ import { useAuth } from '../contexts/AuthContext';
 // 1. Coloque o arquivo PNG em /public/logos/ (ex: /public/logos/webdesign.png)
 // 2. Atualize o campo `logo` abaixo (ex: logo: '/logos/webdesign.png')
 const SECTOR_CONFIG = {
-  webdesign:   { label: 'WebDesign',    color: '#EE3363', emoji: '🌐', logo: null },
-  design:      { label: 'Design',       color: '#a78bfa', emoji: '🎨', logo: null },
-  socialmedia: { label: 'Social Media', color: '#38bdf8', emoji: '📱', logo: null },
-  videomaker:  { label: 'VideoMaker',   color: '#fb923c', emoji: '🎬', logo: null },
-  cs:          { label: 'CS',           color: '#22c55e', emoji: '🎧', logo: null },
-  trafego:     { label: 'Tráfego Pago', color: '#f59e0b', emoji: '📊', logo: null },
-  comercial:   { label: 'Comercial',    color: '#e879f9', emoji: '💼', logo: null },
-  admin:       { label: 'Admin',        color: '#EE3363', emoji: '👑', logo: null },
+  webdesign:   { label: 'WebDesign',    color: '#EE3363', emoji: '🌐', logo: '/logos/webdesign.png' },
+  design:      { label: 'Design',       color: '#a78bfa', emoji: '🎨', logo: '/logos/design.png' },
+  socialmedia: { label: 'Social Media', color: '#38bdf8', emoji: '📱', logo: '/logos/socialmedia.png' },
+  videomaker:  { label: 'VideoMaker',   color: '#fb923c', emoji: '🎬', logo: '/logos/videomaker.png' },
+  cs:          { label: 'CS',           color: '#22c55e', emoji: '🎧', logo: '/logos/cs.png' },
+  trafego:     { label: 'Tráfego Pago', color: '#f59e0b', emoji: '📊', logo: '/logos/trafego.png' },
+  comercial:   { label: 'Comercial',    color: '#e879f9', emoji: '💼', logo: '/logos/comercial.png' },
+  admin:       { label: 'Admin',        color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' },
 };
 
 export default function LoginPage() {
