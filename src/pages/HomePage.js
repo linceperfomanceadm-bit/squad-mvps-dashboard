@@ -5,13 +5,13 @@ import { useNavigate } from 'react-router-dom';
 // Para trocar a logo: coloque o arquivo em /public/logos/ e atualize o campo `logo`
 // Ex: logo: '/logos/webdesign.png'
 const SECTORS = [
-  { id: 'webdesign',   label: 'WebDesign',    route: '/login/webdesign',   color: '#EE3363', emoji: '🌐', logo: null },
-  { id: 'videomaker',  label: 'VideoMaker',   route: '/login/videomaker',  color: '#fb923c', emoji: '🎬', logo: null },
-  { id: 'socialmedia', label: 'Social Media', route: '/login/socialmedia', color: '#38bdf8', emoji: '📱', logo: null },
-  { id: 'design',      label: 'Design',       route: '/login/design',      color: '#a78bfa', emoji: '🎨', logo: null },
-  { id: 'cs',          label: 'CS',           route: '/login/cs',          color: '#22c55e', emoji: '🎧', logo: null },
-  { id: 'trafego',     label: 'Tráfego Pago', route: '/login/trafego',     color: '#f59e0b', emoji: '📊', logo: null },
-  { id: 'comercial',   label: 'Comercial',    route: '/login/comercial',   color: '#e879f9', emoji: '💼', logo: null },
+  { id: 'webdesign',   label: 'WebDesign',    route: '/login/webdesign',   color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
+  { id: 'videomaker',  label: 'VideoMaker',   route: '/login/videomaker',  color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
+  { id: 'socialmedia', label: 'Social Media', route: '/login/socialmedia', color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
+  { id: 'design',      label: 'Design',       route: '/login/design',      color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
+  { id: 'cs',          label: 'CS',           route: '/login/cs',          color: '#22c55e', emoji: '🎧', logo: '/logos/cs.png' },
+  { id: 'trafego',     label: 'Tráfego Pago', route: '/login/trafego',     color: '#f59e0b', emoji: '📊', logo: '/logos/trafego.png' },
+  { id: 'comercial',   label: 'Comercial',    route: '/login/comercial',   color: '#e879f9', emoji: '💼', logo: '/logos/comercial.png' },
 ];
 
 export default function HomePage() {
