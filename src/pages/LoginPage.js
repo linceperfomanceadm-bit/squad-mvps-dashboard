@@ -12,9 +12,9 @@ const SECTOR_CONFIG = {
   design:      { label: 'Design',       color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
   socialmedia: { label: 'Social Media', color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
   videomaker:  { label: 'VideoMaker',   color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
-  cs:          { label: 'CS',           color: '#22c55e', emoji: '🎧', logo: '/logos/cs.png' },
-  trafego:     { label: 'Tráfego Pago', color: '#f59e0b', emoji: '📊', logo: '/logos/trafego.png' },
-  comercial:   { label: 'Comercial',    color: '#e879f9', emoji: '💼', logo: '/logos/comercial.png' },
+  cs:          { label: 'CS',           color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
+  trafego:     { label: 'Tráfego Pago', color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
+  comercial:   { label: 'Comercial',    color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
   admin:       { label: 'Admin',        color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' },
 };
 
