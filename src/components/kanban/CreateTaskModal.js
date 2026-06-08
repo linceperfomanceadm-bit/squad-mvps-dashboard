@@ -205,17 +205,17 @@ const S = {
   overlay: {
     position: 'fixed', inset: 0,
     background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(10px)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 2000, padding: '20px',
+    display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+    zIndex: 2000,
     overflowY: 'auto',
+    padding: '40px 20px',
   },
   modal: {
     background: '#0e0e1c', border: '1px solid var(--neon-border)',
     borderRadius: 18, width: '100%', maxWidth: 580,
     boxShadow: '0 24px 80px rgba(0,0,0,.7)',
     display: 'flex', flexDirection: 'column',
-    maxHeight: 'calc(100vh - 40px)',
-    margin: 'auto',
+    flexShrink: 0,
   },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -234,8 +234,6 @@ const S = {
   },
   body: {
     padding: 22,
-    overflowY: 'auto',
-    flex: 1,
   },
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: {
