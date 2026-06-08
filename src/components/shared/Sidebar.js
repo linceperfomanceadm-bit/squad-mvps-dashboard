@@ -12,7 +12,10 @@ export default function Sidebar({ navItems, activeKey, onNav, onAddClient, secto
     <aside style={{ ...S.sb, borderColor: `${color}22` }}>
       <div style={S.logo}>
         <div style={{ ...S.logoIcon, background: `${color}18`, border: `1px solid ${color}40`, boxShadow: `0 0 16px ${color}30` }}>
-          <span style={{ fontSize: 20 }}>{sector?.emoji || '⚡'}</span>
+          {sector?.logo
+  ? <img src={sector.logo} alt={sector.label} style={{ width: 26, height: 26, objectFit: 'contain' }} />
+  : <span style={{ fontSize: 20 }}>{sector?.emoji}</span>
+}
         </div>
         <div>
           <div style={S.logoText}>{sector?.label || 'Dashboard'}</div>
