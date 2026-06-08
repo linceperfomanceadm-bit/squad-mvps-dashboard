@@ -15,13 +15,13 @@ export const db = getFirestore(app);
 
 // ─── Sectors ──────────────────────────────────────────────────
 export const SECTORS = {
-  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#EE3363', emoji: '🌐', logo: null },
-  design:      { id: 'design',      label: 'Design',        color: '#a78bfa', emoji: '🎨', logo: null },
-  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#38bdf8', emoji: '📱', logo: null },
-  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#fb923c', emoji: '🎬', logo: null },
-  cs:          { id: 'cs',          label: 'CS',            color: '#22c55e', emoji: '🎧', logo: null },
-  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#f59e0b', emoji: '📊', logo: null },
-  comercial:   { id: 'comercial',   label: 'Comercial',     color: '#e879f9', emoji: '💼', logo: null },
+  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
+  design:      { id: 'design',      label: 'Design',        color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
+  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
+  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
+  cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
+  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
+  comercial:   { id: 'comercial',   label: 'Comercial',     color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
 };
 
 // ─── WebDesign service config ─────────────────────────────────
