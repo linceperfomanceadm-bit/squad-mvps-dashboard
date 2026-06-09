@@ -26,7 +26,9 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
+  const userName = myTasks?.[0]?.responsibleName; // used for personal metric
 
+  // Use deliveredBy for "done" metrics — who actually did the work
   const doneTasks = tasks.filter(t => t.status === 'done');
 
   const monthDone = doneTasks.filter(t => {
@@ -34,19 +36,25 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
 
+  // First approval = no rework
   const firstApproval = doneTasks.filter(t => t.reworkCount === 0);
-  const pctFirst = doneTasks.length > 0 ? Math.round((firstApproval.length / doneTasks.length) * 100) : 0;
+  const pctFirst = doneTasks.length > 0
+    ? Math.round((firstApproval.length / doneTasks.length) * 100)
+    : 0;
 
+  // Avg time: from startedAt to completedAt
   const avgDays = (() => {
     const withDates = doneTasks.filter(t => t.startedAt && t.completedAt);
     if (!withDates.length) return 0;
-    const total = withDates.reduce((sum, t) => sum + Math.max(0, differenceInDays(new Date(t.completedAt), new Date(t.startedAt))), 0);
+    const total = withDates.reduce((sum, t) =>
+      sum + Math.max(0, differenceInDays(new Date(t.completedAt), new Date(t.startedAt))), 0);
     return (total / withDates.length).toFixed(1);
   })();
 
-  // My active tasks
   const myActiveTasks = (myTasks || []).filter(t => t.status !== 'done');
-  const pendingApproval = (myTasks || []).filter(t => t.status === 'approval');
+  const pendingApproval = (myTasks || []).filter(
+    t => t.status === 'approval' && t.responsibleName === userName
+  );
 
   return (
     <div className="fade-up">
@@ -56,10 +64,10 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 28 }}>
-        <StatCard icon={Package} label="Entregas no Mês" value={monthDone.length} color={color} />
-        <StatCard icon={Clock} label="Tempo Médio" value={`${avgDays}d`} sub="por entrega" color={color} />
-        <StatCard icon={Star} label="Aprovação de Primeira" value={`${pctFirst}%`} sub={`${firstApproval.length} tasks`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
-        <StatCard icon={Kanban} label="Pendentes Aprovação" value={pendingApproval.length} sub="aguardando ok" color={pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)'} />
+        <StatCard icon={Package} label="Entregas no Mês"        value={monthDone.length}     color={color} />
+        <StatCard icon={Clock}   label="Tempo Médio"            value={`${avgDays}d`}        sub="por entrega" color={color} />
+        <StatCard icon={Star}    label="Aprovação de Primeira"  value={`${pctFirst}%`}       sub={`${firstApproval.length} tasks`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
+        <StatCard icon={Kanban}  label="Pendentes Aprovação"    value={pendingApproval.length} sub="aguardando ok" color={pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)'} />
       </div>
 
       {/* My active tasks */}
@@ -82,13 +90,15 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
                   </div>
                   <p style={{ fontSize: 11, color: 'var(--muted)' }}>{t.clientName}</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {priority && (
                     <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `${priority.color}15`, color: priority.color, fontFamily: 'var(--fm)' }}>
                       {priority.label}
                     </span>
                   )}
-                  {isOverdue && <span style={{ fontSize: 10, color: 'var(--neon)', fontWeight: 700, fontFamily: 'var(--fm)' }}>ATRASADA</span>}
+                  {isOverdue && (
+                    <span style={{ fontSize: 10, color: 'var(--neon)', fontWeight: 700, fontFamily: 'var(--fm)' }}>ATRASADA</span>
+                  )}
                 </div>
               </div>
             );
