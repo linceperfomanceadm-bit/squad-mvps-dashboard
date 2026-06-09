@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Plus } from 'lucide-react';
 import { TASK_COLUMNS } from '../../lib/firebase';
 import TaskCard from './TaskCard';
@@ -9,23 +9,101 @@ export default function TaskKanban({
   tasks, clients, collaborators,
   currentUser, currentUserSector,
   isAdmin = false,
-  adminFilters = null, // { sector, collaborator } — only for admin view
+  adminFilters = null,
   onCreateTask, onMoveToProduction, onMoveToApproval,
   onApprove, onReject, onAddComment, onUpdateLinks, onDelete,
 }) {
   const [selectedTask, setSelectedTask] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [draggingId, setDraggingId] = useState(null);
+  const [dragOverCol, setDragOverCol] = useState(null);
+  const dragTask = useRef(null);
 
-  // Filter tasks visible to this user (unless admin)
+  // Filter tasks visible to this user
   const visibleTasks = isAdmin
     ? tasks.filter(t => {
         if (adminFilters?.sector && t.responsibleSector !== adminFilters.sector && t.requestedBySector !== adminFilters.sector) return false;
         if (adminFilters?.collaborator && t.responsibleName !== adminFilters.collaborator && t.requestedBy !== adminFilters.collaborator) return false;
         return true;
       })
-    : tasks.filter(t => t.responsibleName === currentUser || t.requestedBy === currentUser);
+    : tasks.filter(t =>
+        t.responsibleName === currentUser ||
+        t.requestedBy === currentUser ||
+        t.deliveredBy === currentUser
+      );
 
   const tasksByColumn = (colId) => visibleTasks.filter(t => t.status === colId);
+
+  // ── Drag handlers ─────────────────────────────────────────────
+  const handleDragStart = (e, task) => {
+    draggingId && setDraggingId(null);
+    dragTask.current = task;
+    setDraggingId(task.id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverCol(null);
+    dragTask.current = null;
+  };
+
+  const handleDragOver = (e, colId) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverCol(colId);
+  };
+
+  const handleDrop = async (e, targetColId) => {
+    e.preventDefault();
+    const task = dragTask.current;
+    setDraggingId(null);
+    setDragOverCol(null);
+    dragTask.current = null;
+
+    if (!task || task.status === targetColId) return;
+
+    // Only allow valid forward movements (except admin who can move freely)
+    const colOrder = ['todo', 'doing', 'approval', 'done'];
+    const fromIdx = colOrder.indexOf(task.status);
+    const toIdx = colOrder.indexOf(targetColId);
+
+    // Rules: only responsible can drag their task; requester can drag from approval→doing (reject) or approval→done (approve)
+    const isResponsible = task.responsibleName === currentUser;
+    const isRequester = task.requestedBy === currentUser;
+
+    if (!isAdmin && !isResponsible && !isRequester) return;
+
+    // todo → doing: start task
+    if (task.status === 'todo' && targetColId === 'doing' && (isResponsible || isAdmin)) {
+      await onMoveToProduction(task.id, task.links);
+      return;
+    }
+
+    // doing → approval: requires selecting approver — open modal instead
+    if (task.status === 'doing' && targetColId === 'approval' && (isResponsible || isAdmin)) {
+      setSelectedTask(task);
+      return;
+    }
+
+    // approval → done: approve
+    if (task.status === 'approval' && targetColId === 'done' && (isResponsible || isAdmin)) {
+      await onApprove(task.id);
+      return;
+    }
+
+    // approval → doing: reject — open modal to write rework note
+    if (task.status === 'approval' && targetColId === 'doing' && (isResponsible || isAdmin)) {
+      setSelectedTask(task);
+      return;
+    }
+
+    // Admin can move backwards freely
+    if (isAdmin && toIdx < fromIdx) {
+      setSelectedTask(task);
+      return;
+    }
+  };
 
   return (
     <div className="fade-up">
@@ -46,13 +124,7 @@ export default function TaskKanban({
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'linear-gradient(135deg,var(--neon),#c41f4a)',
-            border: 'none', borderRadius: 10, padding: '10px 18px',
-            color: '#fff', fontSize: 13, fontWeight: 700,
-            boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer',
-          }}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
         >
           <Plus size={15} /> Nova Task
         </button>
@@ -63,16 +135,22 @@ export default function TaskKanban({
         {TASK_COLUMNS.map(col => {
           const colTasks = tasksByColumn(col.id);
           const reworkCount = colTasks.filter(t => t.isRework).length;
+          const isDragTarget = dragOverCol === col.id;
+
           return (
             <div
               key={col.id}
               style={{
-                background: 'rgba(12,12,24,.6)',
-                border: `1px solid ${col.color}18`,
+                background: isDragTarget ? `${col.color}08` : 'rgba(12,12,24,.6)',
+                border: `1px solid ${isDragTarget ? `${col.color}40` : `${col.color}18`}`,
                 borderRadius: 12,
                 padding: '12px 10px',
                 minHeight: 200,
+                transition: 'all .15s ease',
               }}
+              onDragOver={e => handleDragOver(e, col.id)}
+              onDragLeave={() => setDragOverCol(null)}
+              onDrop={e => handleDrop(e, col.id)}
             >
               {/* Column header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
@@ -91,18 +169,36 @@ export default function TaskKanban({
                 </div>
               </div>
 
+              {/* Drop hint */}
+              {isDragTarget && draggingId && (
+                <div style={{ border: `2px dashed ${col.color}50`, borderRadius: 8, padding: '12px', marginBottom: 8, textAlign: 'center' }}>
+                  <span style={{ fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>Soltar aqui</span>
+                </div>
+              )}
+
               {/* Tasks */}
-              {colTasks.length === 0 ? (
+              {colTasks.length === 0 && !isDragTarget ? (
                 <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>
                   Vazio
                 </p>
               ) : (
                 colTasks.map(task => (
-                  <TaskCard
+                  <div
                     key={task.id}
-                    task={task}
-                    onClick={() => setSelectedTask(task)}
-                  />
+                    draggable
+                    onDragStart={e => handleDragStart(e, task)}
+                    onDragEnd={handleDragEnd}
+                    style={{
+                      opacity: draggingId === task.id ? 0.4 : 1,
+                      cursor: 'grab',
+                      transition: 'opacity .15s',
+                    }}
+                  >
+                    <TaskCard
+                      task={task}
+                      onClick={() => setSelectedTask(task)}
+                    />
+                  </div>
                 ))
               )}
             </div>
