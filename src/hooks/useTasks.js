@@ -29,6 +29,9 @@ export function useTasks() {
         priority,
         responsibleSector,
         responsibleName,
+        // deliveredBy tracks who actually did the work (set when moved to approval)
+        deliveredBy: null,
+        deliveredBySector: null,
         requestedBy,
         requestedBySector,
         status: 'todo',
@@ -42,7 +45,6 @@ export function useTasks() {
           text: comment,
           createdAt: now,
         }] : [],
-        // Timeline: tracks who had the task and for how long
         timeline: [{
           action: 'created',
           by: requestedBy,
@@ -64,7 +66,12 @@ export function useTasks() {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       const now = new Date().toISOString();
-      const timeline = [...(task.timeline || []), { action: 'started', by: task.responsibleName, sector: task.responsibleSector, at: now }];
+      const timeline = [...(task.timeline || []), {
+        action: 'started',
+        by: task.responsibleName,
+        sector: task.responsibleSector,
+        at: now,
+      }];
       await updateDoc(doc(db, 'tasks', taskId), {
         status: 'doing',
         startedAt: task.startedAt || now,
@@ -76,6 +83,7 @@ export function useTasks() {
   };
 
   // ── Move to Em Aprovação ─────────────────────────────────────
+  // deliveredBy = who actually did the work (current responsible before handoff)
   const moveToApproval = async (taskId, approverName, approverSector, updatedLinks) => {
     try {
       const task = tasks.find(t => t.id === taskId);
@@ -91,6 +99,9 @@ export function useTasks() {
       await updateDoc(doc(db, 'tasks', taskId), {
         status: 'approval',
         approvalAt: now,
+        // Save who delivered before changing responsible to approver
+        deliveredBy: task.responsibleName,
+        deliveredBySector: task.responsibleSector,
         responsibleName: approverName,
         responsibleSector: approverSector,
         links: updatedLinks || task.links,
@@ -129,7 +140,6 @@ export function useTasks() {
       if (!task) throw new Error('Task não encontrada');
       const now = new Date().toISOString();
       const reworkCount = (task.reworkCount || 0) + 1;
-      // Add rework note as a comment
       const reworkComment = {
         id: `c_${Date.now()}`,
         author: task.responsibleName,
@@ -151,6 +161,9 @@ export function useTasks() {
         reworkCount,
         responsibleName: newResponsibleName,
         responsibleSector: newResponsibleSector,
+        // Reset deliveredBy so next approval cycle tracks correctly
+        deliveredBy: null,
+        deliveredBySector: null,
         comments: [...(task.comments || []), reworkComment],
         timeline,
       });
@@ -165,9 +178,7 @@ export function useTasks() {
       if (!task) throw new Error('Task não encontrada');
       const newComment = {
         id: `c_${Date.now()}`,
-        author,
-        sector,
-        text,
+        author, sector, text,
         createdAt: new Date().toISOString(),
         isRework: false,
       };
@@ -194,10 +205,12 @@ export function useTasks() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── Helper: get tasks visible to a user ─────────────────────
+  // ── Helper: tasks visible to a user ─────────────────────────
   const getMyTasks = (userName) => {
     return tasks.filter(t =>
-      t.responsibleName === userName || t.requestedBy === userName
+      t.responsibleName === userName ||
+      t.requestedBy === userName ||
+      t.deliveredBy === userName
     );
   };
 
