@@ -36,11 +36,15 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
   const [collabFilter, setCollabFilter] = useState('');
   const [sectorTab, setSectorTab] = useState('tasks');
 
-  // Filter tasks
+  // Filter tasks by date and collaborator
+  // For collab filter: match deliveredBy (for done tasks) or responsibleName, or requestedBy
   const filteredTasks = tasks.filter(t => {
     const date = t.completedAt || t.createdAt;
     if (!inRange(date, dateFilter)) return false;
-    if (collabFilter && t.responsibleName !== collabFilter && t.requestedBy !== collabFilter) return false;
+    if (collabFilter) {
+      const delivered = t.deliveredBy || t.responsibleName;
+      if (delivered !== collabFilter && t.requestedBy !== collabFilter) return false;
+    }
     return true;
   });
 
@@ -56,8 +60,8 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
   });
 
   const sectorTabs = [
-    { key: 'tasks', label: '📋 Tasks', count: filteredTasks.length },
-    { key: 'sm',    label: '📱 Social Media', count: allPosts.length },
+    { key: 'tasks', label: '📋 Tasks',        count: filteredTasks.length },
+    { key: 'sm',    label: '📱 Social Media',  count: allPosts.length },
   ];
 
   return (
@@ -103,7 +107,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Responsável', 'Cliente', 'Task', 'Setor', 'Prioridade', 'Status', 'Tempo', 'Ajustes', 'Links'].map(h => (
+                      {['Entregou', 'Solicitante', 'Cliente', 'Task', 'Setor', 'Prioridade', 'Status', 'Tempo', 'Ajustes', 'Links'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
@@ -111,20 +115,27 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
                   <tbody>
                     {filteredTasks.map(t => {
                       const priority = TASK_PRIORITIES.find(p => p.id === t.priority);
-                      const sector = SECTORS[t.responsibleSector];
-                      const slaDays = t.startedAt && t.completedAt
+                      const sector   = SECTORS[t.responsibleSector];
+                      // SLA: from startedAt to completedAt
+                      const slaDays  = t.startedAt && t.completedAt
                         ? differenceInDays(new Date(t.completedAt), new Date(t.startedAt))
                         : null;
                       const statusColors = { todo: 'var(--muted)', doing: 'var(--blue)', approval: 'var(--amber)', done: 'var(--green)' };
                       const statusLabels = { todo: 'Não Iniciada', doing: 'Em Produção', approval: 'Em Aprovação', done: 'Concluída' };
+                      // Who delivered — use deliveredBy for done tasks, responsibleName otherwise
+                      const deliveredBy = t.status === 'done'
+                        ? (t.deliveredBy || t.responsibleName)
+                        : t.responsibleName;
+
                       return (
                         <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)', background: t.isRework ? 'rgba(245,158,11,.03)' : 'transparent' }}>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500, whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {t.isRework && <span style={{ fontSize: 9, color: 'var(--amber)', fontFamily: 'var(--fm)', marginRight: 4 }}>🔄</span>}
-                            {t.responsibleName || '—'}
+                            {deliveredBy || '—'}
                           </td>
+                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 12 }}>{t.requestedBy || '—'}</td>
                           <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{t.clientName}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
                           <td style={{ padding: '10px 12px' }}>
                             {sector && <span style={{ fontSize: 11, color: sector.color }}>{sector.emoji} {sector.label}</span>}
                           </td>

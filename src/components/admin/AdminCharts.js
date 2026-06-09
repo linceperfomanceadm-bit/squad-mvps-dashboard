@@ -19,7 +19,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function AdminCharts({ clients, tasks = [] }) {
   const [hoveredPie, setHoveredPie] = useState(null);
 
-  // Rework ranking by client (from tasks)
+  // Rework ranking by client
   const clientRedoMap = {};
   tasks.forEach(t => {
     if (t.reworkCount > 0) {
@@ -31,7 +31,7 @@ export default function AdminCharts({ clients, tasks = [] }) {
     .sort((a, b) => b.value - a.value)
     .slice(0, 8);
 
-  // Demand by sector (who creates the most tasks)
+  // Demand by sector (who creates tasks)
   const sectorDemandMap = {};
   tasks.forEach(t => {
     if (t.requestedBySector) {
@@ -42,15 +42,21 @@ export default function AdminCharts({ clients, tasks = [] }) {
   const pieData = Object.entries(sectorDemandMap).map(([name, value]) => ({ name, value }));
 
   // Approval rate by collaborator
+  // Use deliveredBy for done tasks (who actually did the work)
   const collabMap = {};
   tasks.filter(t => t.status === 'done').forEach(t => {
-    const name = t.responsibleName || 'Desconhecido';
+    // deliveredBy = who did the work; fallback to responsibleName for old tasks
+    const name = t.deliveredBy || t.responsibleName || 'Desconhecido';
     if (!collabMap[name]) collabMap[name] = { name, total: 0, firstApproval: 0 };
     collabMap[name].total++;
     if (t.reworkCount === 0) collabMap[name].firstApproval++;
   });
   const collabData = Object.values(collabMap)
-    .map(c => ({ name: c.name, 'De Primeira': c.firstApproval, 'Com Ajuste': c.total - c.firstApproval }))
+    .map(c => ({
+      name: c.name,
+      'De Primeira': c.firstApproval,
+      'Com Ajuste': c.total - c.firstApproval,
+    }))
     .sort((a, b) => (b['De Primeira'] + b['Com Ajuste']) - (a['De Primeira'] + a['Com Ajuste']))
     .slice(0, 8);
 
@@ -109,7 +115,7 @@ export default function AdminCharts({ clients, tasks = [] }) {
       {/* Approval rate by collaborator */}
       <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>Aprovação por Colaborador</h2>
-        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>De primeira vs. com ajuste</p>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>De primeira vs. com ajuste — baseado em quem entregou</p>
         {collabData.length === 0
           ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma task concluída ainda.</p>
           : <ResponsiveContainer width="100%" height={260}>
@@ -118,7 +124,7 @@ export default function AdminCharts({ clients, tasks = [] }) {
                 <YAxis type="category" dataKey="name" tick={{ fill: 'var(--text)', fontSize: 12 }} width={110} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,.04)' }} />
                 <Bar dataKey="De Primeira" stackId="a" fill="#22c55e" radius={[0,0,0,0]} />
-                <Bar dataKey="Com Ajuste" stackId="a" fill="#EE3363" radius={[0,6,6,0]} />
+                <Bar dataKey="Com Ajuste"  stackId="a" fill="#EE3363" radius={[0,6,6,0]} />
                 <Legend formatter={v => <span style={{ color: 'var(--text)', fontSize: 12 }}>{v}</span>} />
               </BarChart>
             </ResponsiveContainer>
