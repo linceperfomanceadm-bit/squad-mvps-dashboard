@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -11,6 +11,7 @@ import AdminCharts from '../../components/admin/AdminCharts';
 import AdminClients from '../../components/admin/AdminClients';
 import AdminCollaborators from '../../components/admin/AdminCollaborators';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import VaultPage from '../../components/sectors/creative/VaultPage';
 import { SECTORS } from '../../lib/firebase';
 
 const NAV = [
@@ -18,6 +19,7 @@ const NAV = [
   { key: 'kanban',        label: 'Tasks',           icon: Kanban },
   { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
+  { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
 ];
@@ -25,12 +27,20 @@ const NAV = [
 export default function AdminDashboard() {
   const { user, logout } = useAuth();
   const { toast } = useToast();
-  const { clients, loading: loadingClients, addClient, updateClient, deleteClient, wdMoveToProduction, wdMoveBackToOnboarding, wdMoveStatus } = useClients();
+  const {
+    clients, loading: loadingClients,
+    addClient, updateClient, deleteClient,
+    wdMoveToProduction, wdMoveBackToOnboarding, wdMoveStatus,
+    updateBrandbook,
+  } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
-  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask } = useTasks();
+  const {
+    tasks, loading: loadingTasks,
+    createTask, moveToProduction, moveToApproval,
+    approveTask, rejectTask, addComment, updateLinks, deleteTask,
+  } = useTasks();
 
   const [page, setPage] = useState('overview');
-  // Admin kanban filters
   const [taskSectorFilter, setTaskSectorFilter] = useState('');
   const [taskCollabFilter, setTaskCollabFilter] = useState('');
 
@@ -65,8 +75,14 @@ export default function AdminDashboard() {
     else toast(res.error, 'e');
     return res;
   };
+  const handleUpdateBrandbook = async (clientId, brandbook) => {
+    const res = await updateBrandbook(clientId, brandbook);
+    if (res.success) toast('Brandbook atualizado!');
+    else toast(res.error, 'e');
+  };
 
   const pendingTasks = tasks.filter(t => t.status === 'approval').length;
+
   const navItems = NAV.map(n => ({
     ...n,
     badge: n.key === 'kanban' ? pendingTasks : 0,
@@ -113,31 +129,18 @@ export default function AdminDashboard() {
           <div>
             {/* Admin filters */}
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-              <select
-                style={S.filterSelect}
-                value={taskSectorFilter}
-                onChange={e => { setTaskSectorFilter(e.target.value); setTaskCollabFilter(''); }}
-              >
+              <select style={S.filterSelect} value={taskSectorFilter} onChange={e => { setTaskSectorFilter(e.target.value); setTaskCollabFilter(''); }}>
                 <option value="">Todos os setores</option>
-                {Object.values(SECTORS).map(s => (
-                  <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>
+                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+              </select>
+              <select style={S.filterSelect} value={taskCollabFilter} onChange={e => setTaskCollabFilter(e.target.value)}>
+                <option value="">Todos os colaboradores</option>
+                {collaborators.filter(c => c.active && (!taskSectorFilter || c.sector === taskSectorFilter)).map(c => (
+                  <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
-              <select
-                style={S.filterSelect}
-                value={taskCollabFilter}
-                onChange={e => setTaskCollabFilter(e.target.value)}
-              >
-                <option value="">Todos os colaboradores</option>
-                {collaborators
-                  .filter(c => c.active && (!taskSectorFilter || c.sector === taskSectorFilter))
-                  .map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
               {(taskSectorFilter || taskCollabFilter) && (
-                <button
-                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}
-                  onClick={() => { setTaskSectorFilter(''); setTaskCollabFilter(''); }}
-                >
+                <button style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }} onClick={() => { setTaskSectorFilter(''); setTaskCollabFilter(''); }}>
                   Limpar filtros
                 </button>
               )}
@@ -161,9 +164,27 @@ export default function AdminDashboard() {
             />
           </div>
         ) : page === 'feed' ? (
-          <AdminFeed clients={clients} collaborators={collaborators} tasks={tasks} />
+          <AdminFeed
+            clients={clients}
+            collaborators={collaborators}
+            tasks={tasks}
+            onMoveToProduction={moveToProduction}
+            onMoveToApproval={moveToApproval}
+            onApprove={approveTask}
+            onReject={rejectTask}
+            onAddComment={addComment}
+            onUpdateLinks={updateLinks}
+            onDelete={deleteTask}
+          />
         ) : page === 'charts' ? (
           <AdminCharts clients={clients} tasks={tasks} />
+        ) : page === 'vault' ? (
+          <VaultPage
+            clients={clients}
+            sectorId="design"
+            onUpdateBrandbook={handleUpdateBrandbook}
+            isAdminView={true}
+          />
         ) : page === 'clients' ? (
           <AdminClients
             clients={clients}
