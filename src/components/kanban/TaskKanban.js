@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Plus } from 'lucide-react';
 import { TASK_COLUMNS } from '../../lib/firebase';
 import TaskCard from './TaskCard';
@@ -13,11 +13,14 @@ export default function TaskKanban({
   onCreateTask, onMoveToProduction, onMoveToApproval,
   onApprove, onReject, onAddComment, onUpdateLinks, onDelete,
 }) {
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
   const dragTask = useRef(null);
+
+  // Always derive selectedTask from live tasks array — this makes chat realtime
+  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
 
   // Filter tasks visible to this user
   const visibleTasks = isAdmin
@@ -36,7 +39,6 @@ export default function TaskKanban({
 
   // ── Drag handlers ─────────────────────────────────────────────
   const handleDragStart = (e, task) => {
-    draggingId && setDraggingId(null);
     dragTask.current = task;
     setDraggingId(task.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -63,44 +65,29 @@ export default function TaskKanban({
 
     if (!task || task.status === targetColId) return;
 
-    // Only allow valid forward movements (except admin who can move freely)
-    const colOrder = ['todo', 'doing', 'approval', 'done'];
-    const fromIdx = colOrder.indexOf(task.status);
-    const toIdx = colOrder.indexOf(targetColId);
-
-    // Rules: only responsible can drag their task; requester can drag from approval→doing (reject) or approval→done (approve)
     const isResponsible = task.responsibleName === currentUser;
-    const isRequester = task.requestedBy === currentUser;
+    const isRequester   = task.requestedBy === currentUser;
 
     if (!isAdmin && !isResponsible && !isRequester) return;
 
-    // todo → doing: start task
     if (task.status === 'todo' && targetColId === 'doing' && (isResponsible || isAdmin)) {
       await onMoveToProduction(task.id, task.links);
       return;
     }
-
-    // doing → approval: requires selecting approver — open modal instead
     if (task.status === 'doing' && targetColId === 'approval' && (isResponsible || isAdmin)) {
-      setSelectedTask(task);
+      setSelectedTaskId(task.id);
       return;
     }
-
-    // approval → done: approve
     if (task.status === 'approval' && targetColId === 'done' && (isResponsible || isAdmin)) {
       await onApprove(task.id);
       return;
     }
-
-    // approval → doing: reject — open modal to write rework note
     if (task.status === 'approval' && targetColId === 'doing' && (isResponsible || isAdmin)) {
-      setSelectedTask(task);
+      setSelectedTaskId(task.id);
       return;
     }
-
-    // Admin can move backwards freely
-    if (isAdmin && toIdx < fromIdx) {
-      setSelectedTask(task);
+    if (isAdmin) {
+      setSelectedTaskId(task.id);
       return;
     }
   };
@@ -133,8 +120,8 @@ export default function TaskKanban({
       {/* Kanban columns */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, alignItems: 'start' }}>
         {TASK_COLUMNS.map(col => {
-          const colTasks = tasksByColumn(col.id);
-          const reworkCount = colTasks.filter(t => t.isRework).length;
+          const colTasks     = tasksByColumn(col.id);
+          const reworkCount  = colTasks.filter(t => t.isRework).length;
           const isDragTarget = dragOverCol === col.id;
 
           return (
@@ -143,9 +130,7 @@ export default function TaskKanban({
               style={{
                 background: isDragTarget ? `${col.color}08` : 'rgba(12,12,24,.6)',
                 border: `1px solid ${isDragTarget ? `${col.color}40` : `${col.color}18`}`,
-                borderRadius: 12,
-                padding: '12px 10px',
-                minHeight: 200,
+                borderRadius: 12, padding: '12px 10px', minHeight: 200,
                 transition: 'all .15s ease',
               }}
               onDragOver={e => handleDragOver(e, col.id)}
@@ -154,9 +139,7 @@ export default function TaskKanban({
             >
               {/* Column header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>
-                  {col.label}
-                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>{col.label}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   {reworkCount > 0 && (
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>
@@ -178,9 +161,7 @@ export default function TaskKanban({
 
               {/* Tasks */}
               {colTasks.length === 0 && !isDragTarget ? (
-                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>
-                  Vazio
-                </p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>Vazio</p>
               ) : (
                 colTasks.map(task => (
                   <div
@@ -188,16 +169,9 @@ export default function TaskKanban({
                     draggable
                     onDragStart={e => handleDragStart(e, task)}
                     onDragEnd={handleDragEnd}
-                    style={{
-                      opacity: draggingId === task.id ? 0.4 : 1,
-                      cursor: 'grab',
-                      transition: 'opacity .15s',
-                    }}
+                    style={{ opacity: draggingId === task.id ? 0.4 : 1, cursor: 'grab', transition: 'opacity .15s' }}
                   >
-                    <TaskCard
-                      task={task}
-                      onClick={() => setSelectedTask(task)}
-                    />
+                    <TaskCard task={task} onClick={() => setSelectedTaskId(task.id)} />
                   </div>
                 ))
               )}
@@ -206,21 +180,22 @@ export default function TaskKanban({
         })}
       </div>
 
-      {/* Task detail modal */}
+      {/* Task detail modal — uses live task from tasks array */}
       {selectedTask && (
         <TaskModal
           task={selectedTask}
           currentUser={currentUser}
           currentUserSector={currentUserSector}
           collaborators={collaborators}
-          onClose={() => setSelectedTask(null)}
-          onMoveToProduction={async (...args) => { await onMoveToProduction(...args); setSelectedTask(null); }}
-          onMoveToApproval={async (...args) => { await onMoveToApproval(...args); setSelectedTask(null); }}
+          isAdmin={isAdmin}
+          onClose={() => setSelectedTaskId(null)}
+          onMoveToProduction={async (...args) => { await onMoveToProduction(...args); setSelectedTaskId(null); }}
+          onMoveToApproval={async (...args) => { await onMoveToApproval(...args); setSelectedTaskId(null); }}
           onApprove={onApprove}
           onReject={onReject}
           onAddComment={onAddComment}
           onUpdateLinks={onUpdateLinks}
-          onDelete={async (...args) => { await onDelete(...args); setSelectedTask(null); }}
+          onDelete={async (...args) => { await onDelete(...args); setSelectedTaskId(null); }}
         />
       )}
 

@@ -194,7 +194,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {(isAdmin || isRequester) && task.status !== 'done' && (
+            {(isAdmin || isRequester) && (
               <button style={{ background: 'rgba(238,51,99,.1)', border: '1px solid rgba(238,51,99,.25)', borderRadius: 8, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(true)}>
                 <Trash2 size={14} />
               </button>
