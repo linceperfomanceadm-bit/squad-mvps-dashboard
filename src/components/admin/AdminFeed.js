@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { ExternalLink } from 'lucide-react';
+
 import { SLA_DAYS, SM_COLUMNS, TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
 import TaskModal from '../kanban/TaskModal';
 import { useAuth } from '../../contexts/AuthContext';
