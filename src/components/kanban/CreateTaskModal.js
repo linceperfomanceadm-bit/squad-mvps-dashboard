@@ -13,31 +13,42 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     responsibleName: '',
     comment: '',
   });
-  const [links, setLinks] = useState(['']);
+  const [links, setLinks] = useState([{ name: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active);
 
-  const handleAddLink = () => setLinks(l => [...l, '']);
-  const handleLinkChange = (i, v) => setLinks(l => l.map((x, idx) => idx === i ? v : x));
-  const handleRemoveLink = (i) => setLinks(l => l.filter((_, idx) => idx !== i));
+  const addLink = () => setLinks(l => [...l, { name: '', url: '' }]);
+  const updateLink = (i, field, val) => setLinks(l => l.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
+  const removeLink = (i) => setLinks(l => l.filter((_, idx) => idx !== i));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name.trim()) { setError('Preencha o nome da task.'); return; }
-    if (!form.clientId) { setError('Selecione o cliente.'); return; }
-    if (!form.responsibleSector) { setError('Selecione o setor responsável.'); return; }
-    if (!form.responsibleName) { setError('Selecione o colaborador responsável.'); return; }
+    if (!form.name.trim())           { setError('Preencha o nome da task.'); return; }
+    if (!form.clientId)              { setError('Selecione o cliente.'); return; }
+    if (!form.responsibleSector)     { setError('Selecione o setor responsável.'); return; }
+    if (!form.responsibleName)       { setError('Selecione o colaborador responsável.'); return; }
+
     setLoading(true);
     const client = clients.find(c => c.id === form.clientId);
-    const validLinks = links.filter(l => l.trim());
+
+    // Only include links that have both name and url filled
+    const validLinks = links
+      .filter(l => l.name.trim() && l.url.trim())
+      .map(l => ({
+        name:    l.name.trim(),
+        url:     l.url.trim(),
+        addedBy: currentUser,
+        addedAt: new Date().toISOString(),
+      }));
+
     const res = await onSave({
       ...form,
-      clientName: client?.name || '',
-      links: validLinks,
-      requestedBy: currentUser,
+      clientName:        client?.name || '',
+      links:             validLinks,
+      requestedBy:       currentUser,
       requestedBySector: currentUserSector,
     });
     setLoading(false);
@@ -49,9 +60,8 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     <div
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,.8)', backdropFilter: 'blur(10px)',
-        zIndex: 99999,
-        overflowY: 'auto',
+        background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(10px)',
+        zIndex: 99999, overflowY: 'auto',
         display: 'flex', justifyContent: 'center',
         padding: '40px 20px',
       }}
@@ -59,32 +69,30 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     >
       <div
         style={{
-          background: '#0e0e1c',
-          border: '1px solid var(--neon-border)',
-          borderRadius: 18,
-          width: '100%', maxWidth: 580,
-          boxShadow: '0 24px 80px rgba(0,0,0,.7)',
-          height: 'fit-content',
-          flexShrink: 0,
+          background: '#0e0e1c', border: '1px solid var(--neon-border)',
+          borderRadius: 18, width: '100%', maxWidth: 580,
+          boxShadow: '0 24px 80px rgba(0,0,0,.8)',
+          height: 'fit-content', flexShrink: 0,
         }}
         onClick={e => e.stopPropagation()}
         className="fade-up"
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={18} color="var(--neon)" />
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Nova Task</h2>
           </div>
-          <button style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
-            <X size={16} color="var(--muted)" />
+          <button style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
+            <X size={16} color="#aaa" />
           </button>
         </div>
 
         {/* Body */}
         <form onSubmit={handleSubmit} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
           {/* Name */}
           <div style={S.field}>
             <label style={S.label}>NOME DA TASK *</label>
@@ -112,8 +120,17 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             <div style={{ display: 'flex', gap: 8 }}>
               {TASK_PRIORITIES.map(p => (
                 <button type="button" key={p.id}
-                  style={{ flex: 1, background: form.priority === p.id ? `${p.color}18` : 'var(--surface)', border: `1px solid ${form.priority === p.id ? `${p.color}40` : 'var(--border)'}`, borderRadius: 8, padding: '8px 6px', color: form.priority === p.id ? p.color : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' }}
-                  onClick={() => set('priority', p.id)}>
+                  style={{
+                    flex: 1,
+                    background: form.priority === p.id ? `${p.color}22` : 'rgba(255,255,255,.04)',
+                    border: `1px solid ${form.priority === p.id ? p.color : 'rgba(255,255,255,.1)'}`,
+                    borderRadius: 8, padding: '8px 6px',
+                    color: form.priority === p.id ? p.color : '#888',
+                    fontSize: 12, fontWeight: form.priority === p.id ? 700 : 500,
+                    cursor: 'pointer', transition: 'all .15s',
+                  }}
+                  onClick={() => set('priority', p.id)}
+                >
                   {p.label}
                 </button>
               ))}
@@ -138,20 +155,40 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             </div>
           </div>
 
-          {/* Links */}
+          {/* Links with name */}
           <div style={S.field}>
             <label style={S.label}>LINKS DO MATERIAL (OPCIONAL)</label>
+            <p style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>Adicione uma descrição para cada link, para facilitar a identificação</p>
             {links.map((link, i) => (
-              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-                <input style={{ ...S.input, flex: 1 }} value={link} onChange={e => handleLinkChange(i, e.target.value)} placeholder="https://drive.google.com/..." />
-                {links.length > 1 && (
-                  <button type="button" style={{ background: 'rgba(238,51,99,.08)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => handleRemoveLink(i)}>
-                    <Trash2 size={13} />
-                  </button>
-                )}
+              <div key={i} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+                  <input
+                    style={{ ...S.input, flex: 1 }}
+                    value={link.name}
+                    onChange={e => updateLink(i, 'name', e.target.value)}
+                    placeholder="Descrição (ex: Referência, Briefing, Arte final...)"
+                  />
+                  {links.length > 1 && (
+                    <button type="button"
+                      style={{ background: 'rgba(238,51,99,.08)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                      onClick={() => removeLink(i)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                <input
+                  style={S.input}
+                  value={link.url}
+                  onChange={e => updateLink(i, 'url', e.target.value)}
+                  placeholder="https://drive.google.com/..."
+                />
               </div>
             ))}
-            <button type="button" style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 7, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }} onClick={handleAddLink}>
+            <button type="button"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.03)', border: '1px dashed rgba(255,255,255,.12)', borderRadius: 7, padding: '7px 12px', color: '#777', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }}
+              onClick={addLink}
+            >
               <Plus size={13} /> Adicionar link
             </button>
           </div>
@@ -159,15 +196,30 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
           {/* Comment */}
           <div style={S.field}>
             <label style={S.label}>COMENTÁRIO INICIAL (OPCIONAL)</label>
-            <textarea style={{ ...S.input, minHeight: 72, resize: 'vertical' }} value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="Descreva detalhes, referências ou instruções para o responsável..." />
+            <textarea
+              style={{ ...S.input, minHeight: 72, resize: 'vertical' }}
+              value={form.comment}
+              onChange={e => set('comment', e.target.value)}
+              placeholder="Descreva detalhes, referências ou instruções para o responsável..."
+            />
           </div>
 
           {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
-            <button type="button" style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '10px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }} onClick={onClose}>Cancelar</button>
-            <button type="submit" style={{ background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 }} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Criar Task'}
+            <button type="button"
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 18px', color: '#888', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+              onClick={onClose}
+            >
+              Cancelar
+            </button>
+            <button type="submit"
+              style={{ background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 }}
+              disabled={loading}
+            >
+              {loading
+                ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} />
+                : 'Criar Task'}
             </button>
           </div>
         </form>
@@ -175,13 +227,12 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     </div>
   );
 
-  // Render outside the DOM hierarchy using a portal — fixes clipping from overflow:auto parents
   return ReactDOM.createPortal(content, document.body);
 }
 
 const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
-  label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  label: { fontSize: 10, letterSpacing: '.14em', color: '#666', fontWeight: 600, fontFamily: 'var(--fm)' },
+  input: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
 };
