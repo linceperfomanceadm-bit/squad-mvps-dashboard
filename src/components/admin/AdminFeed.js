@@ -38,7 +38,10 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
   const [dateFilter, setDateFilter]   = useState('today');
   const [collabFilter, setCollabFilter] = useState('');
   const [sectorTab, setSectorTab]     = useState('tasks');
-  const [selectedTask, setSelectedTask] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState(null);
+
+  // Derive from live tasks array — keeps modal in sync with Firestore realtime updates
+  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
 
   const filteredTasks = tasks.filter(t => {
     const date = t.completedAt || t.updatedAt || t.createdAt;
@@ -130,7 +133,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                       return (
                         <tr
                           key={t.id}
-                          onClick={() => setSelectedTask(t)}
+                          onClick={() => setSelectedTaskId(t.id)}
                           style={{
                             borderBottom: '1px solid rgba(255,255,255,.04)',
                             background: t.isRework ? 'rgba(245,158,11,.03)' : 'transparent',
@@ -221,14 +224,14 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
           currentUserSector={user?.sector}
           collaborators={collaborators}
           isAdmin={true}
-          onClose={() => setSelectedTask(null)}
-          onMoveToProduction={async (...args) => { if (onMoveToProduction) { await onMoveToProduction(...args); setSelectedTask(null); } }}
-          onMoveToApproval={async (...args) => { if (onMoveToApproval) { await onMoveToApproval(...args); setSelectedTask(null); } }}
+          onClose={() => setSelectedTaskId(null)}
+          onMoveToProduction={async (...args) => { if (onMoveToProduction) { await onMoveToProduction(...args); setSelectedTaskId(null); } }}
+          onMoveToApproval={async (...args) => { if (onMoveToApproval) { await onMoveToApproval(...args); setSelectedTaskId(null); } }}
           onApprove={async (...args) => { if (onApprove) await onApprove(...args); }}
-          onReject={async (...args) => { if (onReject) { await onReject(...args); setSelectedTask(null); } }}
+          onReject={async (...args) => { if (onReject) { await onReject(...args); setSelectedTaskId(null); } }}
           onAddComment={onAddComment}
           onUpdateLinks={onUpdateLinks}
-          onDelete={async (...args) => { if (onDelete) { await onDelete(...args); setSelectedTask(null); } }}
+          onDelete={async (...args) => { if (onDelete) { await onDelete(...args); setSelectedTaskId(null); } }}
         />
       )}
     </div>
