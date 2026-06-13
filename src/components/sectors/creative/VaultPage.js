@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check, Plus } from 'lucide-react';
+import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 function ColorSwatch({ hex }) {
