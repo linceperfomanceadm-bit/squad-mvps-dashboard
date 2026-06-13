@@ -3,6 +3,8 @@ import { differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ExternalLink } from 'lucide-react';
 import { SLA_DAYS, SM_COLUMNS, TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
+import TaskModal from '../kanban/TaskModal';
+import { useAuth } from '../../contexts/AuthContext';
 
 const DATE_FILTERS = [
   { key: 'today',     label: 'Hoje' },
@@ -31,15 +33,15 @@ function SLABadge({ days }) {
   );
 }
 
-export default function AdminFeed({ clients, collaborators, tasks = [] }) {
-  const [dateFilter, setDateFilter] = useState('today');
+export default function AdminFeed({ clients, collaborators, tasks = [], onMoveToProduction, onMoveToApproval, onApprove, onReject, onAddComment, onUpdateLinks, onDelete }) {
+  const { user } = useAuth();
+  const [dateFilter, setDateFilter]   = useState('today');
   const [collabFilter, setCollabFilter] = useState('');
-  const [sectorTab, setSectorTab] = useState('tasks');
+  const [sectorTab, setSectorTab]     = useState('tasks');
+  const [selectedTask, setSelectedTask] = useState(null);
 
-  // Filter tasks by date and collaborator
-  // For collab filter: match deliveredBy (for done tasks) or responsibleName, or requestedBy
   const filteredTasks = tasks.filter(t => {
-    const date = t.completedAt || t.createdAt;
+    const date = t.completedAt || t.updatedAt || t.createdAt;
     if (!inRange(date, dateFilter)) return false;
     if (collabFilter) {
       const delivered = t.deliveredBy || t.responsibleName;
@@ -48,7 +50,6 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
     return true;
   });
 
-  // SM posts
   const allPosts = [];
   clients.forEach(c => {
     (c.sm?.posts || []).forEach(p => {
@@ -60,15 +61,18 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
   });
 
   const sectorTabs = [
-    { key: 'tasks', label: '📋 Tasks',        count: filteredTasks.length },
-    { key: 'sm',    label: '📱 Social Media',  count: allPosts.length },
+    { key: 'tasks', label: '📋 Tasks',       count: filteredTasks.length },
+    { key: 'sm',    label: '📱 Social Media', count: allPosts.length },
   ];
+
+  const statusColors = { todo: 'var(--muted)', doing: 'var(--blue)', approval: 'var(--amber)', done: 'var(--green)' };
+  const statusLabels = { todo: 'Não Iniciada', doing: 'Em Produção', approval: 'Em Aprovação', done: 'Concluída' };
 
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Extrato de Produção</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Atividades do time</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Clique em uma task para ver os detalhes</p>
       </div>
 
       {/* Filters */}
@@ -107,35 +111,48 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                   <thead>
                     <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                      {['Entregou', 'Solicitante', 'Cliente', 'Task', 'Setor', 'Prioridade', 'Status', 'Tempo', 'Ajustes', 'Links'].map(h => (
+                      {['Entregou', 'Solicitante', 'Cliente', 'Task', 'Setor', 'Prioridade', 'Status', 'Tempo', 'Ajustes'].map(h => (
                         <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {filteredTasks.map(t => {
-                      const priority = TASK_PRIORITIES.find(p => p.id === t.priority);
-                      const sector   = SECTORS[t.responsibleSector];
-                      // SLA: from startedAt to completedAt
-                      const slaDays  = t.startedAt && t.completedAt
+                      const priority  = TASK_PRIORITIES.find(p => p.id === t.priority);
+                      const sector    = SECTORS[t.responsibleSector];
+                      const slaDays   = t.startedAt && t.completedAt
                         ? differenceInDays(new Date(t.completedAt), new Date(t.startedAt))
                         : null;
-                      const statusColors = { todo: 'var(--muted)', doing: 'var(--blue)', approval: 'var(--amber)', done: 'var(--green)' };
-                      const statusLabels = { todo: 'Não Iniciada', doing: 'Em Produção', approval: 'Em Aprovação', done: 'Concluída' };
-                      // Who delivered — use deliveredBy for done tasks, responsibleName otherwise
                       const deliveredBy = t.status === 'done'
                         ? (t.deliveredBy || t.responsibleName)
                         : t.responsibleName;
 
                       return (
-                        <tr key={t.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)', background: t.isRework ? 'rgba(245,158,11,.03)' : 'transparent' }}>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        <tr
+                          key={t.id}
+                          onClick={() => setSelectedTask(t)}
+                          style={{
+                            borderBottom: '1px solid rgba(255,255,255,.04)',
+                            background: t.isRework ? 'rgba(245,158,11,.03)' : 'transparent',
+                            cursor: 'pointer',
+                            transition: 'background .15s',
+                          }}
+                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+                          onMouseLeave={e => e.currentTarget.style.background = t.isRework ? 'rgba(245,158,11,.03)' : 'transparent'}
+                        >
+                          <td style={{ padding: '10px 12px', color: '#ddd', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {t.isRework && <span style={{ fontSize: 9, color: 'var(--amber)', fontFamily: 'var(--fm)', marginRight: 4 }}>🔄</span>}
                             {deliveredBy || '—'}
                           </td>
-                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 12 }}>{t.requestedBy || '—'}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{t.clientName}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</td>
+                          <td style={{ padding: '10px 12px', color: '#999', fontSize: 12 }}>{t.requestedBy || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{t.clientName}</td>
+                          <td style={{ padding: '10px 12px', color: '#ddd', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              {t.name}
+                              {/* Clickable hint */}
+                              <span style={{ fontSize: 10, color: 'var(--neon)', opacity: .5, fontFamily: 'var(--fm)' }}>↗</span>
+                            </span>
+                          </td>
                           <td style={{ padding: '10px 12px' }}>
                             {sector && <span style={{ fontSize: 11, color: sector.color }}>{sector.emoji} {sector.label}</span>}
                           </td>
@@ -150,15 +167,8 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
                           <td style={{ padding: '10px 12px' }}>
                             {slaDays !== null ? <SLABadge days={slaDays} /> : '—'}
                           </td>
-                          <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : 'var(--muted)', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
+                          <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : '#666', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
                             {t.reworkCount || 0}
-                          </td>
-                          <td style={{ padding: '10px 12px' }}>
-                            {t.links?.length > 0
-                              ? <a href={t.links[0]} target="_blank" rel="noreferrer" style={{ color: 'var(--blue)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none', fontSize: 12 }}>
-                                  <ExternalLink size={12} /> Ver
-                                </a>
-                              : '—'}
                           </td>
                         </tr>
                       );
@@ -185,10 +195,10 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
                       const col = SM_COLUMNS.find(c => c.id === p.status);
                       return (
                         <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500 }}>{p.responsible || '—'}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.clientName}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.name}</td>
-                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 11, fontFamily: 'var(--fm)' }}>
+                          <td style={{ padding: '10px 12px', color: '#ddd', fontWeight: 500 }}>{p.responsible || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{p.clientName}</td>
+                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{p.name}</td>
+                          <td style={{ padding: '10px 12px', color: '#888', fontSize: 11, fontFamily: 'var(--fm)' }}>
                             {p.date ? format(new Date(p.date), 'dd/MM/yy', { locale: ptBR }) : '—'}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
@@ -202,6 +212,25 @@ export default function AdminFeed({ clients, collaborators, tasks = [] }) {
               </div>
         )}
       </div>
+
+      {/* Task detail modal — opens when row is clicked */}
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          currentUser={user?.name}
+          currentUserSector={user?.sector}
+          collaborators={collaborators}
+          isAdmin={true}
+          onClose={() => setSelectedTask(null)}
+          onMoveToProduction={async (...args) => { if (onMoveToProduction) { await onMoveToProduction(...args); setSelectedTask(null); } }}
+          onMoveToApproval={async (...args) => { if (onMoveToApproval) { await onMoveToApproval(...args); setSelectedTask(null); } }}
+          onApprove={async (...args) => { if (onApprove) await onApprove(...args); }}
+          onReject={async (...args) => { if (onReject) { await onReject(...args); setSelectedTask(null); } }}
+          onAddComment={onAddComment}
+          onUpdateLinks={onUpdateLinks}
+          onDelete={async (...args) => { if (onDelete) { await onDelete(...args); setSelectedTask(null); } }}
+        />
+      )}
     </div>
   );
 }
