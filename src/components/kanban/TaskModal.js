@@ -106,7 +106,6 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
   const isResponsible = task.responsibleName === currentUser;
   const isRequester   = task.requestedBy === currentUser;
-  const canAct        = isAdmin || isResponsible || isRequester;
   const priority      = TASK_PRIORITIES.find(p => p.id === task.priority);
   const responsibleSector = SECTORS[task.responsibleSector];
 
