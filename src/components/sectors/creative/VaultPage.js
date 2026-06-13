@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check } from 'lucide-react';
+import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check, Plus } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 function ColorSwatch({ hex }) {
@@ -13,32 +13,41 @@ function ColorSwatch({ hex }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }} onClick={handleCopy}>
       <div style={{ width: 24, height: 24, borderRadius: 6, background: hex, border: '1px solid rgba(255,255,255,.1)', flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'var(--fm)' }}>{hex}</span>
-      {copied ? <Check size={12} color="var(--green)" style={{ marginLeft: 'auto' }} /> : <Copy size={12} color="var(--muted)" style={{ marginLeft: 'auto' }} />}
+      {copied
+        ? <Check size={12} color="var(--green)" style={{ marginLeft: 'auto' }} />
+        : <Copy  size={12} color="var(--muted)" style={{ marginLeft: 'auto' }} />}
     </div>
   );
 }
 
-function ClientVaultCard({ client, isAdmin, onUpdate }) {
-  const [open, setOpen] = useState(false);
+function ClientVaultCard({ client, canEdit, onUpdate }) {
+  const [open,    setOpen]    = useState(false);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    colors: client.brandbook?.colors?.join(', ') || '',
+  const [form,    setForm]    = useState({
+    colors:    client.brandbook?.colors?.join(', ') || '',
     typography: client.brandbook?.typography || '',
-    driveLink: client.brandbook?.driveLink || '',
+    driveLink:  client.brandbook?.driveLink  || '',
   });
 
   const handleSave = () => {
-    const colors = form.colors.split(',').map(c => c.trim()).filter(c => c.length > 0);
+    const colors = form.colors
+      .split(',')
+      .map(c => c.trim())
+      .filter(c => c.length > 0);
     onUpdate(client.id, { colors, typography: form.typography, driveLink: form.driveLink });
     setEditing(false);
   };
 
-  const bb = client.brandbook || {};
+  const bb      = client.brandbook || {};
   const hasData = bb.colors?.length || bb.typography || bb.driveLink;
 
   return (
     <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' }} onClick={() => setOpen(!open)}>
+      {/* Card header */}
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' }}
+        onClick={() => setOpen(!open)}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'var(--neon)' }}>
             {client.name.charAt(0).toUpperCase()}
@@ -49,10 +58,11 @@ function ClientVaultCard({ client, isAdmin, onUpdate }) {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {isAdmin && (
+          {canEdit && (
             <button
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' }}
-              onClick={e => { e.stopPropagation(); setEditing(!editing); setOpen(true); }}>
+              onClick={e => { e.stopPropagation(); setEditing(!editing); setOpen(true); }}
+            >
               <Edit2 size={13} />
             </button>
           )}
@@ -60,9 +70,10 @@ function ClientVaultCard({ client, isAdmin, onUpdate }) {
         </div>
       </div>
 
+      {/* Expanded content */}
       {open && (
         <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--border)' }} className="fade-in">
-          {editing && isAdmin ? (
+          {editing && canEdit ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
               <div>
                 <label style={S.label}>CORES (HEX separados por vírgula)</label>
@@ -98,12 +109,23 @@ function ClientVaultCard({ client, isAdmin, onUpdate }) {
                 </div>
               )}
               {bb.driveLink && (
-                <a href={bb.driveLink} target="_blank" rel="noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 8, padding: '9px 14px', color: 'var(--blue)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
+                <a
+                  href={bb.driveLink} target="_blank" rel="noreferrer"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(56,189,248,.1)', border: '1px solid rgba(56,189,248,.3)', borderRadius: 8, padding: '9px 14px', color: 'var(--blue)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+                >
                   <ExternalLink size={14} /> Acessar Pasta de Assets
                 </a>
               )}
-              {!hasData && <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>Nenhum dado de brandbook cadastrado.</p>}
+              {!hasData && (
+                <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '8px 0' }}>
+                  Nenhum dado de brandbook cadastrado.
+                  {canEdit && (
+                    <button style={{ marginLeft: 8, background: 'none', border: 'none', color: 'var(--neon)', cursor: 'pointer', fontSize: 13, textDecoration: 'underline' }} onClick={() => setEditing(true)}>
+                      Adicionar agora
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -112,34 +134,50 @@ function ClientVaultCard({ client, isAdmin, onUpdate }) {
   );
 }
 
-export default function VaultPage({ clients, onUpdateBrandbook }) {
+export default function VaultPage({ clients, sectorId, onUpdateBrandbook, isAdminView = false }) {
   const { user } = useAuth();
   const [search, setSearch] = useState('');
-  const activeClients = clients.filter(c => c.active && c.name.toLowerCase().includes(search.toLowerCase()));
+
+  // Admin can always edit; sector collaborators can only edit if they are the responsible
+  const canEdit = isAdminView || user?.isAdmin;
+
+  const activeClients = clients.filter(
+    c => c.active && c.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>🔐 O Cofre</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Brandbooks dos clientes — paletas, tipografias e assets</p>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+          🔐 O Cofre
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Brandbooks dos clientes — paletas, tipografias e assets
+          {isAdminView && <span style={{ color: 'var(--neon)', marginLeft: 8 }}>· Modo Admin</span>}
+        </p>
       </div>
+
       <input
         style={{ ...S.input, marginBottom: 16, width: '100%', maxWidth: 380 }}
         placeholder="Buscar cliente..."
         value={search}
         onChange={e => setSearch(e.target.value)}
       />
-      {activeClients.length === 0
-        ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>Nenhum cliente encontrado.</p>
-        : activeClients.map(c => (
+
+      {activeClients.length === 0 ? (
+        <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>
+          Nenhum cliente encontrado.
+        </p>
+      ) : (
+        activeClients.map(c => (
           <ClientVaultCard
             key={c.id}
             client={c}
-            isAdmin={user?.isAdmin}
+            canEdit={canEdit}
             onUpdate={onUpdateBrandbook}
           />
         ))
-      }
+      )}
     </div>
   );
 }
