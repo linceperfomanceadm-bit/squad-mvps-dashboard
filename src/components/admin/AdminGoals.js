@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Target, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { SECTORS } from '../../lib/firebase';
 
 const COLOR = SECTORS.comercial.color;
@@ -19,7 +19,8 @@ export default function AdminGoals({ goals, collaborators, onSave, toast }) {
 
   const save = async () => {
     const r = await onSave({ teamGoal: Number(teamGoal) || 0, individual });
-    r.success ? toast('Metas salvas!') : toast(r.error, 'e');
+    if (r.success) toast('Metas salvas!');
+    else toast(r.error, 'e');
   };
 
   return (
