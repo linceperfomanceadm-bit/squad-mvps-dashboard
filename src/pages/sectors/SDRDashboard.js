@@ -99,7 +99,7 @@ export default function SDRDashboard() {
             emptyMsg="Nenhum lead na fila agora. 🎯"
           />
         ) : page === 'cold' ? (
-          <ColdView list={buckets.cold} onReopen={async (id) => { const r = await reopenLead(id, me); r.success ? toast('Lead reaberto na fila.') : toast(r.error, 'e'); }} now={now} />
+          <ColdView list={buckets.cold} onReopen={async (id) => { const r = await reopenLead(id, me); if (r.success) toast('Lead reaberto na fila.'); else toast(r.error, 'e'); }} now={now} />
         ) : page === 'scheduled' ? (
           <ScheduledView list={buckets.scheduled} />
         ) : page === 'lost' ? (
@@ -231,7 +231,8 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone }) {
 
   const doLost = async () => {
     const r = await actions.markLost(lead.id, me);
-    r.success ? (toast('Lead marcado como perdido.'), onDone()) : toast(r.error, 'e');
+    if (r.success) { toast('Lead marcado como perdido.'); onDone(); }
+    else toast(r.error, 'e');
   };
 
   return (
@@ -288,14 +289,16 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone }) {
         <FollowupModal onClose={() => setShowFollowup(false)} onConfirm={async (iso) => {
           const r = await actions.scheduleFollowup(lead.id, me, iso);
           setShowFollowup(false);
-          r.success ? (toast('Follow-up agendado.'), onDone()) : toast(r.error, 'e');
+          if (r.success) { toast('Follow-up agendado.'); onDone(); }
+          else toast(r.error, 'e');
         }} />, document.body)}
 
       {showCall && ReactDOM.createPortal(
         <CallModal onClose={() => setShowCall(false)} onConfirm={async (data) => {
           const r = await actions.scheduleCall(lead.id, me, data);
           setShowCall(false);
-          r.success ? (toast('Call agendada e enviada ao Closer! 🤝'), onDone()) : toast(r.error, 'e');
+          if (r.success) { toast('Call agendada e enviada ao Closer! 🤝'); onDone(); }
+          else toast(r.error, 'e');
         }} />, document.body)}
     </div>
   );
