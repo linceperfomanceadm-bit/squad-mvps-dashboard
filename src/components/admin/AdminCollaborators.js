@@ -4,7 +4,7 @@ import { SECTORS } from '../../lib/firebase';
 
 export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onDelete }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false });
+  const [form, setForm] = useState({ name: '', sector: '', commercialRole: '', phone: '', loginId: '', password: '', isAdmin: false });
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,25 +18,48 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
     e.preventDefault();
     if (!form.name.trim()) { setError('Preencha o nome.'); return; }
     if (!form.sector) { setError('Selecione o setor.'); return; }
+    if (form.sector === 'comercial' && !form.commercialRole) { setError('Selecione a função comercial (SDR ou Closer).'); return; }
     if (!form.loginId.trim()) { setError('Defina o ID de acesso.'); return; }
-    if (!form.password.trim() || form.password.length < 4) { setError('Senha provisória deve ter pelo menos 4 caracteres.'); return; }
+    if (!form.password.trim() || form.password.length < 6) { setError('Senha provisória deve ter pelo menos 6 caracteres.'); return; }
     if (collaborators.some(c => c.loginId === form.loginId.trim())) { setError('Este ID já está em uso.'); return; }
     setLoading(true);
-    const res = await onAdd({ ...form, loginId: form.loginId.trim() });
+    // commercialRole só faz sentido para o setor comercial.
+    const payload = { ...form, loginId: form.loginId.trim() };
+    if (payload.sector !== 'comercial') payload.commercialRole = null;
+    const res = await onAdd(payload);
     setLoading(false);
-    if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false }); setShowForm(false); setError(''); }
+    if (res.success) { setForm({ name: '', sector: '', commercialRole: '', phone: '', loginId: '', password: '', isAdmin: false }); setShowForm(false); setError(''); }
     else setError(res.error);
   };
 
   const handleEdit = async (id) => {
-    if (!editForm.name?.trim() || !editForm.role?.trim === undefined) {}
-    await onUpdate(id, { name: editForm.name, phone: editForm.phone || '', sector: editForm.sector, isAdmin: editForm.isAdmin || false });
+    if (!editForm.name?.trim()) { setEditId(null); return; }
+    if (editForm.sector === 'comercial' && !editForm.commercialRole) { return; }
+    const patch = {
+      name: editForm.name.trim(),
+      phone: editForm.phone || '',
+      sector: editForm.sector,
+      isAdmin: editForm.isAdmin || false,
+      commercialRole: editForm.sector === 'comercial' ? editForm.commercialRole : null,
+    };
+    await onUpdate(id, patch);
     setEditId(null);
   };
 
+  // Reset compatível com Firebase Auth (sem backend):
+  // Reabilita a migração lazy — grava a nova senha provisória e
+  // limpa o vínculo do Auth, para que a conta seja recriada no
+  // próximo login do colaborador. Ver guia para o caso "senha
+  // esquecida" (exige excluir a conta no console primeiro).
   const handleResetPassword = async (id, newPw) => {
-    if (!newPw || newPw.length < 4) return;
-    await onUpdate(id, { password: newPw, firstAccess: true });
+    if (!newPw || newPw.length < 6) return { ok: false };
+    const res = await onUpdate(id, {
+      password: newPw,
+      firstAccess: true,
+      authUid: null,
+      authMigrated: false,
+    });
+    return { ok: res.success };
   };
 
   return (
@@ -67,6 +90,16 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
                 {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
               </select>
             </div>
+            {form.sector === 'comercial' && (
+              <div style={S.field}>
+                <label style={S.label}>FUNÇÃO COMERCIAL *</label>
+                <select style={S.select} value={form.commercialRole} onChange={e => set('commercialRole', e.target.value)}>
+                  <option value="">Selecionar função</option>
+                  <option value="sdr">🎯 SDR (prospecção)</option>
+                  <option value="closer">🤝 Closer (fechamento)</option>
+                </select>
+              </div>
+            )}
             <div style={S.field}>
               <label style={S.label}>TELEFONE</label>
               <input style={S.input} value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="(47) 9 9999-9999" />
@@ -78,7 +111,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
             <div style={S.field}>
               <label style={S.label}>SENHA PROVISÓRIA *</label>
               <div style={{ position: 'relative' }}>
-                <input style={{ ...S.input, paddingRight: 40 }} type={showPw ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Mínimo 4 caracteres" />
+                <input style={{ ...S.input, paddingRight: 40 }} type={showPw ? 'text' : 'password'} value={form.password} onChange={e => set('password', e.target.value)} placeholder="Mínimo 6 caracteres" />
                 <button type="button" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }} onClick={() => setShowPw(!showPw)}>
                   {showPw ? <EyeOff size={14} color="var(--muted)" /> : <Eye size={14} color="var(--muted)" />}
                 </button>
@@ -120,7 +153,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
                   sector={sector}
                   isEditing={editId === collab.id}
                   editForm={editForm}
-                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false }); }}
+                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, commercialRole: collab.commercialRole || '', isAdmin: collab.isAdmin || false }); }}
                   onSaveEdit={() => handleEdit(collab.id)}
                   onCancelEdit={() => setEditId(null)}
                   onEditFormChange={(k, v) => setEditForm(f => ({ ...f, [k]: v }))}
@@ -143,6 +176,14 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
 function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, onCancelEdit, onEditFormChange, onToggleActive, onDelete, onConfirmDelete, onCancelDelete, confirmDelete, onResetPassword }) {
   const [resetPw, setResetPw] = useState('');
   const [showReset, setShowReset] = useState(false);
+  const [resetMsg, setResetMsg] = useState('');
+
+  const doReset = async () => {
+    if (resetPw.length < 6) { setResetMsg('Mínimo 6 caracteres.'); return; }
+    const r = await onResetPassword(resetPw);
+    if (r?.ok) { setResetPw(''); setShowReset(false); setResetMsg(''); }
+    else setResetMsg('Falha ao redefinir.');
+  };
 
   return (
     <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, opacity: collab.active ? 1 : 0.5, transition: 'opacity .3s' }}>
@@ -153,6 +194,13 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
           <select style={S.select} value={editForm.sector} onChange={e => onEditFormChange('sector', e.target.value)}>
             {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
           </select>
+          {editForm.sector === 'comercial' && (
+            <select style={S.select} value={editForm.commercialRole || ''} onChange={e => onEditFormChange('commercialRole', e.target.value)}>
+              <option value="">Função comercial...</option>
+              <option value="sdr">🎯 SDR</option>
+              <option value="closer">🤝 Closer</option>
+            </select>
+          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
             <input type="checkbox" checked={editForm.isAdmin} onChange={e => onEditFormChange('isAdmin', e.target.checked)} style={{ accentColor: 'var(--neon)' }} />
             Permissões de Admin
@@ -190,13 +238,24 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               {collab.active ? '● Ativo' : '○ Inativo'}
             </span>
             {collab.isAdmin && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)', fontFamily: 'var(--fm)' }}>👑 Admin</span>}
+            {collab.sector === 'comercial' && collab.commercialRole && (
+              <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: `${sector.color}1a`, color: sector.color, border: `1px solid ${sector.color}40`, fontFamily: 'var(--fm)' }}>
+                {collab.commercialRole === 'sdr' ? '🎯 SDR' : '🤝 Closer'}
+              </span>
+            )}
             {collab.firstAccess && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>1º Acesso pendente</span>}
           </div>
           {showReset
-            ? <div style={{ display: 'flex', gap: 6 }}>
-                <input style={{ ...S.input, flex: 1, fontSize: 12, padding: '6px 10px' }} placeholder="Nova senha provisória" value={resetPw} onChange={e => setResetPw(e.target.value)} />
-                <button style={{ ...S.iconBtnGreen, padding: '6px 10px' }} onClick={() => { onResetPassword(resetPw); setResetPw(''); setShowReset(false); }}><Check size={13} /></button>
-                <button style={{ ...S.iconBtn, padding: '6px 8px' }} onClick={() => setShowReset(false)}><X size={13} /></button>
+            ? <div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input style={{ ...S.input, flex: 1, fontSize: 12, padding: '6px 10px' }} placeholder="Nova senha (mín. 6)" value={resetPw} onChange={e => setResetPw(e.target.value)} />
+                  <button style={{ ...S.iconBtnGreen, padding: '6px 10px' }} onClick={doReset}><Check size={13} /></button>
+                  <button style={{ ...S.iconBtn, padding: '6px 8px' }} onClick={() => { setShowReset(false); setResetMsg(''); }}><X size={13} /></button>
+                </div>
+                {resetMsg && <p style={{ fontSize: 10, color: 'var(--neon)', marginTop: 4 }}>{resetMsg}</p>}
+                <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4 }}>
+                  Se o colaborador esqueceu a senha, exclua a conta dele em Authentication no console do Firebase antes de redefinir.
+                </p>
               </div>
             : <button style={{ fontSize: 11, color: 'var(--muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 0', textDecoration: 'underline', textUnderlineOffset: 2 }} onClick={() => setShowReset(true)}>Redefinir senha</button>
           }
