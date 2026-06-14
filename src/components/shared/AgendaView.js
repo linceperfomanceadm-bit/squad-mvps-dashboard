@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, ExternalLink, Save } from 'lucide-react';
+import { Calendar, Save } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAppConfig } from '../../hooks/useAppConfig';
 
