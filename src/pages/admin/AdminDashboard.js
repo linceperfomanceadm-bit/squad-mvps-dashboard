@@ -1,15 +1,19 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useLeads } from '../../hooks/useLeads';
+import { useCommercialGoals } from '../../hooks/useCloserData';
 import { useToast } from '../../components/shared/Toast';
 import AdminOverview from '../../components/admin/AdminOverview';
 import AdminFeed from '../../components/admin/AdminFeed';
 import AdminCharts from '../../components/admin/AdminCharts';
 import AdminClients from '../../components/admin/AdminClients';
 import AdminCollaborators from '../../components/admin/AdminCollaborators';
+import AdminLeads from '../../components/admin/AdminLeads';
+import AdminGoals from '../../components/admin/AdminGoals';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import { SECTORS } from '../../lib/firebase';
@@ -18,6 +22,8 @@ const NAV = [
   { key: 'overview',      label: 'Visão Geral',    icon: LayoutDashboard },
   { key: 'kanban',        label: 'Tasks',           icon: Kanban },
   { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
+  { key: 'leads',         label: 'Leads',           icon: Target },
+  { key: 'goals',         label: 'Metas',           icon: TrendingUp },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
   { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
@@ -34,6 +40,8 @@ export default function AdminDashboard() {
     updateBrandbook,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
+  const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
+  const { goals, saveGoals } = useCommercialGoals();
   const {
     tasks, loading: loadingTasks,
     createTask, moveToProduction, moveToApproval,
@@ -44,7 +52,7 @@ export default function AdminDashboard() {
   const [taskSectorFilter, setTaskSectorFilter] = useState('');
   const [taskCollabFilter, setTaskCollabFilter] = useState('');
 
-  const loading = loadingClients || loadingCollabs || loadingTasks;
+  const loading = loadingClients || loadingCollabs || loadingTasks || loadingLeads;
 
   const handleAddClient = async (data) => {
     const res = await addClient(data);
@@ -178,6 +186,16 @@ export default function AdminDashboard() {
           />
         ) : page === 'charts' ? (
           <AdminCharts clients={clients} tasks={tasks} />
+        ) : page === 'leads' ? (
+          <AdminLeads
+            leads={leads}
+            onAdd={addLead}
+            onAddBulk={addLeadsBulk}
+            onDelete={deleteLead}
+            toast={toast}
+          />
+        ) : page === 'goals' ? (
+          <AdminGoals goals={goals} collaborators={collaborators} onSave={saveGoals} toast={toast} />
         ) : page === 'vault' ? (
           <VaultPage
             clients={clients}
