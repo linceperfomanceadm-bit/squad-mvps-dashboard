@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -12,6 +13,15 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+// ─── Auth: synthetic email domain ─────────────────────────────
+// Firebase Auth autentica por email. O usuário continua digitando
+// apenas o loginId; o app converte loginId -> email sintético com
+// este domínio interno (nunca enviado a lugar nenhum).
+export const AUTH_EMAIL_DOMAIN = 'squadmvps.interno';
+export const loginIdToEmail = (loginId) =>
+  `${String(loginId).trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
 
 // ─── Sectors ──────────────────────────────────────────────────
 export const SECTORS = {
