@@ -1,20 +1,23 @@
 import { useState, useEffect } from 'react';
 import {
-  collection, onSnapshot, updateDoc, doc, query, orderBy,
+  collection, onSnapshot, updateDoc, doc, query, orderBy, serverTimestamp, addDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
 /*
- * Coleção `deals` — criada pelo SDR (Bloco 3) ao agendar uma call.
+ * Coleção `deals` — calls do funil comercial.
  *
- * status:
- *   scheduled    → call marcada, aguardando o Closer
- *   won          → ganho (briefing preenchido) → segue para CS
- *   lost         → perdido (com motivo)
- *   noshow       → cliente não apareceu
- *   standby      → retomar no futuro (standbyAt)
- *   awaiting_cs  → ganho + briefing enviado, na fila do CS
- *   active       → CS concluiu o setup, virou cliente
+ * status (fluxo do Closer):
+ *   available    → call agendada pelo SDR, disponível para qualquer closer puxar
+ *   claimed      → puxada por um closer (vai para a agenda interna dele)
+ *   won          → ganho → vira awaiting_cs (CS)
+ *   lost         → perdido (recuperável)
+ *   standby      → retomar no futuro (recuperável)
+ *   noshow       → cliente não compareceu (lead volta ao SDR com flag)
+ *   awaiting_cs  → ganho + briefing → fila do CS
+ *   active       → CS concluiu o setup
+ *
+ * Calls manuais do closer (sem SDR) nascem já com status 'claimed'.
  */
 export function useDeals() {
   const [deals, setDeals] = useState([]);
@@ -28,24 +31,61 @@ export function useDeals() {
     });
   }, []);
 
-  // Closer assume o deal (claim leve).
-  const claimDeal = async (dealId, closerName) => {
-    try {
-      const d = deals.find(x => x.id === dealId);
-      await updateDoc(doc(db, 'deals', dealId), {
-        closerName: d?.closerName || closerName,
-      });
-      return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
-  };
-
   const updateDeal = async (dealId, data) => {
     try { await updateDoc(doc(db, 'deals', dealId), data); return { success: true }; }
     catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Closer puxa uma call disponível para a agenda dele ───────
+  const claimCall = async (dealId, closerName) => {
+    const d = deals.find(x => x.id === dealId);
+    if (d && d.status === 'claimed' && d.closerName && d.closerName !== closerName) {
+      return { success: false, error: 'Essa call já foi puxada por outro closer.' };
+    }
+    return updateDeal(dealId, {
+      status: 'claimed', closerName, claimedAt: new Date().toISOString(),
+    });
+  };
+
+  // ── Closer devolve a call para "disponíveis" (exige justificativa) ──
+  const releaseCall = async (dealId, closerName, reason) => {
+    if (!reason || !reason.trim()) return { success: false, error: 'Justifique a devolução.' };
+    const d = deals.find(x => x.id === dealId);
+    const releaseLog = [...(d?.releaseLog || []), { by: closerName, reason: reason.trim(), at: new Date().toISOString() }];
+    return updateDeal(dealId, {
+      status: 'available', closerName: null, claimedAt: null, releaseLog,
+    });
+  };
+
+  // ── Closer cadastra call manual (não veio do SDR) ────────────
+  const addManualCall = async (closerName, { leadName, company, callAt, meetLink, pains }) => {
+    try {
+      const ref = await addDoc(collection(db, 'deals'), {
+        leadId: null, leadName: (leadName || '').trim(), leadPhone: '',
+        company: (company || '').trim(),
+        sdrName: null, manual: true,
+        callAt, meetLink: (meetLink || '').trim(), pains: (pains || '').trim(),
+        sdrLogs: [],
+        status: 'claimed', closerName, claimedAt: new Date().toISOString(),
+        outcome: null, briefing: null,
+        createdAt: serverTimestamp(),
+      });
+      return { success: true, id: ref.id };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Encerramento da call ─────────────────────────────────────
+
+  // No-show: devolve o lead ao SDR com flag e marca o deal.
   const closeNoShow = async (dealId, closerName) => {
+    const d = deals.find(x => x.id === dealId);
+    if (d?.leadId) {
+      try {
+        await updateDoc(doc(db, 'leads', d.leadId), {
+          status: 'queue', noShowFlag: true, followupAt: null, dealId: null,
+        });
+      } catch {}
+    }
     return updateDeal(dealId, {
       status: 'noshow', closerName, outcome: 'noshow',
       closedAt: new Date().toISOString(),
@@ -68,24 +108,50 @@ export function useDeals() {
     });
   };
 
-  // Ganho: grava o briefing e manda para o CS.
+  // Ganho: grava briefing (com valor da venda) e manda para o CS.
   const closeWon = async (dealId, closerName, briefing) => {
     return updateDeal(dealId, {
       status: 'awaiting_cs', closerName, outcome: 'won',
       briefing,
+      saleValue: briefing?.saleMonthly ? Number(briefing.saleMonthly) : null,
+      saleMonths: briefing?.saleMonths ? Number(briefing.saleMonths) : null,
+      saleTotal: (briefing?.saleMonthly && briefing?.saleMonths)
+        ? Number(briefing.saleMonthly) * Number(briefing.saleMonths) : null,
       wonAt: new Date().toISOString(),
       closedAt: new Date().toISOString(),
     });
   };
 
-  // Anotações da call (rich text) — salvas no deal.
+  // ── Recuperar deal encerrado (standby/lost/noshow) → agenda do closer ──
+  const recoverDeal = async (dealId, closerName) => {
+    return updateDeal(dealId, {
+      status: 'claimed', closerName, outcome: null,
+      lostReason: null, standbyAt: null, closedAt: null,
+      recoveredAt: new Date().toISOString(),
+    });
+  };
+
   const saveCallNotes = async (dealId, notesHtml) => {
     return updateDeal(dealId, { callNotes: notesHtml });
   };
 
   return {
-    deals, loading,
-    claimDeal, updateDeal,
-    closeNoShow, closeLost, closeStandby, closeWon, saveCallNotes,
+    deals, loading, updateDeal,
+    claimCall, releaseCall, addManualCall,
+    closeNoShow, closeLost, closeStandby, closeWon,
+    recoverDeal, saveCallNotes,
   };
+}
+
+// Detecta conflito de horário (janela de 1h) entre uma call candidata
+// e as calls que o closer já tem na agenda.
+export function hasConflict(candidateCallAt, closerDeals, windowMs = 60 * 60 * 1000) {
+  if (!candidateCallAt) return null;
+  const t = new Date(candidateCallAt).getTime();
+  for (const d of closerDeals) {
+    if (!d.callAt) continue;
+    const dt = new Date(d.callAt).getTime();
+    if (Math.abs(dt - t) < windowMs) return d;
+  }
+  return null;
 }

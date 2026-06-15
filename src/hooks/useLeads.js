@@ -181,7 +181,9 @@ export function useLeads() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── SDR: reabrir lead (followup vencido ou frio) → fila ──────
+  // ── SDR: reabrir lead (qualquer estado) → volta para a fila ──
+  // Restaura tentativas (senão um lead esgotado voltaria com 0 e não
+  // poderia ser trabalhado) e limpa flags de no-show/perdido.
   const reopenLead = async (leadId, sdrName) => {
     try {
       const lead = leads.find(l => l.id === leadId);
@@ -189,7 +191,31 @@ export function useLeads() {
       const now = new Date().toISOString();
       const logs = appendLog(lead, { type: 'reopened', by: sdrName, at: now });
       await updateDoc(doc(db, 'leads', leadId), {
-        status: 'queue', followupAt: null, logs,
+        status: 'queue',
+        followupAt: null,
+        attemptsLeft: DEFAULT_ATTEMPTS, // recomeça com tentativas cheias
+        lostReason: null,
+        lostAt: null,
+        noShowFlag: false,
+        logs,
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Closer → SDR: no-show devolve o lead para a fila com flag ──
+  const returnFromNoShow = async (leadId) => {
+    try {
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead) return { success: false, error: 'Lead não encontrado' };
+      const now = new Date().toISOString();
+      const logs = appendLog(lead, { type: 'noshow_return', by: 'Closer', at: now });
+      await updateDoc(doc(db, 'leads', leadId), {
+        status: 'queue',
+        noShowFlag: true, // SDR vê que precisa reagendar
+        followupAt: null,
+        dealId: null,
+        logs,
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
@@ -214,8 +240,8 @@ export function useLeads() {
         meetLink: (meetLink || '').trim(),
         pains: (pains || '').trim(),
         sdrLogs: lead.logs || [],
-        // Estado do Closer (preenchido nos blocos seguintes).
-        status: 'scheduled', // scheduled → won/lost/noshow/standby (Closer)
+        // Estado do Closer: disponível para qualquer closer puxar.
+        status: 'available',
         closerName: null,
         outcome: null,
         briefing: null,
@@ -236,7 +262,7 @@ export function useLeads() {
     leads, loading,
     addLead, addLeadsBulk, updateLead, deleteLead,
     claimLead, logMessageSent, markLost, scheduleFollowup,
-    markCold, reopenLead, scheduleCall,
+    markCold, reopenLead, returnFromNoShow, scheduleCall,
   };
 }
 
