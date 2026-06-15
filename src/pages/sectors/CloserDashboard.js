@@ -432,6 +432,7 @@ function GoalBar({ label, value, goal, color }) {
 
 function Empty({ msg }) { return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>{msg}</p>; }
 const BTN_BIG = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#fff', width: '100%' };
+const CARD = { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 };
 
 // ════════════════════════════════════════════════════════════════
 // MODO SHOWTIME
