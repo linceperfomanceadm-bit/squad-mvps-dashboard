@@ -27,19 +27,16 @@ export default function SDRDashboard() {
 
   const [page, setPage] = useState('queue');
   const [selectedId, setSelectedId] = useState(null);
-  const [tick, setTick] = useState(0);
+  const [now, setNow] = useState(Date.now());
 
-  // Reavalia follow-ups vencidos a cada minuto (faz o lead "voltar
-  // sozinho" para a fila quando chega a hora, sem recarregar a página).
+  // Atualiza 'now' a cada minuto, fazendo follow-ups vencidos voltarem
+  // sozinhos para a fila sem recarregar a página.
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60000);
+    const id = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(id);
   }, []);
 
   const me = user?.name;
-  // 'now' é recalculado sempre que o tick avança (a cada minuto), o que
-  // faz os follow-ups vencidos voltarem para a fila sem recarregar.
-  const now = useMemo(() => Date.now(), [tick]);
 
   // ── Particiona os leads por destino ─────────────────────────
   const buckets = useMemo(() => {
