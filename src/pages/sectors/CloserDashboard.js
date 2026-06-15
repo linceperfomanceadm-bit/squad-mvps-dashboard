@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   CalendarClock, CheckSquare, Calendar, MessageSquare,
   Video, X, Plus, Trash2, Edit2, Check, ChevronDown, Bold, List,
-  AlertTriangle, RotateCcw, Inbox, Undo2,
+  AlertTriangle, RotateCcw, Inbox, Undo2, Columns,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -26,7 +26,7 @@ export default function CloserDashboard() {
   const {
     deals, loading,
     claimCall, releaseCall, addManualCall,
-    closeNoShow, closeLost, closeStandby, closeWon, recoverDeal, saveCallNotes,
+    closeNoShow, closeLost, closeStandby, closeWon, recoverDeal, saveCallNotes, deleteManualCall,
   } = useDeals();
   const { goals } = useCommercialGoals();
   const objections = useObjections(user?.authUid);
@@ -97,7 +97,8 @@ export default function CloserDashboard() {
           page === 'available' ? (
             <AvailableView list={available} me={me} goalMe={goalMe} wonMe={wonMe} goalTeam={goalTeam} wonTeam={wonTeam} onClaim={tryClaim} />
           ) : page === 'agenda-int' ? (
-            <InternalAgenda list={myAgenda} onStart={tryStart} onRelease={setReleaseTarget} onAddManual={() => setShowManual(true)} />
+            <InternalAgenda list={myAgenda} onStart={tryStart} onRelease={setReleaseTarget} onAddManual={() => setShowManual(true)}
+              onDelete={async (id) => { const r = await deleteManualCall(id, user); if (r.success) toast('Call manual excluída.'); else toast(r.error, 'e'); }} />
           ) : page === 'recover' ? (
             <RecoverView list={recoverable} onRecover={async (id) => { const r = await recoverDeal(id, me); if (r.success) toast('Call recuperada para sua agenda.'); else toast(r.error, 'e'); }} />
           ) : page === 'objections' ? (
@@ -198,10 +199,11 @@ function AvailableView({ list, goalMe, wonMe, goalTeam, wonTeam, onClaim }) {
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Puxe uma call para sua agenda. Uma vez puxada, some para os outros closers.</p>
       </div>
 
-      {/* Metas (sem R$) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 22 }}>
-        <GoalBar label="Minhas vendas (mês)" value={wonMe} goal={goalMe} color="#22c55e" />
-        <GoalBar label="Vendas do time (mês)" value={wonTeam} goal={goalTeam} color={ACCENT} />
+      {/* Metas do mês (sempre visíveis) */}
+      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', marginBottom: 10 }}>📊 METAS DO MÊS</p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+        <GoalBar label="Minhas vendas" value={wonMe} goal={goalMe} color="#22c55e" />
+        <GoalBar label="Vendas do time" value={wonTeam} goal={goalTeam} color={ACCENT} />
       </div>
 
       {list.length === 0 ? (
@@ -228,9 +230,10 @@ function AvailableView({ list, goalMe, wonMe, goalTeam, wonTeam, onClaim }) {
   );
 }
 
-// ── Agenda interna (estilo Google Agenda, semana atual) ────────
-function InternalAgenda({ list, onStart, onRelease, onAddManual }) {
-  // agrupa por dia
+// ── Agenda interna (lista OU colunas por dia) ──────────────────
+function InternalAgenda({ list, onStart, onRelease, onAddManual, onDelete }) {
+  const [view, setView] = useState('list'); // 'list' | 'columns'
+
   const days = useMemo(() => {
     const map = {};
     list.forEach(d => {
@@ -248,14 +251,26 @@ function InternalAgenda({ list, onStart, onRelease, onAddManual }) {
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Minha Agenda</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>Suas calls da semana. Só você vê esta agenda.</p>
         </div>
-        <button onClick={onAddManual} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 10, padding: '10px 16px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-          <Plus size={15} /> Cadastrar call manual
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* Toggle de visualização */}
+          <div style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: 3 }}>
+            <button onClick={() => setView('list')} title="Lista" style={{ display: 'flex', alignItems: 'center', gap: 5, background: view === 'list' ? `${ACCENT}22` : 'transparent', color: view === 'list' ? ACCENT : 'var(--muted)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              <List size={14} /> Lista
+            </button>
+            <button onClick={() => setView('columns')} title="Colunas" style={{ display: 'flex', alignItems: 'center', gap: 5, background: view === 'columns' ? `${ACCENT}22` : 'transparent', color: view === 'columns' ? ACCENT : 'var(--muted)', border: 'none', borderRadius: 7, padding: '6px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+              <Columns size={14} /> Colunas
+            </button>
+          </div>
+          <button onClick={onAddManual} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 10, padding: '10px 16px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+            <Plus size={15} /> Call manual
+          </button>
+        </div>
       </div>
 
       {list.length === 0 ? (
         <Empty msg="Nenhuma call na sua agenda. Puxe uma das disponíveis ou cadastre manualmente." />
-      ) : (
+      ) : view === 'list' ? (
+        // ── Modo LISTA ──
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           {days.map(([day, items]) => (
             <div key={day}>
@@ -265,31 +280,61 @@ function InternalAgenda({ list, onStart, onRelease, onAddManual }) {
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{items.length} call{items.length > 1 ? 's' : ''}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 16, borderLeft: `2px solid ${ACCENT}30` }}>
-                {items.map(d => (
-                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
-                    <div style={{ textAlign: 'center', minWidth: 52 }}>
-                      <p style={{ fontSize: 16, fontWeight: 800, color: ACCENT, fontFamily: 'var(--fm)' }}>{fmtTime(d.callAt)}</p>
-                      {d.manual && <span style={{ fontSize: 8, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>MANUAL</span>}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{d.leadName}</p>
-                      {d.company && <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.company}</p>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                      <button onClick={() => onStart(d)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
-                        <Video size={13} /> Iniciar
-                      </button>
-                      <button onClick={() => onRelease(d)} title="Devolver para disponíveis" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
-                        <Undo2 size={13} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {items.map(d => <CallCard key={d.id} d={d} onStart={onStart} onRelease={onRelease} onDelete={onDelete} />)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        // ── Modo COLUNAS (cada dia uma coluna) ──
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+          {days.map(([day, items]) => (
+            <div key={day} style={{ minWidth: 240, flex: '0 0 240px', display: 'flex', flexDirection: 'column' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, paddingBottom: 8, borderBottom: `2px solid ${ACCENT}40` }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{dayLabel(day)}</span>
+                <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginLeft: 'auto' }}>{items.length}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {items.map(d => <CallCard key={d.id} d={d} onStart={onStart} onRelease={onRelease} onDelete={onDelete} compact />)}
               </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// Card de call reutilizado nos dois modos.
+function CallCard({ d, onStart, onRelease, onDelete, compact }) {
+  return (
+    <div style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 12, padding: compact ? '10px 12px' : '12px 14px' }}>
+      <div style={{ display: 'flex', alignItems: compact ? 'flex-start' : 'center', gap: 12, flexDirection: compact ? 'column' : 'row' }}>
+        {!compact && (
+          <div style={{ textAlign: 'center', minWidth: 52 }}>
+            <p style={{ fontSize: 16, fontWeight: 800, color: ACCENT, fontFamily: 'var(--fm)' }}>{fmtTime(d.callAt)}</p>
+            {d.manual && <span style={{ fontSize: 8, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>MANUAL</span>}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0, width: compact ? '100%' : 'auto' }}>
+          {compact && <p style={{ fontSize: 13, fontWeight: 800, color: ACCENT, fontFamily: 'var(--fm)' }}>{fmtTime(d.callAt)}{d.manual && <span style={{ fontSize: 8, color: 'var(--muted)', marginLeft: 6 }}>MANUAL</span>}</p>}
+          <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{d.leadName}</p>
+          {d.company && <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.company}</p>}
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: compact ? '100%' : 'auto', marginTop: compact ? 8 : 0 }}>
+          <button onClick={() => onStart(d)} style={{ flex: compact ? 1 : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            <Video size={13} /> Iniciar
+          </button>
+          <button onClick={() => onRelease(d)} title="Devolver para disponíveis" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
+            <Undo2 size={13} />
+          </button>
+          {d.manual && (
+            <button onClick={() => onDelete(d.id)} title="Excluir call manual" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -416,16 +461,24 @@ function ConfirmModal({ icon, title, message, confirmLabel, confirmColor, onConf
 }
 
 function GoalBar({ label, value, goal, color }) {
-  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0;
+  const hasGoal = goal > 0;
+  const pct = hasGoal ? Math.min(100, Math.round((value / goal) * 100)) : 0;
   return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>
-        <span style={{ fontSize: 18, fontWeight: 800, color }}>{value}{goal > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}> / {goal}</span>}</span>
+    <div style={{ background: 'rgba(12,12,24,.88)', border: `1px solid ${color}33`, borderRadius: 14, padding: 18, position: 'relative', overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color},transparent)` }} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{label}</span>
+        <span style={{ fontSize: 24, fontWeight: 800, color }}>
+          {value}
+          {hasGoal
+            ? <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}> / {goal}</span>
+            : <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginLeft: 6 }}>sem meta</span>}
+        </span>
       </div>
-      <div style={{ height: 6, borderRadius: 4, background: 'var(--surface)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width .4s' }} />
+      <div style={{ height: 8, borderRadius: 4, background: 'var(--surface)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width .4s', boxShadow: pct > 0 ? `0 0 10px ${color}88` : 'none' }} />
       </div>
+      {hasGoal && pct >= 100 && <p style={{ fontSize: 11, color: '#22c55e', fontWeight: 700, fontFamily: 'var(--fm)', marginTop: 6 }}>🎉 Meta batida!</p>}
     </div>
   );
 }
