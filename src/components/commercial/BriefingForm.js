@@ -19,7 +19,7 @@ const emptyBriefing = {
   // Cadastral
   companyName: '', cnpj: '', contactName: '', contactPhone: '', contactEmail: '',
   // Escopo
-  services: [], scope: '', budget: '',
+  services: [], scope: '', budget: '', saleMonthly: '', saleMonths: '',
   // Inteligência
   pains: '', goals: '', competitors: '', decisionMaker: '',
   // Técnico
@@ -108,7 +108,20 @@ export default function BriefingForm({ initial, onSubmit, onCancel }) {
                 {data.scope.trim().length} / {MIN_SCOPE}
               </div>
             </F>
-            <F label="VERBA / INVESTIMENTO *" err={errors.field.budget}><input style={INP} value={data.budget} onChange={e => set('budget', e.target.value)} placeholder="Ex: 2500 (valor mensal acordado)" /></F>
+            <F label="VERBA / INVESTIMENTO *" err={errors.field.budget}><input style={INP} value={data.budget} onChange={e => set('budget', e.target.value)} placeholder="Ex: 2500 (verba que o cliente pode investir)" /></F>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <F label="VALOR DA VENDA — MENSAL (R$) *" err={errors.field.saleMonthly}>
+                <input style={INP} type="number" min="0" value={data.saleMonthly} onChange={e => set('saleMonthly', e.target.value)} placeholder="Ex: 2500" />
+              </F>
+              <F label="DURAÇÃO (MESES) *" err={errors.field.saleMonths}>
+                <input style={INP} type="number" min="1" value={data.saleMonths} onChange={e => set('saleMonths', e.target.value)} placeholder="Ex: 6" />
+              </F>
+            </div>
+            {data.saleMonthly && data.saleMonths && (
+              <div style={{ fontSize: 12, color: '#22c55e', fontFamily: 'var(--fm)', marginTop: -4, marginBottom: 8 }}>
+                Total do contrato: R$ {(Number(data.saleMonthly) * Number(data.saleMonths)).toLocaleString('pt-BR')}
+              </div>
+            )}
           </div>
         )}
 
@@ -161,11 +174,13 @@ function validate(d) {
   req('services', d.services.length > 0);
   req('scope', d.scope.trim().length >= MIN_SCOPE);
   req('budget', d.budget.trim());
+  req('saleMonthly', String(d.saleMonthly).trim() && Number(d.saleMonthly) > 0);
+  req('saleMonths', String(d.saleMonths).trim() && Number(d.saleMonths) > 0);
   req('pains', d.pains.trim());
 
   const byTab = [
     ['companyName', 'cnpj', 'contactName'].filter(k => field[k]),
-    ['services', 'scope', 'budget'].filter(k => field[k]),
+    ['services', 'scope', 'budget', 'saleMonthly', 'saleMonths'].filter(k => field[k]),
     ['pains'].filter(k => field[k]),
     [],
   ];
