@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import {
-  collection, onSnapshot, updateDoc, doc, query, orderBy, serverTimestamp, addDoc,
+  collection, onSnapshot, updateDoc, doc, query, orderBy, serverTimestamp, addDoc, deleteDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -131,6 +131,17 @@ export function useDeals() {
     });
   };
 
+  // ── Excluir call manual (só o closer que criou OU admin) ─────
+  const deleteManualCall = async (dealId, requester) => {
+    const d = deals.find(x => x.id === dealId);
+    if (!d) return { success: false, error: 'Call não encontrada.' };
+    if (!d.manual) return { success: false, error: 'Só calls manuais podem ser excluídas.' };
+    const allowed = requester?.isAdmin || d.closerName === requester?.name;
+    if (!allowed) return { success: false, error: 'Sem permissão para excluir esta call.' };
+    try { await deleteDoc(doc(db, 'deals', dealId)); return { success: true }; }
+    catch (err) { return { success: false, error: err.message }; }
+  };
+
   const saveCallNotes = async (dealId, notesHtml) => {
     return updateDeal(dealId, { callNotes: notesHtml });
   };
@@ -139,7 +150,7 @@ export function useDeals() {
     deals, loading, updateDeal,
     claimCall, releaseCall, addManualCall,
     closeNoShow, closeLost, closeStandby, closeWon,
-    recoverDeal, saveCallNotes,
+    recoverDeal, saveCallNotes, deleteManualCall,
   };
 }
 
