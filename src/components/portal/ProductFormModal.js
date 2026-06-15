@@ -45,9 +45,9 @@ export default function ProductFormModal({ product, onClose, onSave, uploadImage
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Upload de fotos. Na edição já temos id; na criação, fazemos upload
-  // depois de salvar (ver handleSave) — aqui guardamos os File pendentes.
-  const [pendingFiles, setPendingFiles] = useState([]);
+  // Fotos: na edição sobem direto (já há id). Na criação, o upload é
+  // feito depois — por ora o cliente salva e reabre em "Editar" para
+  // anexar (sinalizado na UI). Aqui mostramos só o preview local.
 
   const handleFiles = async (fileList) => {
     const files = Array.from(fileList);
@@ -63,9 +63,7 @@ export default function ProductFormModal({ product, onClose, onSave, uploadImage
       }
       setUploading(false);
     } else {
-      // ainda não há id — guarda para subir após salvar
-      setPendingFiles(prev => [...prev, ...files]);
-      // preview local
+      // ainda não há id — mostra só preview local (upload na edição)
       files.forEach(file => {
         const url = URL.createObjectURL(file);
         setImages(prev => [...prev, { url, _local: true }]);
@@ -82,7 +80,6 @@ export default function ProductFormModal({ product, onClose, onSave, uploadImage
       await onSave({ images: next }, product.id);
     } else {
       setImages(prev => prev.filter((_, i) => i !== idx));
-      setPendingFiles(prev => prev.filter((_, i) => i !== idx));
     }
   };
 
