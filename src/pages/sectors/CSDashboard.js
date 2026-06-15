@@ -1,15 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  LayoutDashboard, ClipboardList, CheckSquare, Calendar, X, Check, FileText,
+  LayoutDashboard, ClipboardList, CheckSquare, Calendar, X, Check, FileText, Activity,
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useDeals } from '../../hooks/useDeals';
+import { useTasks } from '../../hooks/useTasks';
 import Sidebar from '../../components/shared/Sidebar';
 import { SECTORS } from '../../lib/firebase';
 import CSActivateModal from '../../components/commercial/CSActivateModal';
+import CSHealth from '../../components/commercial/CSHealth';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 
@@ -17,9 +19,10 @@ const COLOR = SECTORS.cs.color;
 
 export default function CSDashboard() {
   const { toast } = useToast();
-  const { addClient } = useClients();
+  const { clients, addClient, updateClient } = useClients();
   const { collaborators } = useCollaborators();
   const { deals, loading, updateDeal } = useDeals();
+  const { tasks } = useTasks();
 
   const [page, setPage] = useState('onboarding');
   const [openDeal, setOpenDeal] = useState(null);   // deal aberto (briefing)
@@ -30,6 +33,7 @@ export default function CSDashboard() {
 
   const NAV = [
     { key: 'onboarding', label: 'Onboarding', icon: ClipboardList, badge: queue.length, badgeDanger: queue.length > 0 },
+    { key: 'health',     label: 'Saúde',       icon: Activity },
     { key: 'overview',   label: 'Visão Geral', icon: LayoutDashboard },
     { key: 'todo',       label: 'Meu Dia',     icon: CheckSquare },
     { key: 'agenda',     label: 'Agenda',      icon: Calendar },
@@ -53,6 +57,8 @@ export default function CSDashboard() {
         {loading ? <Spinner /> :
           page === 'onboarding' ? (
             <Onboarding queue={queue} onOpen={setOpenDeal} />
+          ) : page === 'health' ? (
+            <CSHealth clients={clients} tasks={tasks} onUpdateClient={updateClient} toast={toast} />
           ) : page === 'overview' ? (
             <Overview queue={queue} activated={activated} />
           ) : page === 'todo' ? (
