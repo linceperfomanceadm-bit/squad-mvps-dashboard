@@ -152,6 +152,7 @@ function ManualCallsBlock({ deals, onDeleteCall, user }) {
       </div>
     </div>
   );
+}
 
 function TotalCard({ icon, label, value, color, small }) {
   return (
