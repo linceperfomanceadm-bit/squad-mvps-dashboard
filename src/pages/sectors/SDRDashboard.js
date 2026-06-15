@@ -37,7 +37,9 @@ export default function SDRDashboard() {
   }, []);
 
   const me = user?.name;
-  const now = Date.now();
+  // 'now' é recalculado sempre que o tick avança (a cada minuto), o que
+  // faz os follow-ups vencidos voltarem para a fila sem recarregar.
+  const now = useMemo(() => Date.now(), [tick]);
 
   // ── Particiona os leads por destino ─────────────────────────
   const buckets = useMemo(() => {
@@ -65,7 +67,7 @@ export default function SDRDashboard() {
     // Ordena a fila: follow-ups vencidos primeiro, depois mais antigos.
     queue.sort((a, b) => (b._followupDue ? 1 : 0) - (a._followupDue ? 1 : 0));
     return { queue, cold, scheduled, lost };
-  }, [leads, me, now, tick]);
+  }, [leads, me, now]);
 
   const selected = leads.find(l => l.id === selectedId) || null;
 

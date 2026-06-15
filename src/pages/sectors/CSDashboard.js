@@ -3,7 +3,6 @@ import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, ClipboardList, CheckSquare, Calendar, X, Check, FileText,
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -17,7 +16,6 @@ import AgendaView from '../../components/shared/AgendaView';
 const COLOR = SECTORS.cs.color;
 
 export default function CSDashboard() {
-  const { user } = useAuth();
   const { toast } = useToast();
   const { addClient } = useClients();
   const { collaborators } = useCollaborators();

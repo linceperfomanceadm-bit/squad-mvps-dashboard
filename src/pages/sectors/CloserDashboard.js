@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, Briefcase, CheckSquare, Calendar, MessageSquare,
-  Phone, Clock, Video, X, Plus, Trash2, Edit2, Check, ChevronDown, Bold, List,
+  Video, X, Plus, Trash2, Edit2, Check, ChevronDown, Bold, List,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
