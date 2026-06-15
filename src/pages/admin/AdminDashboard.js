@@ -5,6 +5,7 @@ import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useLeads } from '../../hooks/useLeads';
+import { useDeals } from '../../hooks/useDeals';
 import { useCommercialGoals } from '../../hooks/useCloserData';
 import { useToast } from '../../components/shared/Toast';
 import AdminOverview from '../../components/admin/AdminOverview';
@@ -15,6 +16,7 @@ import AdminCollaborators from '../../components/admin/AdminCollaborators';
 import AdminLeads from '../../components/admin/AdminLeads';
 import AdminGoals from '../../components/admin/AdminGoals';
 import AdminAgenda from '../../components/admin/AdminAgenda';
+import AdminCommercialMetrics from '../../components/admin/AdminCommercialMetrics';
 import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
@@ -26,6 +28,7 @@ const NAV = [
   { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
   { key: 'leads',         label: 'Leads',           icon: Target },
   { key: 'goals',         label: 'Metas',           icon: TrendingUp },
+  { key: 'commercial',    label: 'Métricas Comercial', icon: BarChart2 },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
   { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
@@ -45,6 +48,7 @@ export default function AdminDashboard() {
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
   const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
+  const { deals } = useDeals();
   const { goals, saveGoals } = useCommercialGoals();
   const {
     tasks, loading: loadingTasks,
@@ -200,6 +204,8 @@ export default function AdminDashboard() {
           />
         ) : page === 'goals' ? (
           <AdminGoals goals={goals} collaborators={collaborators} onSave={saveGoals} toast={toast} />
+        ) : page === 'commercial' ? (
+          <AdminCommercialMetrics leads={leads} deals={deals} />
         ) : page === 'vault' ? (
           <VaultPage
             clients={clients}
