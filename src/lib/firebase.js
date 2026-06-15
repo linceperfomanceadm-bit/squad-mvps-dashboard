@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -14,6 +15,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app); // fotos dos produtos do portal
 
 // ─── Auth: synthetic email domain ─────────────────────────────
 // Firebase Auth autentica por email. O usuário continua digitando
@@ -105,3 +107,26 @@ export const RECURRENCE_SERVICES = [
 ];
 
 export const SLA_DAYS = 3;
+
+// ─── Portal de Coleta de Produtos (clientes externos) ─────────
+// Plataformas de e-commerce que o cliente pode ter. "Outro" abre
+// campo de texto livre na criação do acesso.
+export const ECOMMERCE_PLATFORMS = [
+  { id: 'shopify',   label: 'Shopify',   color: '#95BF47' },
+  { id: 'tray',      label: 'Tray',      color: '#00A8E0' },
+  { id: 'nuvemshop', label: 'Nuvemshop', color: '#2C6EF2' },
+  { id: 'outro',     label: 'Outro',     color: '#8F97A0' },
+];
+
+// Categorias sugeridas para produtos (livre — o cliente pode digitar).
+export const PRODUCT_CATEGORIES = [
+  'Roupas', 'Calçados', 'Acessórios', 'Beleza', 'Casa', 'Eletrônicos',
+  'Alimentos', 'Pet', 'Infantil', 'Esporte', 'Outro',
+];
+
+// Status da coleta de um cliente do portal.
+export const PORTAL_STATUS = {
+  collecting: { label: 'Coletando',  color: '#f59e0b' },
+  complete:   { label: 'Completo',   color: '#22c55e' },
+  paused:     { label: 'Pausado',    color: '#8F97A0' },
+};
