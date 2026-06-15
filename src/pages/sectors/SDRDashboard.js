@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import {
   Target, Snowflake, CalendarCheck, XCircle, MessageSquare,
-  CheckSquare, Calendar, Phone, Clock, Send, X, Plus, Trash2, Edit2, Check,
+  CheckSquare, Calendar, Phone, Clock, Send, X, Plus, Trash2, Edit2, Check, RotateCcw,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -40,29 +40,36 @@ export default function SDRDashboard() {
 
   // ── Particiona os leads por destino ─────────────────────────
   const buckets = useMemo(() => {
-    const queue = [];   // fila ativa: não reivindicados OU meus, com tentativas
-    const cold = [];    // meus frios manuais
-    const scheduled = []; // meus agendados (viraram deals)
-    const lost = [];    // meus perdidos
+    const queue = [];     // fila ativa
+    const cold = [];      // frios / follow-up pendente
+    const scheduled = []; // agendados (viraram deals)
+    const lost = [];      // perdidos/esgotados/ignorados — TODOS recuperáveis
     for (const l of leads) {
       const mine = !l.claimedBy || l.claimedBy === me;
-      // Follow-up vencido volta para a fila automaticamente.
       const followupDue = l.status === 'followup' && l.followupAt && new Date(l.followupAt).getTime() <= now;
-      if ((l.status === 'queue' || followupDue) && mine && (l.attemptsLeft ?? 0) > 0) {
+      const hasAttempts = (l.attemptsLeft ?? 0) > 0;
+
+      if ((l.status === 'queue' || followupDue) && mine && hasAttempts) {
         queue.push({ ...l, _followupDue: followupDue });
+      } else if (l.status === 'queue' && mine && !hasAttempts) {
+        // esgotou tentativas mas continua recuperável
+        lost.push({ ...l, _exhausted: true });
       } else if (l.status === 'followup' && l.claimedBy === me) {
-        // agendado para o futuro — aparece em "Frios/Agendados SDR" como follow-up pendente
         cold.push({ ...l, _pendingFollowup: true });
       } else if (l.status === 'cold' && l.claimedBy === me) {
         cold.push(l);
       } else if (l.status === 'scheduled' && l.claimedBy === me) {
         scheduled.push(l);
-      } else if (l.status === 'lost' && l.claimedBy === me) {
+      } else if (l.status === 'lost' && (l.claimedBy === me || !l.claimedBy)) {
         lost.push(l);
       }
     }
-    // Ordena a fila: follow-ups vencidos primeiro, depois mais antigos.
-    queue.sort((a, b) => (b._followupDue ? 1 : 0) - (a._followupDue ? 1 : 0));
+    // Fila: no-show (precisa reagendar) e follow-ups vencidos no topo.
+    queue.sort((a, b) => {
+      const pa = (a.noShowFlag ? 2 : 0) + (a._followupDue ? 1 : 0);
+      const pb = (b.noShowFlag ? 2 : 0) + (b._followupDue ? 1 : 0);
+      return pb - pa;
+    });
     return { queue, cold, scheduled, lost };
   }, [leads, me, now]);
 
@@ -72,7 +79,7 @@ export default function SDRDashboard() {
     { key: 'queue',     label: 'Fila de Leads', icon: Target,        badge: buckets.queue.length },
     { key: 'cold',      label: 'Frios / Follow-up', icon: Snowflake, badge: buckets.cold.length },
     { key: 'scheduled', label: 'Agendados',     icon: CalendarCheck, badge: buckets.scheduled.length },
-    { key: 'lost',      label: 'Perdidos',      icon: XCircle },
+    { key: 'lost',      label: 'Recuperáveis',  icon: XCircle },
     { key: 'scripts',   label: 'Meus Scripts',  icon: MessageSquare },
     { key: 'todo',      label: 'Meu Dia',       icon: CheckSquare },
     { key: 'agenda',    label: 'Agenda',        icon: Calendar },
@@ -102,7 +109,7 @@ export default function SDRDashboard() {
         ) : page === 'scheduled' ? (
           <ScheduledView list={buckets.scheduled} />
         ) : page === 'lost' ? (
-          <LostView list={buckets.lost} />
+          <LostView list={buckets.lost} onReopen={async (id) => { const r = await reopenLead(id, me); if (r.success) toast('Lead recuperado para a fila!'); else toast(r.error, 'e'); }} />
         ) : page === 'scripts' ? (
           <ScriptsView scripts={scripts} addScript={addScript} updateScript={updateScript} removeScript={removeScript} toast={toast} />
         ) : page === 'todo' ? (
@@ -192,15 +199,46 @@ function LeadRow({ lead, active, onClick }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.name || 'Sem nome'}</span>
-        {lead._followupDue && <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--fm)', flexShrink: 0 }}>⏰ RETOMAR</span>}
+        {lead.noShowFlag && <span style={{ fontSize: 9, fontWeight: 700, color: '#ef4444', fontFamily: 'var(--fm)', flexShrink: 0 }}>🔁 REAGENDAR</span>}
+        {!lead.noShowFlag && lead._followupDue && <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--amber)', fontFamily: 'var(--fm)', flexShrink: 0 }}>⏰ RETOMAR</span>}
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
         {lead.company && <span style={{ fontSize: 11, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lead.company}</span>}
-        <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginLeft: 'auto', flexShrink: 0 }}>
-          {lead.attemptsLeft ?? 0} tent.
-        </span>
+        <span style={{ marginLeft: 'auto', flexShrink: 0 }}><AttemptsBadge left={lead.attemptsLeft ?? 0} compact /></span>
       </div>
     </button>
+  );
+}
+
+// Sinalização forte das tentativas: verde → amarelo → vermelho.
+function AttemptsBadge({ left, total = 5, compact = false }) {
+  const ratio = left / total;
+  const color = left <= 1 ? '#ef4444' : ratio <= 0.5 ? '#f59e0b' : '#22c55e';
+  const label = left === 0 ? 'ESGOTADO' : `${left}/${total}`;
+  if (compact) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 800, fontFamily: 'var(--fm)', color, padding: '2px 7px', borderRadius: 8, background: `${color}1f`, border: `1px solid ${color}55` }}>
+        <span style={{ display: 'flex', gap: 2 }}>
+          {Array.from({ length: total }).map((_, i) => (
+            <span key={i} style={{ width: 4, height: 10, borderRadius: 2, background: i < left ? color : 'var(--border)' }} />
+          ))}
+        </span>
+        {label}
+      </span>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 12, background: `${color}14`, border: `1px solid ${color}44` }}>
+      <span style={{ display: 'flex', gap: 4 }}>
+        {Array.from({ length: total }).map((_, i) => (
+          <span key={i} style={{ width: 8, height: 22, borderRadius: 3, background: i < left ? color : 'var(--border)', boxShadow: i < left ? `0 0 8px ${color}66` : 'none' }} />
+        ))}
+      </span>
+      <div>
+        <p style={{ fontSize: 18, fontWeight: 800, color, lineHeight: 1 }}>{label === 'ESGOTADO' ? 'Esgotado' : `${left} de ${total}`}</p>
+        <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', marginTop: 2 }}>TENTATIVAS RESTANTES</p>
+      </div>
+    </div>
   );
 }
 
@@ -245,10 +283,14 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone }) {
             {phone && <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>📱 {phone}</span>}
           </div>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>
-          {lead.attemptsLeft ?? 0} tentativas
-        </span>
+        <AttemptsBadge left={lead.attemptsLeft ?? 0} />
       </div>
+
+      {lead.noShowFlag && (
+        <div style={{ background: '#ef444415', border: '1px solid #ef444444', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: '#fca5a5', lineHeight: 1.5 }}>
+          🔁 Este lead voltou por <strong>no-show</strong> (não compareceu à call). Reagende uma nova call.
+        </div>
+      )}
 
       {lead.notes && (
         <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
@@ -406,16 +448,25 @@ function ScheduledView({ list }) {
   );
 }
 
-function LostView({ list }) {
+function LostView({ list, onReopen }) {
   return (
     <div className="fade-up">
-      <Header title="Perdidos" subtitle="Leads arquivados" count={list.length} />
-      {list.length === 0 ? <Empty msg="Nenhum lead perdido." /> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 10 }}>
+      <Header title="Recuperáveis" subtitle="Perdidos, ignorados e com tentativas esgotadas — todos podem voltar para a fila" count={list.length} />
+      {list.length === 0 ? <Empty msg="Nenhum lead aqui." /> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 10 }}>
           {list.map(l => (
-            <div key={l.id} style={{ ...CARD, opacity: .6 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{l.name}</span>
-              {l.lostReason && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>{l.lostReason}</p>}
+            <div key={l.id} style={{ ...CARD }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{l.name}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, fontFamily: 'var(--fm)', background: l._exhausted ? '#ef444420' : 'var(--surface)', color: l._exhausted ? '#ef4444' : 'var(--muted)', border: '1px solid var(--border)' }}>
+                  {l._exhausted ? 'ESGOTADO' : 'PERDIDO'}
+                </span>
+              </div>
+              {l.company && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{l.company}</p>}
+              {l.lostReason && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontStyle: 'italic' }}>{l.lostReason}</p>}
+              <button onClick={() => onReopen(l.id)} style={{ ...BTN, width: '100%', marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)', fontSize: 12 }}>
+                <RotateCcw size={13} /> Recuperar para a fila
+              </button>
             </div>
           ))}
         </div>

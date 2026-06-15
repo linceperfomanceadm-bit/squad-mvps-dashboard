@@ -1,78 +1,109 @@
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  LayoutDashboard, Briefcase, CheckSquare, Calendar, MessageSquare,
+  CalendarClock, CheckSquare, Calendar, MessageSquare,
   Video, X, Plus, Trash2, Edit2, Check, ChevronDown, Bold, List,
+  AlertTriangle, RotateCcw, Inbox, Undo2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import { SECTORS } from '../../lib/firebase';
-import { useDeals } from '../../hooks/useDeals';
+import { useDeals, hasConflict } from '../../hooks/useDeals';
 import { useCommercialGoals, useObjections, countWonThisMonth } from '../../hooks/useCloserData';
 import BriefingForm from '../../components/commercial/BriefingForm';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 
 const COLOR = SECTORS.comercial.color;
+// O comercial é quase-preto (emblema); para destaque na UI usamos um
+// tom de apoio legível no fundo escuro.
+const ACCENT = '#7C5CFF';
 
 export default function CloserDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { deals, loading, claimDeal, closeNoShow, closeLost, closeStandby, closeWon, saveCallNotes } = useDeals();
+  const {
+    deals, loading,
+    claimCall, releaseCall, addManualCall,
+    closeNoShow, closeLost, closeStandby, closeWon, recoverDeal, saveCallNotes,
+  } = useDeals();
   const { goals } = useCommercialGoals();
   const objections = useObjections(user?.authUid);
 
-  const [page, setPage] = useState('cockpit');
+  const [page, setPage] = useState('available');
   const [showtimeDealId, setShowtimeDealId] = useState(null);
+  const [showManual, setShowManual] = useState(false);
+  const [releaseTarget, setReleaseTarget] = useState(null); // deal a devolver
+  const [conflictPrompt, setConflictPrompt] = useState(null); // { deal, conflictsWith }
+  const [startPrompt, setStartPrompt] = useState(null); // deal a iniciar fora de hora
 
   const me = user?.name;
 
-  // Deals deste closer (ou ainda sem closer = disponíveis).
-  const myDeals = useMemo(
-    () => deals.filter(d => !d.closerName || d.closerName === me),
+  // ── Partição dos deals ───────────────────────────────────────
+  const available = useMemo(() => deals.filter(d => d.status === 'available'), [deals]);
+  const myAgenda = useMemo(
+    () => deals.filter(d => d.status === 'claimed' && d.closerName === me),
     [deals, me]
   );
-  const todayCalls = useMemo(() => myDeals.filter(d => d.status === 'scheduled'), [myDeals]);
-  const funnel = useMemo(() => myDeals.filter(d => ['scheduled', 'standby'].includes(d.status)), [myDeals]);
+  const recoverable = useMemo(
+    () => deals.filter(d => ['standby', 'lost', 'noshow'].includes(d.status) && d.closerName === me),
+    [deals, me]
+  );
 
-  const wonMe = countWonThisMonth(deals, me);
-  const wonTeam = countWonThisMonth(deals);
-  const goalMe = goals.individual?.[me] || 0;
-  const goalTeam = goals.teamGoal || 0;
+  // metas
+  const wonMe = useMemo(() => countWonThisMonth(deals, me), [deals, me]);
+  const wonTeam = useMemo(() => countWonThisMonth(deals), [deals]);
+  const goalMe = goals?.individual?.[me] || 0;
+  const goalTeam = goals?.teamGoal || 0;
 
-  const enterShowtime = async (dealId) => {
-    await claimDeal(dealId, me);
-    setShowtimeDealId(dealId);
+  // ── Puxar uma call (com checagem de conflito) ────────────────
+  const tryClaim = (deal) => {
+    const conflict = hasConflict(deal.callAt, myAgenda);
+    if (conflict) { setConflictPrompt({ deal, conflictsWith: conflict }); return; }
+    doClaim(deal);
+  };
+  const doClaim = async (deal) => {
+    const r = await claimCall(deal.id, me);
+    if (r.success) toast('Call adicionada à sua agenda!');
+    else toast(r.error, 'e');
+    setConflictPrompt(null);
   };
 
-  const showtimeDeal = deals.find(d => d.id === showtimeDealId) || null;
+  // ── Iniciar call (pop-up se estiver fora do horário) ─────────
+  const tryStart = (deal) => {
+    if (!deal.callAt) { setShowtimeDealId(deal.id); return; }
+    const diff = Math.abs(new Date(deal.callAt).getTime() - Date.now());
+    if (diff > 60 * 60 * 1000) { setStartPrompt(deal); return; } // >1h fora
+    setShowtimeDealId(deal.id);
+  };
 
   const NAV = [
-    { key: 'cockpit', label: 'Cockpit',    icon: LayoutDashboard, badge: todayCalls.length },
-    { key: 'funnel',  label: 'Meu Funil',  icon: Briefcase },
+    { key: 'available', label: 'Calls Disponíveis', icon: Inbox, badge: available.length, badgeDanger: available.length > 0 },
+    { key: 'agenda-int', label: 'Minha Agenda', icon: CalendarClock, badge: myAgenda.length },
+    { key: 'recover', label: 'Recuperar', icon: RotateCcw, badge: recoverable.length },
     { key: 'objections', label: 'Objeções', icon: MessageSquare },
-    { key: 'todo',    label: 'Meu Dia',    icon: CheckSquare },
-    { key: 'agenda',  label: 'Agenda',     icon: Calendar },
+    { key: 'todo', label: 'Meu Dia', icon: CheckSquare },
+    { key: 'agenda', label: 'Agenda', icon: Calendar },
   ];
+
+  const showtimeDeal = deals.find(d => d.id === showtimeDealId) || null;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar sectorId="comercial" navItems={NAV} activeKey={page} onNav={setPage} />
       <main style={{ flex: 1, marginLeft: 224, padding: 28, minHeight: '100vh', overflow: 'auto' }}>
         {loading ? <Spinner /> :
-          page === 'cockpit' ? (
-            <Cockpit
-              me={me} todayCalls={todayCalls} funnel={funnel}
-              wonMe={wonMe} goalMe={goalMe} wonTeam={wonTeam} goalTeam={goalTeam}
-              onEnterCall={enterShowtime}
-            />
-          ) : page === 'funnel' ? (
-            <FunnelView funnel={funnel} onEnterCall={enterShowtime} />
+          page === 'available' ? (
+            <AvailableView list={available} me={me} goalMe={goalMe} wonMe={wonMe} goalTeam={goalTeam} wonTeam={wonTeam} onClaim={tryClaim} />
+          ) : page === 'agenda-int' ? (
+            <InternalAgenda list={myAgenda} onStart={tryStart} onRelease={setReleaseTarget} onAddManual={() => setShowManual(true)} />
+          ) : page === 'recover' ? (
+            <RecoverView list={recoverable} onRecover={async (id) => { const r = await recoverDeal(id, me); if (r.success) toast('Call recuperada para sua agenda.'); else toast(r.error, 'e'); }} />
           ) : page === 'objections' ? (
-            <ObjectionsView {...objections} toast={toast} />
+            <ObjectionsView items={objections.items} addItem={objections.addItem} updateItem={objections.updateItem} removeItem={objections.removeItem} toast={toast} />
           ) : page === 'todo' ? (
-            <TodoView accent={COLOR} />
+            <TodoView accent={ACCENT} />
           ) : page === 'agenda' ? (
             <AgendaView />
           ) : (
@@ -80,7 +111,7 @@ export default function CloserDashboard() {
           )}
       </main>
 
-      {/* Modo Showtime — sobrepõe tudo */}
+      {/* Showtime */}
       {showtimeDeal && ReactDOM.createPortal(
         <Showtime
           deal={showtimeDeal} me={me} objections={objections.items}
@@ -89,6 +120,54 @@ export default function CloserDashboard() {
           actions={{ closeNoShow, closeLost, closeStandby, closeWon }}
           toast={toast}
         />, document.body)}
+
+      {/* Modal de call manual */}
+      {showManual && ReactDOM.createPortal(
+        <ManualCallModal
+          onClose={() => setShowManual(false)}
+          onSave={async (data) => {
+            const r = await addManualCall(me, data);
+            if (r.success) { toast('Call manual adicionada à sua agenda!'); setShowManual(false); }
+            else toast(r.error, 'e');
+          }}
+          myAgenda={myAgenda}
+        />, document.body)}
+
+      {/* Devolução com justificativa */}
+      {releaseTarget && ReactDOM.createPortal(
+        <ReleaseModal
+          deal={releaseTarget}
+          onClose={() => setReleaseTarget(null)}
+          onConfirm={async (reason) => {
+            const r = await releaseCall(releaseTarget.id, me, reason);
+            if (r.success) { toast('Call devolvida às disponíveis.'); setReleaseTarget(null); }
+            else toast(r.error, 'e');
+          }}
+        />, document.body)}
+
+      {/* Alerta de conflito ao puxar */}
+      {conflictPrompt && ReactDOM.createPortal(
+        <ConfirmModal
+          icon={<AlertTriangle size={28} color="var(--amber)" />}
+          title="Conflito de agenda"
+          message={`Você já tem "${conflictPrompt.conflictsWith.leadName}" em horário próximo (janela de 1h). Deseja puxar esta call mesmo assim?`}
+          confirmLabel="Puxar mesmo assim"
+          confirmColor="var(--amber)"
+          onConfirm={() => doClaim(conflictPrompt.deal)}
+          onClose={() => setConflictPrompt(null)}
+        />, document.body)}
+
+      {/* Confirmação de início fora de hora */}
+      {startPrompt && ReactDOM.createPortal(
+        <ConfirmModal
+          icon={<AlertTriangle size={28} color={ACCENT} />}
+          title="Iniciar fora do horário?"
+          message={`Esta call estava marcada para ${fmtDateTime(startPrompt.callAt)}. Você está iniciando em um horário diferente. Confirmar início?`}
+          confirmLabel="Iniciar call"
+          confirmColor={ACCENT}
+          onConfirm={() => { setShowtimeDealId(startPrompt.id); setStartPrompt(null); }}
+          onClose={() => setStartPrompt(null)}
+        />, document.body)}
     </div>
   );
 }
@@ -96,108 +175,51 @@ export default function CloserDashboard() {
 function Spinner() {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}><div className="spinner" style={{ width: 36, height: 36 }} /></div>;
 }
-
 function StubView({ page }) {
-  const labels = { todo: 'Meu Dia', agenda: 'Agenda' };
-  return (
-    <div className="fade-up" style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 16, padding: '48px 32px', textAlign: 'center' }}>
-      <div style={{ fontSize: 40, marginBottom: 12 }}>🚧</div>
-      <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>{labels[page] || 'Em construção'}</h2>
-      <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 420, margin: '0 auto', lineHeight: 1.6 }}>Esta seção chega num bloco dedicado.</p>
-    </div>
-  );
+  return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '60px 0' }}>Seção "{page}" em breve.</p>;
 }
 
-// ════════════════════════════════════════════════════════════════
-// COCKPIT
-// ════════════════════════════════════════════════════════════════
-function Cockpit({ me, todayCalls, funnel, wonMe, goalMe, wonTeam, goalTeam, onEnterCall }) {
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+function fmtTime(iso) {
+  if (!iso) return '--:--';
+  return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ── Calls Disponíveis (tela inicial) ───────────────────────────
+function AvailableView({ list, goalMe, wonMe, goalTeam, wonTeam, onClaim }) {
   return (
     <div className="fade-up">
-      <div style={{ marginBottom: 24 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🤝 CLOSER</span>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10 }}>Olá, {me}</h1>
+      <div style={{ marginBottom: 20 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${ACCENT}1a`, color: ACCENT, border: `1px solid ${ACCENT}40`, fontFamily: 'var(--fm)' }}>💼 CLOSER</span>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Calls Disponíveis</h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Puxe uma call para sua agenda. Uma vez puxada, some para os outros closers.</p>
       </div>
 
       {/* Metas (sem R$) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 26 }}>
-        <GoalBar label="Meta Individual (mês)" value={wonMe} goal={goalMe} color={COLOR} />
-        <GoalBar label="Meta da Equipe (mês)" value={wonTeam} goal={goalTeam} color="#38bdf8" />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 22 }}>
+        <GoalBar label="Minhas vendas (mês)" value={wonMe} goal={goalMe} color="#22c55e" />
+        <GoalBar label="Vendas do time (mês)" value={wonTeam} goal={goalTeam} color={ACCENT} />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-        {/* Calls de hoje */}
-        <div>
-          <h2 style={SEC_TITLE}>Calls de Hoje</h2>
-          {todayCalls.length === 0 ? <Empty msg="Nenhuma call agendada." /> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {todayCalls.map(d => (
-                <div key={d.id} style={CARD}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
-                    {d.callAt && <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{new Date(d.callAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>}
-                  </div>
-                  {d.company && <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>{d.company}</p>}
-                  <button onClick={() => onEnterCall(d.id)} style={{ ...BTN_BIG, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)` }}>
-                    <Video size={18} /> Entrar na Call
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Mini-funil */}
-        <div>
-          <h2 style={SEC_TITLE}>Meu Funil</h2>
-          {funnel.length === 0 ? <Empty msg="Funil vazio." /> : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {funnel.map(d => (
-                <div key={d.id} style={{ ...CARD, padding: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.leadName}</p>
-                    <p style={{ fontSize: 11, color: 'var(--muted)' }}>{STATUS_PT[d.status] || d.status}</p>
-                  </div>
-                  {d.status === 'standby' && d.standbyAt && <span style={{ fontSize: 10, color: 'var(--amber)', fontFamily: 'var(--fm)' }}>⏰</span>}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GoalBar({ label, value, goal, color }) {
-  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0;
-  return (
-    <div style={CARD}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>
-        <span style={{ fontSize: 20, fontWeight: 800, color, fontFamily: 'var(--fm)' }}>{value}<span style={{ fontSize: 13, color: 'var(--muted)' }}> / {goal || '—'}</span></span>
-      </div>
-      <div style={{ height: 10, borderRadius: 6, background: 'var(--surface)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: `linear-gradient(90deg,${color},${color}aa)`, borderRadius: 6, transition: 'width .4s' }} />
-      </div>
-    </div>
-  );
-}
-
-function FunnelView({ funnel, onEnterCall }) {
-  return (
-    <div className="fade-up">
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 18 }}>Meu Funil</h1>
-      {funnel.length === 0 ? <Empty msg="Nenhum deal ativo." /> : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 }}>
-          {funnel.map(d => (
-            <div key={d.id} style={CARD}>
-              <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
-              {d.company && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{d.company}</p>}
-              <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 8 }}>{STATUS_PT[d.status] || d.status}</span>
-              {d.status === 'scheduled' && (
-                <button onClick={() => onEnterCall(d.id)} style={{ ...BTN_BIG, marginTop: 12, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)`, fontSize: 13, padding: '9px' }}><Video size={15} /> Entrar na Call</button>
-              )}
+      {list.length === 0 ? (
+        <Empty msg="Nenhuma call disponível no momento." />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>
+          {list.map(d => (
+            <div key={d.id} style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: `${ACCENT}1a`, color: ACCENT, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{fmtDateTime(d.callAt)}</span>
+              </div>
+              {d.company && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>🏢 {d.company}</p>}
+              {d.sdrName && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--fm)' }}>SDR: {d.sdrName}</p>}
+              {d.pains && <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 8, lineHeight: 1.5, maxHeight: 60, overflow: 'hidden' }}>{d.pains}</p>}
+              <button onClick={() => onClaim(d)} style={{ ...BTN_BIG, marginTop: 12, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)` }}>
+                <Plus size={15} /> Puxar para minha agenda
+              </button>
             </div>
           ))}
         </div>
@@ -206,11 +228,210 @@ function FunnelView({ funnel, onEnterCall }) {
   );
 }
 
-const STATUS_PT = { scheduled: 'Call agendada', standby: 'Stand-by', won: 'Ganho', lost: 'Perdido', noshow: 'No-show', awaiting_cs: 'Aguardando CS', active: 'Cliente ativo' };
-const SEC_TITLE = { fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 12 };
-const CARD = { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 };
+// ── Agenda interna (estilo Google Agenda, semana atual) ────────
+function InternalAgenda({ list, onStart, onRelease, onAddManual }) {
+  // agrupa por dia
+  const days = useMemo(() => {
+    const map = {};
+    list.forEach(d => {
+      const key = d.callAt ? new Date(d.callAt).toISOString().slice(0, 10) : 'sem-data';
+      (map[key] = map[key] || []).push(d);
+    });
+    Object.values(map).forEach(arr => arr.sort((a, b) => new Date(a.callAt || 0) - new Date(b.callAt || 0)));
+    return Object.entries(map).sort(([a], [b]) => (a === 'sem-data' ? 1 : b === 'sem-data' ? -1 : a.localeCompare(b)));
+  }, [list]);
+
+  return (
+    <div className="fade-up">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Minha Agenda</h1>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Suas calls da semana. Só você vê esta agenda.</p>
+        </div>
+        <button onClick={onAddManual} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 10, padding: '10px 16px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+          <Plus size={15} /> Cadastrar call manual
+        </button>
+      </div>
+
+      {list.length === 0 ? (
+        <Empty msg="Nenhuma call na sua agenda. Puxe uma das disponíveis ou cadastre manualmente." />
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {days.map(([day, items]) => (
+            <div key={day}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: ACCENT }} />
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{dayLabel(day)}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{items.length} call{items.length > 1 ? 's' : ''}</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 16, borderLeft: `2px solid ${ACCENT}30` }}>
+                {items.map(d => (
+                  <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                    <div style={{ textAlign: 'center', minWidth: 52 }}>
+                      <p style={{ fontSize: 16, fontWeight: 800, color: ACCENT, fontFamily: 'var(--fm)' }}>{fmtTime(d.callAt)}</p>
+                      {d.manual && <span style={{ fontSize: 8, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>MANUAL</span>}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{d.leadName}</p>
+                      {d.company && <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.company}</p>}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                      <button onClick={() => onStart(d)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                        <Video size={13} /> Iniciar
+                      </button>
+                      <button onClick={() => onRelease(d)} title="Devolver para disponíveis" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
+                        <Undo2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Recuperar (standby / lost / noshow) ────────────────────────
+function RecoverView({ list, onRecover }) {
+  const label = { standby: '⏸ Stand-by', lost: '❌ Perdido', noshow: '👻 No-show' };
+  const col = { standby: 'var(--amber)', lost: 'var(--neon)', noshow: 'var(--muted)' };
+  return (
+    <div className="fade-up">
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Recuperar Calls</h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Stand-by, perdidas e no-show — clique para retomar na sua agenda.</p>
+      </div>
+      {list.length === 0 ? <Empty msg="Nada para recuperar." /> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 10 }}>
+          {list.map(d => (
+            <div key={d.id} style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 12, padding: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, fontFamily: 'var(--fm)', color: col[d.status], background: `${col[d.status]}1a`, whiteSpace: 'nowrap' }}>{label[d.status]}</span>
+              </div>
+              {d.company && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{d.company}</p>}
+              {d.lostReason && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontStyle: 'italic' }}>{d.lostReason}</p>}
+              {d.standbyAt && <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4, fontFamily: 'var(--fm)' }}>Retomar: {fmtDateTime(d.standbyAt)}</p>}
+              <button onClick={() => onRecover(d.id)} style={{ ...BTN_BIG, marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <RotateCcw size={13} /> Recuperar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function dayLabel(key) {
+  if (key === 'sem-data') return 'Sem data definida';
+  const d = new Date(key + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - today) / 86400000);
+  const wd = d.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit' });
+  if (diff === 0) return `Hoje · ${wd}`;
+  if (diff === 1) return `Amanhã · ${wd}`;
+  return wd.charAt(0).toUpperCase() + wd.slice(1);
+}
+
+// ── Modais ─────────────────────────────────────────────────────
+function ManualCallModal({ onClose, onSave, myAgenda }) {
+  const [leadName, setLeadName] = useState('');
+  const [company, setCompany] = useState('');
+  const [callAt, setCallAt] = useState('');
+  const [meetLink, setMeetLink] = useState('');
+  const [pains, setPains] = useState('');
+  const [warn, setWarn] = useState(null);
+
+  const submit = () => {
+    if (!leadName.trim()) { setWarn('Informe o nome do lead.'); return; }
+    if (!callAt) { setWarn('Defina data e hora.'); return; }
+    const iso = new Date(callAt).toISOString();
+    const conflict = hasConflict(iso, myAgenda);
+    if (conflict && !warn?.startsWith('Conflito')) {
+      setWarn(`Conflito: você já tem "${conflict.leadName}" em horário próximo. Clique em salvar de novo para confirmar.`);
+      return;
+    }
+    onSave({ leadName, company, callAt: iso, meetLink, pains });
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 460, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Nova call manual</h3>
+          <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
+        </div>
+        <label style={ST_LBL}>NOME DO LEAD *</label>
+        <input value={leadName} onChange={e => setLeadName(e.target.value)} style={{ ...INP_M, marginTop: 6, marginBottom: 12 }} />
+        <label style={ST_LBL}>EMPRESA</label>
+        <input value={company} onChange={e => setCompany(e.target.value)} style={{ ...INP_M, marginTop: 6, marginBottom: 12 }} />
+        <label style={ST_LBL}>DATA E HORA *</label>
+        <input type="datetime-local" value={callAt} onChange={e => setCallAt(e.target.value)} style={{ ...INP_M, marginTop: 6, marginBottom: 12, colorScheme: 'dark' }} />
+        <label style={ST_LBL}>LINK DA REUNIÃO</label>
+        <input value={meetLink} onChange={e => setMeetLink(e.target.value)} placeholder="https://meet..." style={{ ...INP_M, marginTop: 6, marginBottom: 12 }} />
+        <label style={ST_LBL}>NOTAS / DORES</label>
+        <textarea value={pains} onChange={e => setPains(e.target.value)} rows={3} style={{ ...INP_M, marginTop: 6, marginBottom: 12, resize: 'vertical', fontFamily: 'var(--f)' }} />
+        {warn && <p style={{ fontSize: 12, color: warn.startsWith('Conflito') ? 'var(--amber)' : 'var(--neon)', marginBottom: 12 }}>{warn}</p>}
+        <button onClick={submit} style={{ ...BTN_BIG, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)` }}>Salvar na agenda</button>
+      </div>
+    </Overlay>
+  );
+}
+
+function ReleaseModal({ deal, onClose, onConfirm }) {
+  const [reason, setReason] = useState('');
+  return (
+    <Overlay onClose={onClose}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+        <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Devolver call</h3>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16 }}>"{deal.leadName}" voltará para as disponíveis. Justifique a devolução.</p>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Motivo (ex: conflito de agenda, fora do meu perfil...)" style={{ ...INP_M, resize: 'vertical', fontFamily: 'var(--f)', marginBottom: 14 }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => onConfirm(reason)} style={{ ...BTN_BIG, background: `linear-gradient(135deg,var(--amber),#d97706)`, flex: 1 }}>Devolver</button>
+          <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '0 18px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+function ConfirmModal({ icon, title, message, confirmLabel, confirmColor, onConfirm, onClose }) {
+  return (
+    <Overlay onClose={onClose}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, textAlign: 'center', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+        <div style={{ marginBottom: 12 }}>{icon}</div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{title}</h3>
+        <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20, lineHeight: 1.5 }}>{message}</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onConfirm} style={{ ...BTN_BIG, flex: 1, background: `linear-gradient(135deg,${confirmColor},${confirmColor}cc)` }}>{confirmLabel}</button>
+          <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '0 18px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+function GoalBar({ label, value, goal, color }) {
+  const pct = goal > 0 ? Math.min(100, Math.round((value / goal) * 100)) : 0;
+  return (
+    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>{label}</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color }}>{value}{goal > 0 && <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 500 }}> / {goal}</span>}</span>
+      </div>
+      <div style={{ height: 6, borderRadius: 4, background: 'var(--surface)', overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width .4s' }} />
+      </div>
+    </div>
+  );
+}
+
+function Empty({ msg }) { return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>{msg}</p>; }
 const BTN_BIG = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#fff', width: '100%' };
-function Empty({ msg }) { return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '32px 0' }}>{msg}</p>; }
 
 // ════════════════════════════════════════════════════════════════
 // MODO SHOWTIME
