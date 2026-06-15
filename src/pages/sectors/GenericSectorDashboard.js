@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Kanban } from 'lucide-react';
+import { LayoutDashboard, Kanban, CheckSquare, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import TodoView from '../../components/shared/TodoView';
+import AgendaView from '../../components/shared/AgendaView';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -112,6 +114,8 @@ export default function GenericSectorDashboard({ sectorId }) {
   const NAV = [
     { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard, badge: 0 },
     { key: 'kanban',   label: 'Tasks',        icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 },
+    { key: 'todo',     label: 'Meu Dia',      icon: CheckSquare },
+    { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];
 
   return (
@@ -124,6 +128,10 @@ export default function GenericSectorDashboard({ sectorId }) {
           </div>
         ) : page === 'overview' ? (
           <GenericOverview myTasks={myTasks} sectorId={sectorId} />
+        ) : page === 'todo' ? (
+          <TodoView accent={SECTORS[sectorId]?.color || 'var(--neon)'} />
+        ) : page === 'agenda' ? (
+          <AgendaView />
         ) : (
           <TaskKanban
             tasks={tasks}

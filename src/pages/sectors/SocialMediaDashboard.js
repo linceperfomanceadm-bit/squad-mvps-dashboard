@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Columns, Plus, Kanban } from 'lucide-react';
+import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import TodoView from '../../components/shared/TodoView';
+import AgendaView from '../../components/shared/AgendaView';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -16,6 +18,8 @@ const NAV = [
   { key: 'smkanban',  label: 'Posts',         icon: Columns },
   { key: 'planning',  label: 'Planejamento',  icon: Plus },
   { key: 'kanban',    label: 'Tasks',          icon: Kanban },
+  { key: 'todo',      label: 'Meu Dia',        icon: CheckSquare },
+  { key: 'agenda',    label: 'Agenda',         icon: Calendar },
 ];
 
 export default function SocialMediaDashboard() {
@@ -71,6 +75,10 @@ export default function SocialMediaDashboard() {
           <SMKanban myPosts={myPosts} onStatusChange={smUpdatePostStatus} />
         ) : page === 'planning' ? (
           <SMBulkInput clients={myClients} responsible={user?.name} onSave={handleBulkSave} />
+        ) : page === 'todo' ? (
+          <TodoView accent="#38bdf8" />
+        ) : page === 'agenda' ? (
+          <AgendaView />
         ) : (
           <TaskKanban
             tasks={tasks}

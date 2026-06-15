@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban } from 'lucide-react';
+import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -10,6 +10,8 @@ import WDOverview from '../../components/sectors/webdesign/WDOverview';
 import WDClientList from '../../components/sectors/webdesign/WDClientList';
 import WDAddClientModal from '../../components/sectors/webdesign/WDAddClientModal';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import TodoView from '../../components/shared/TodoView';
+import AgendaView from '../../components/shared/AgendaView';
 
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',  icon: LayoutDashboard },
@@ -19,6 +21,8 @@ const NAV = [
   { key: 'recurrence', label: 'Recorrência',   icon: RefreshCw },
   { key: 'finished',   label: 'Finalizados',   icon: CheckCircle },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
+  { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
+  { key: 'agenda',     label: 'Agenda',         icon: Calendar },
 ];
 
 export default function WebDesignDashboard() {
@@ -102,6 +106,10 @@ export default function WebDesignDashboard() {
             onUpdateLinks={updateLinks}
             onDelete={deleteTask}
           />
+        ) : page === 'todo' ? (
+          <TodoView accent="var(--neon)" />
+        ) : page === 'agenda' ? (
+          <AgendaView />
         ) : (
           <WDClientList
             clients={wdClients}

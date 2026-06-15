@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Trophy, Kanban, CheckSquare, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useTasks } from '../../hooks/useTasks';
@@ -10,12 +10,16 @@ import CreativeOverview from '../../components/sectors/creative/CreativeOverview
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import HallOfFame from '../../components/sectors/creative/HallOfFame';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import TodoView from '../../components/shared/TodoView';
+import AgendaView from '../../components/shared/AgendaView';
 
 const NAV = [
   { key: 'overview',  label: 'Visão Geral', icon: LayoutDashboard },
   { key: 'kanban',    label: 'Tasks',        icon: Kanban },
   { key: 'vault',     label: 'O Cofre',      icon: BookOpen },
   { key: 'hallofame', label: 'Hall da Fama', icon: Trophy },
+  { key: 'todo',      label: 'Meu Dia',      icon: CheckSquare },
+  { key: 'agenda',    label: 'Agenda',       icon: Calendar },
 ];
 
 export default function CreativeDashboard({ sectorId }) {
@@ -96,6 +100,10 @@ export default function CreativeDashboard({ sectorId }) {
           />
         ) : page === 'vault' ? (
           <VaultPage clients={clients} sectorId={sectorId} onUpdateBrandbook={handleUpdateBrandbook} />
+        ) : page === 'todo' ? (
+          <TodoView accent={sectorId === 'design' ? '#a78bfa' : '#fb923c'} />
+        ) : page === 'agenda' ? (
+          <AgendaView />
         ) : (
           <HallOfFame tasks={hallTasks} />
         )}
