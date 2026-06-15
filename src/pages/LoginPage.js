@@ -2,21 +2,13 @@ import React, { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { SECTORS, ADMIN_CONFIG } from '../lib/firebase';
 
-// ─── Sector config ─────────────────────────────────────────────
-// Para trocar a logo de cada setor:
-// 1. Coloque o arquivo PNG em /public/logos/ (ex: /public/logos/webdesign.png)
-// 2. Atualize o campo `logo` abaixo (ex: logo: '/logos/webdesign.png')
-const SECTOR_CONFIG = {
-  webdesign:   { label: 'WebDesign',    color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
-  design:      { label: 'Design',       color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
-  socialmedia: { label: 'Social Media', color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
-  videomaker:  { label: 'VideoMaker',   color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
-  cs:          { label: 'CS',           color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
-  trafego:     { label: 'Tráfego Pago', color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
-  comercial:   { label: 'Comercial',    color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
-  admin:       { label: 'Admin',        color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' },
-};
+// A identidade de cada setor (cor do emblema, emoji, logo) vem de
+// SECTORS em lib/firebase.js — fonte única, compartilhada com os
+// painéis. Para trocar a logo: PNG em /public/logos/ e ajuste o
+// campo `logo` lá.
+const SECTOR_CONFIG = { ...SECTORS, admin: ADMIN_CONFIG };
 
 export default function LoginPage() {
   const { sectorId } = useParams();
