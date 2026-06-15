@@ -48,7 +48,7 @@ export default function AdminDashboard() {
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
   const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
-  const { deals } = useDeals();
+  const { deals, deleteManualCall } = useDeals();
   const { goals, saveGoals } = useCommercialGoals();
   const {
     tasks, loading: loadingTasks,
@@ -205,7 +205,7 @@ export default function AdminDashboard() {
         ) : page === 'goals' ? (
           <AdminGoals goals={goals} collaborators={collaborators} onSave={saveGoals} toast={toast} />
         ) : page === 'commercial' ? (
-          <AdminCommercialMetrics leads={leads} deals={deals} />
+          <AdminCommercialMetrics leads={leads} deals={deals} user={user} onDeleteCall={async (id) => { const r = await deleteManualCall(id, { ...user, isAdmin: true }); if (r.success) toast('Call excluída.'); else toast(r.error, 'e'); }} />
         ) : page === 'vault' ? (
           <VaultPage
             clients={clients}
