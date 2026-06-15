@@ -24,15 +24,23 @@ export const loginIdToEmail = (loginId) =>
   `${String(loginId).trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
 
 // ─── Sectors ──────────────────────────────────────────────────
+// FONTE ÚNICA da identidade de cada setor (cor do emblema, emoji,
+// logo). Tanto a tela de login quanto os painéis leem daqui — então
+// alterar uma cor aqui atualiza o app inteiro. As cores são extraídas
+// do emblema de cada time.
+// Para trocar a logo: coloque o PNG em /public/logos/ e ajuste `logo`.
 export const SECTORS = {
-  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#EE3363', emoji: '🌐', logo: null },
-  design:      { id: 'design',      label: 'Design',        color: '#a78bfa', emoji: '🎨', logo: null },
-  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#38bdf8', emoji: '📱', logo: null },
-  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#fb923c', emoji: '🎬', logo: null },
-  cs:          { id: 'cs',          label: 'CS',            color: '#22c55e', emoji: '🎧', logo: null },
-  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#f59e0b', emoji: '📊', logo: null },
-  comercial:   { id: 'comercial',   label: 'Comercial',     color: '#e879f9', emoji: '💼', logo: null },
+  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
+  design:      { id: 'design',      label: 'Design',        color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
+  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
+  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
+  cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
+  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
+  comercial:   { id: 'comercial',   label: 'Comercial',     color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
 };
+
+// Entrada do Admin (não é um "setor" comum, mas a tela de login usa).
+export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' };
 
 // ─── WebDesign service config ─────────────────────────────────
 export const WD_SERVICE_CONFIG = {
