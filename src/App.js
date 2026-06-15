@@ -13,6 +13,9 @@ import SDRDashboard from './pages/sectors/SDRDashboard';
 import CloserDashboard from './pages/sectors/CloserDashboard';
 import CSDashboard from './pages/sectors/CSDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import { PortalAuthProvider, usePortalAuth } from './contexts/PortalAuthContext';
+import PortalLoginPage from './pages/PortalLoginPage';
+import PortalDashboard from './pages/PortalDashboard';
 
 // Destino do usuário comercial conforme o subpapel.
 function commercialHome(user) {
@@ -116,18 +119,34 @@ function AppRoutes() {
         <ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>
       } />
 
+      {/* Portal de Coleta (clientes externos — auth próprio) */}
+      <Route path="/portal/login" element={<PortalLoginPage />} />
+      <Route path="/portal" element={
+        <PortalProtectedRoute><PortalDashboard /></PortalProtectedRoute>
+      } />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
 
+// Proteção das rotas do cliente do portal (isolada da agência).
+function PortalProtectedRoute({ children }) {
+  const { client, loading } = usePortalAuth();
+  if (loading) return null;
+  if (!client) return <Navigate to="/portal/login" replace />;
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-        <ToastContainer />
-      </BrowserRouter>
+      <PortalAuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+          <ToastContainer />
+        </BrowserRouter>
+      </PortalAuthProvider>
     </AuthProvider>
   );
 }
