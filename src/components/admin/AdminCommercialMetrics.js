@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { startOfDay, startOfWeek, startOfMonth } from 'date-fns';
-import { Phone, CalendarCheck, Trophy, TrendingUp } from 'lucide-react';
+import { Phone, CalendarCheck, Trophy, TrendingUp, Trash2 } from 'lucide-react';
 
 /*
  * Métricas comerciais (admin): produtividade de SDR e Closer.
@@ -11,7 +11,7 @@ import { Phone, CalendarCheck, Trophy, TrendingUp } from 'lucide-react';
  *   - leads[].logs: { type: 'message_sent' | 'call_scheduled', by, at }
  *   - deals: { closerName, outcome, wonAt, closedAt, saleTotal, callAt }
  */
-export default function AdminCommercialMetrics({ leads = [], deals = [] }) {
+export default function AdminCommercialMetrics({ leads = [], deals = [], onDeleteCall, user }) {
   const [period, setPeriod] = useState('day');
 
   const since = useMemo(() => {
@@ -118,9 +118,40 @@ export default function AdminCommercialMetrics({ leads = [], deals = [] }) {
           </Table>
         )}
       </Block>
+
+      {/* Calls manuais — exclusão (admin) */}
+      <ManualCallsBlock deals={deals} onDeleteCall={onDeleteCall} user={user} />
     </div>
   );
 }
+
+function ManualCallsBlock({ deals, onDeleteCall, user }) {
+  const manuals = useMemo(() => deals.filter(d => d.manual), [deals]);
+  if (!onDeleteCall) return null;
+  return (
+    <div style={{ marginBottom: 26 }}>
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Calls Manuais</h2>
+      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Calls cadastradas manualmente pelos closers. Exclua para limpar métricas de teste.</p>
+      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+        {manuals.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma call manual cadastrada.</p>
+        ) : manuals.map(d => (
+          <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.leadName} {d.company && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>· {d.company}</span>}</p>
+              <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
+                {d.closerName || '—'} · {d.callAt ? new Date(d.callAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem data'}
+                {d.outcome && ` · ${d.outcome}`}
+              </p>
+            </div>
+            <button onClick={() => onDeleteCall(d.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+              <Trash2 size={13} /> Excluir
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
 function TotalCard({ icon, label, value, color, small }) {
   return (
