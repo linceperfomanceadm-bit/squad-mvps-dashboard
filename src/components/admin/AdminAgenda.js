@@ -68,8 +68,8 @@ export default function AdminAgenda({ toast }) {
           {config.agendaEmbedUrl && (
             <div style={{ marginTop: 20 }}>
               <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}><Calendar size={13} /> Prévia (o que todos verão):</p>
-              <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)', background: '#fff' }}>
-                <iframe title="Prévia da Agenda" src={config.agendaEmbedUrl} style={{ width: '100%', height: 480, border: 'none', display: 'block' }} />
+              <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)', background: '#121826' }}>
+                <iframe title="Prévia da Agenda" src={config.agendaEmbedUrl} style={{ width: '100%', height: 480, border: 'none', display: 'block', filter: 'invert(0.92) hue-rotate(180deg) contrast(0.9) brightness(1.05)' }} />
               </div>
             </div>
           )}
