@@ -34,60 +34,86 @@ const AuthContext = createContext(null);
 const ADMIN_ID = (process.env.REACT_APP_ADMIN_ID || 'admin').toLowerCase();
 const ADMIN_PASS = process.env.REACT_APP_ADMIN_PASSWORD || 'Dash@2026';
 
+// Garante que uma operação do Firestore nunca pendure a cadeia de login.
+// Se passar do tempo, rejeita para o chamador tratar (em vez de travar).
+function withTimeout(promise, ms = 6000, label = 'firestore') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`timeout:${label}`)), ms)),
+  ]);
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Reidrata o perfil a partir do usuário autenticado no Auth.
   useEffect(() => {
+    let settled = false;
+    // Rede de segurança: se algo no Firestore pendurar, não deixa o
+    // app preso no spinner para sempre.
+    const safety = setTimeout(() => { if (!settled) setLoading(false); }, 8000);
+
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) { setUser(null); setLoading(false); return; }
+      if (!fbUser) { settled = true; clearTimeout(safety); setUser(null); setLoading(false); return; }
       try {
         const profile = await loadProfileByUid(fbUser.uid, fbUser.email);
         setUser(profile);
       } catch {
         setUser(null);
+      } finally {
+        settled = true;
+        clearTimeout(safety);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return unsub;
+    return () => { clearTimeout(safety); unsub(); };
   }, []);
 
   // Busca o doc do colaborador vinculado a este authUid.
   // Fallback: por loginId derivado do email (contas recém-migradas
   // num tick em que authUid ainda não foi gravado).
   const loadProfileByUid = async (uid, email) => {
-    let snap = await getDocs(query(collection(db, 'collaborators'), where('authUid', '==', uid)));
-    if (snap.empty && email) {
-      const loginId = email.split('@')[0];
-      snap = await getDocs(query(collection(db, 'collaborators'), where('loginId', '==', loginId)));
+    const loginIdFromEmail = email ? email.split('@')[0] : null;
+
+    let snap;
+    try {
+      snap = await withTimeout(getDocs(query(collection(db, 'collaborators'), where('authUid', '==', uid))), 6000, 'q-authUid');
+    } catch {
+      snap = { empty: true, docs: [] };
     }
+    if (snap.empty && loginIdFromEmail) {
+      try {
+        snap = await withTimeout(getDocs(query(collection(db, 'collaborators'), where('loginId', '==', loginIdFromEmail))), 6000, 'q-loginId');
+      } catch {
+        snap = { empty: true, docs: [] };
+      }
+    }
+
     if (snap.empty) {
       // Conta admin master sem doc no Firestore.
-      const loginId = email ? email.split('@')[0] : 'admin';
-      if (loginId === ADMIN_ID) {
-        try {
-          await setDoc(doc(db, 'userIndex', uid), { collabId: null, isAdmin: true, sector: null }, { merge: true });
-        } catch {}
+      if (loginIdFromEmail === ADMIN_ID) {
+        try { await withTimeout(setDoc(doc(db, 'userIndex', uid), { collabId: null, isAdmin: true, sector: null }, { merge: true }), 5000, 'idx-admin'); } catch {}
         return { id: uid, authUid: uid, name: 'Admin', loginId: ADMIN_ID, sector: null, role: 'superadmin', isAdmin: true, firstAccess: false };
       }
       throw new Error('Perfil não encontrado.');
     }
+
     const d = snap.docs[0];
     const c = { id: d.id, ...d.data() };
-    // Garante o vínculo authUid no doc (idempotente).
+    // Vínculo authUid e índice são "best-effort": não podem travar o
+    // login. Rodam com timeout e qualquer falha é ignorada.
     if (c.authUid !== uid) {
-      try { await updateDoc(doc(db, 'collaborators', d.id), { authUid: uid }); } catch {}
+      try { await withTimeout(updateDoc(doc(db, 'collaborators', d.id), { authUid: uid }), 5000, 'upd-uid'); } catch {}
     }
-    // Mantém o índice uid -> perfil que as REGRAS do Firestore usam
-    // para validar admin (regras não fazem query; leem por id direto).
     try {
-      await setDoc(doc(db, 'userIndex', uid), {
+      await withTimeout(setDoc(doc(db, 'userIndex', uid), {
         collabId: d.id,
         isAdmin: c.isAdmin || false,
         sector: c.sector || null,
-      }, { merge: true });
+      }, { merge: true }), 5000, 'idx');
     } catch {}
+
     return {
       id: d.id,
       authUid: uid,
@@ -122,21 +148,24 @@ export function AuthProvider({ children }) {
       }
     }
 
-    // Valida setor (defesa em profundidade — regras do Firestore
-    // são a trava real; isto é só UX para login na tela errada).
+    // Validação de setor (apenas UX — a trava real são as regras do
+    // Firestore). Best-effort: se falhar/expirar, deixa o login seguir
+    // (o onAuthStateChanged carrega o perfil). Nunca trava aqui.
     try {
       const fbUser = auth.currentUser;
-      const profile = await loadProfileByUid(fbUser.uid, fbUser.email);
-      if (!profile.isAdmin && sectorId && profile.sector !== sectorId) {
-        await signOut(auth);
-        return { success: false, error: 'ID não pertence a este setor.' };
+      if (fbUser) {
+        const profile = await withTimeout(loadProfileByUid(fbUser.uid, fbUser.email), 6000, 'login-profile');
+        if (!profile.isAdmin && sectorId && profile.sector !== sectorId) {
+          await signOut(auth);
+          return { success: false, error: 'ID não pertence a este setor.' };
+        }
+        setUser(profile);
+        return { success: true, firstAccess: profile.firstAccess };
       }
-      setUser(profile);
-      return { success: true, firstAccess: profile.firstAccess };
     } catch {
-      await signOut(auth);
-      return { success: false, error: 'Perfil não encontrado.' };
+      // Não bloqueia: o listener global resolve o perfil e o loading.
     }
+    return { success: true };
   };
 
   // Cria a conta no Auth a partir das credenciais antigas do Firestore.
