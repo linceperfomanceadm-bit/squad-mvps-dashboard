@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp, CheckSquare, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -14,6 +14,8 @@ import AdminClients from '../../components/admin/AdminClients';
 import AdminCollaborators from '../../components/admin/AdminCollaborators';
 import AdminLeads from '../../components/admin/AdminLeads';
 import AdminGoals from '../../components/admin/AdminGoals';
+import AdminAgenda from '../../components/admin/AdminAgenda';
+import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import { SECTORS } from '../../lib/firebase';
@@ -28,6 +30,8 @@ const NAV = [
   { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
+  { key: 'todo',          label: 'Meu Dia',         icon: CheckSquare },
+  { key: 'agenda',        label: 'Agenda',          icon: Calendar },
 ];
 
 export default function AdminDashboard() {
@@ -214,6 +218,10 @@ export default function AdminDashboard() {
             onWdMoveBackToOnboarding={wdMoveBackToOnboarding}
             onWdMoveStatus={wdMoveStatus}
           />
+        ) : page === 'todo' ? (
+          <TodoView accent="var(--neon)" />
+        ) : page === 'agenda' ? (
+          <AdminAgenda toast={toast} />
         ) : (
           <AdminCollaborators
             collaborators={collaborators}
