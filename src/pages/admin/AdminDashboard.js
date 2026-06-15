@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp, CheckSquare, Calendar } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp, CheckSquare, Calendar, Package } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -17,6 +17,7 @@ import AdminLeads from '../../components/admin/AdminLeads';
 import AdminGoals from '../../components/admin/AdminGoals';
 import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminCommercialMetrics from '../../components/admin/AdminCommercialMetrics';
+import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
@@ -32,6 +33,7 @@ const NAV = [
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
   { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
+  { key: 'portal',        label: 'Portal de Produtos', icon: Package },
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
   { key: 'todo',          label: 'Meu Dia',         icon: CheckSquare },
   { key: 'agenda',        label: 'Agenda',          icon: Calendar },
@@ -206,6 +208,8 @@ export default function AdminDashboard() {
           <AdminGoals goals={goals} collaborators={collaborators} onSave={saveGoals} toast={toast} />
         ) : page === 'commercial' ? (
           <AdminCommercialMetrics leads={leads} deals={deals} user={user} onDeleteCall={async (id) => { const r = await deleteManualCall(id, { ...user, isAdmin: true }); if (r.success) toast('Call excluída.'); else toast(r.error, 'e'); }} />
+        ) : page === 'portal' ? (
+          <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
         ) : page === 'vault' ? (
           <VaultPage
             clients={clients}
