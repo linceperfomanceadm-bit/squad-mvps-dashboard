@@ -28,15 +28,15 @@ export function usePersonalTasks(userId) {
     }, () => setLoading(false));
   }, [userId]);
 
-  const addTask = async ({ title, note = '', dueDate = null, checklist = [] }) => {
+  const addTask = async ({ title, note = '', dueDate = null, checklist = [], type = 'card' }) => {
     if (!title?.trim() || !userId) return { success: false };
     try {
-      await addDoc(collection(db, 'personal_tasks'), {
+      const ref = await addDoc(collection(db, 'personal_tasks'), {
         userId, title: title.trim(), note: note.trim(),
-        dueDate: dueDate || null, checklist,
+        dueDate: dueDate || null, checklist, type,
         status: 'open', createdAt: serverTimestamp(),
       });
-      return { success: true };
+      return { success: true, id: ref.id };
     } catch (err) { return { success: false, error: err.message }; }
   };
 

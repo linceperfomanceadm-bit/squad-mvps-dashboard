@@ -18,9 +18,12 @@ export function useTasks() {
   }, []);
 
   // ── Create task ──────────────────────────────────────────────
-  const createTask = async ({ name, clientId, clientName, deadline, priority, responsibleSector, responsibleName, requestedBy, requestedBySector, comment, links }) => {
+  const createTask = async ({ name, clientId, clientName, deadline, priority, responsibleSector, responsibleName, responsibleNames, requestedBy, requestedBySector, comment, links }) => {
     try {
       const now = new Date().toISOString();
+      // responsibleNames: lista de todos os responsáveis. responsibleName
+      // (singular) = principal, mantido para a lógica de entrega/métricas.
+      const names = (responsibleNames && responsibleNames.length) ? responsibleNames : (responsibleName ? [responsibleName] : []);
       await addDoc(collection(db, 'tasks'), {
         name,
         clientId,
@@ -28,7 +31,8 @@ export function useTasks() {
         deadline,
         priority,
         responsibleSector,
-        responsibleName,
+        responsibleName: names[0] || responsibleName,
+        responsibleNames: names,
         // deliveredBy tracks who actually did the work (set when moved to approval)
         deliveredBy: null,
         deliveredBySector: null,
@@ -197,6 +201,37 @@ export function useTasks() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Alterar data de entrega (com justificativa) ─────────────
+  // Registra na timeline E como comentário no chat da task.
+  const changeDeadline = async (taskId, newDeadline, reason, byName, bySector) => {
+    try {
+      const task = tasks.find(t => t.id === taskId);
+      if (!task) return { success: false, error: 'Task não encontrada.' };
+      if (!reason || !reason.trim()) return { success: false, error: 'Justifique a mudança de data.' };
+      const now = new Date().toISOString();
+      const oldDeadline = task.deadline || '—';
+      const timeline = [...(task.timeline || []), {
+        action: 'deadline_changed',
+        by: byName,
+        sector: bySector,
+        at: now,
+        from: oldDeadline,
+        to: newDeadline,
+        reason: reason.trim(),
+      }];
+      const comments = [...(task.comments || []), {
+        id: `c_${Date.now()}`,
+        author: byName,
+        sector: bySector,
+        text: `📅 Data de entrega alterada de ${oldDeadline} para ${newDeadline}. Motivo: ${reason.trim()}`,
+        createdAt: now,
+        isSystem: true,
+      }];
+      await updateDoc(doc(db, 'tasks', taskId), { deadline: newDeadline, timeline, comments });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Delete task ──────────────────────────────────────────────
   const deleteTask = async (taskId) => {
     try {
@@ -209,6 +244,7 @@ export function useTasks() {
   const getMyTasks = (userName) => {
     return tasks.filter(t =>
       t.responsibleName === userName ||
+      (Array.isArray(t.responsibleNames) && t.responsibleNames.includes(userName)) ||
       t.requestedBy === userName ||
       t.deliveredBy === userName
     );
@@ -218,6 +254,6 @@ export function useTasks() {
     tasks, loading,
     createTask, moveToProduction, moveToApproval,
     approveTask, rejectTask, addComment, updateLinks, deleteTask,
-    getMyTasks,
+    changeDeadline, getMyTasks,
   };
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { db, WD_SERVICE_CONFIG } from '../lib/firebase';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { db, storage, WD_SERVICE_CONFIG } from '../lib/firebase';
 
 export function useClients() {
   const [clients, setClients] = useState([]);
@@ -55,6 +56,60 @@ export function useClients() {
   const deleteClient = async (id) => {
     try { await deleteDoc(doc(db, 'clients', id)); return { success: true }; }
     catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ─── Brand Hub: materiais (upload de arquivo OU link de vídeo) ───
+  // Cada material: { id, type, name, url, path, fileType, addedBy,
+  //   addedBySector, addedAt }. Registro de autoria para rastreio.
+  const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon', 'application/pdf'];
+
+  const addBrandMaterial = async (clientId, { type, name, file, videoUrl }, addedBy, addedBySector) => {
+    try {
+      const id = `mat_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      let material = {
+        id, type, name: name?.trim() || 'Sem nome',
+        addedBy: addedBy || 'Desconhecido',
+        addedBySector: addedBySector || '',
+        addedAt: new Date().toISOString(),
+      };
+
+      if (type === 'video') {
+        if (!videoUrl?.trim()) return { success: false, error: 'Informe o link do vídeo.' };
+        material.url = videoUrl.trim();
+        material.path = null;
+        material.fileType = 'video';
+      } else {
+        if (!file) return { success: false, error: 'Selecione um arquivo.' };
+        if (!ALLOWED_FILE_TYPES.includes(file.type)) {
+          return { success: false, error: 'Formato não suportado. Use JPG, PNG, WEBP, ICO ou PDF.' };
+        }
+        if (file.size > 25 * 1024 * 1024) return { success: false, error: 'Arquivo muito grande (máx. 25MB).' };
+        const clean = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const path = `brand-hub/${clientId}/${id}_${clean}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, file);
+        material.url = await getDownloadURL(storageRef);
+        material.path = path;
+        material.fileType = file.type;
+      }
+
+      await updateDoc(doc(db, 'clients', clientId), {
+        'brandbook.materials': arrayUnion(material),
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Remove material. Permissão (criador/admin) é checada na UI; aqui
+  // só executa. Apaga o arquivo do Storage se houver.
+  const removeBrandMaterial = async (clientId, material) => {
+    try {
+      if (material.path) { try { await deleteObject(ref(storage, material.path)); } catch {} }
+      await updateDoc(doc(db, 'clients', clientId), {
+        'brandbook.materials': arrayRemove(material),
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
   };
 
   // ── WebDesign actions ──────────────────────────────────────
@@ -154,8 +209,16 @@ export function useClients() {
 
   // ── Brandbook ────────────────────────────────────────────
   const updateBrandbook = async (clientId, brandbook) => {
-    try { await updateDoc(doc(db, 'clients', clientId), { brandbook }); return { success: true }; }
-    catch (err) { return { success: false, error: err.message }; }
+    try {
+      // Atualiza apenas colors/typography por campo, para NÃO apagar
+      // os materials já existentes (que vivem em brandbook.materials).
+      const patch = {};
+      if ('colors' in brandbook) patch['brandbook.colors'] = brandbook.colors;
+      if ('typography' in brandbook) patch['brandbook.typography'] = brandbook.typography;
+      if ('driveLink' in brandbook) patch['brandbook.driveLink'] = brandbook.driveLink;
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
   };
 
   return {
@@ -163,5 +226,6 @@ export function useClients() {
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     smAddPost, smAddBulkPosts, smUpdatePostStatus,
     addDelivery, updateBrandbook,
+    addBrandMaterial, removeBrandMaterial,
   };
 }
