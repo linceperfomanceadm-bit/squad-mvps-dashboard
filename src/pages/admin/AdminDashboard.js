@@ -31,7 +31,7 @@ const NAV = [
   { key: 'goals',         label: 'Metas',           icon: TrendingUp },
   { key: 'commercial',    label: 'Métricas Comercial', icon: BarChart2 },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
-  { key: 'vault',         label: 'O Cofre',         icon: BookOpen },
+  { key: 'vault',         label: 'Brand Hub',        icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
   { key: 'portal',        label: 'Portal de Produtos', icon: Package },
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
@@ -47,6 +47,8 @@ export default function AdminDashboard() {
     addClient, updateClient, deleteClient,
     wdMoveToProduction, wdMoveBackToOnboarding, wdMoveStatus,
     updateBrandbook,
+    addBrandMaterial,
+    removeBrandMaterial,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
   const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
@@ -55,7 +57,7 @@ export default function AdminDashboard() {
   const {
     tasks, loading: loadingTasks,
     createTask, moveToProduction, moveToApproval,
-    approveTask, rejectTask, addComment, updateLinks, deleteTask,
+    approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
   } = useTasks();
 
   const [page, setPage] = useState('overview');
@@ -178,6 +180,7 @@ export default function AdminDashboard() {
               onReject={rejectTask}
               onAddComment={addComment}
               onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
               onDelete={deleteTask}
             />
           </div>
@@ -192,6 +195,7 @@ export default function AdminDashboard() {
             onReject={rejectTask}
             onAddComment={addComment}
             onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
         ) : page === 'charts' ? (
@@ -215,6 +219,8 @@ export default function AdminDashboard() {
             clients={clients}
             sectorId="design"
             onUpdateBrandbook={handleUpdateBrandbook}
+            onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, 'admin')}
+            onRemoveMaterial={removeBrandMaterial}
             isAdminView={true}
           />
         ) : page === 'clients' ? (
