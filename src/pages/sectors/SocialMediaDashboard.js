@@ -27,7 +27,7 @@ export default function SocialMediaDashboard() {
   const { toast } = useToast();
   const { clients, loading, smAddBulkPosts, smUpdatePostStatus } = useClients();
   const { collaborators } = useCollaborators();
-  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask } = useTasks();
+  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
   const [page, setPage] = useState('overview');
 
   const myClients = clients.filter(c => c.active && c.responsibles?.socialmedia === user?.name);
@@ -93,6 +93,7 @@ export default function SocialMediaDashboard() {
             onReject={rejectTask}
             onAddComment={addComment}
             onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
         )}

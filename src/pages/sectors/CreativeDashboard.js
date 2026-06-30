@@ -16,7 +16,7 @@ import AgendaView from '../../components/shared/AgendaView';
 const NAV = [
   { key: 'overview',  label: 'Visão Geral', icon: LayoutDashboard },
   { key: 'kanban',    label: 'Tasks',        icon: Kanban },
-  { key: 'vault',     label: 'O Cofre',      icon: BookOpen },
+  { key: 'vault',     label: 'Brand Hub',     icon: BookOpen },
   { key: 'hallofame', label: 'Hall da Fama', icon: Trophy },
   { key: 'todo',      label: 'Meu Dia',      icon: CheckSquare },
   { key: 'agenda',    label: 'Agenda',       icon: Calendar },
@@ -25,12 +25,12 @@ const NAV = [
 export default function CreativeDashboard({ sectorId }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading: loadingClients, updateBrandbook } = useClients();
+  const { clients, loading: loadingClients, updateBrandbook, addBrandMaterial, removeBrandMaterial } = useClients();
   const { collaborators, loading: loadingCollabs } = useCollaborators();
   const {
     tasks, loading: loadingTasks,
     createTask, moveToProduction, moveToApproval,
-    approveTask, rejectTask, addComment, updateLinks, deleteTask,
+    approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
   } = useTasks();
 
   const [page, setPage] = useState('overview');
@@ -96,10 +96,13 @@ export default function CreativeDashboard({ sectorId }) {
             onReject={rejectTask}
             onAddComment={addComment}
             onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
         ) : page === 'vault' ? (
-          <VaultPage clients={clients} sectorId={sectorId} onUpdateBrandbook={handleUpdateBrandbook} />
+          <VaultPage clients={clients} sectorId={sectorId} onUpdateBrandbook={handleUpdateBrandbook}
+            onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, sectorId)}
+            onRemoveMaterial={removeBrandMaterial} />
         ) : page === 'todo' ? (
           <TodoView accent={sectorId === 'design' ? '#a78bfa' : '#fb923c'} />
         ) : page === 'agenda' ? (

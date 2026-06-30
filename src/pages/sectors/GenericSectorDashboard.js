@@ -88,7 +88,7 @@ export default function GenericSectorDashboard({ sectorId }) {
   const {
     tasks, loading: loadingTasks,
     createTask, moveToProduction, moveToApproval,
-    approveTask, rejectTask, addComment, updateLinks, deleteTask,
+    approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
   } = useTasks();
 
   const [page, setPage] = useState('overview');
@@ -111,9 +111,11 @@ export default function GenericSectorDashboard({ sectorId }) {
     return res;
   };
 
+  // CS e Comercial não têm a ferramenta de Tasks (Kanban).
+  const hideTasks = sectorId === 'cs' || sectorId === 'comercial';
   const NAV = [
     { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard, badge: 0 },
-    { key: 'kanban',   label: 'Tasks',        icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 },
+    ...(hideTasks ? [] : [{ key: 'kanban', label: 'Tasks', icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 }]),
     { key: 'todo',     label: 'Meu Dia',      icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];
@@ -132,7 +134,7 @@ export default function GenericSectorDashboard({ sectorId }) {
           <TodoView accent={SECTORS[sectorId]?.color || 'var(--neon)'} />
         ) : page === 'agenda' ? (
           <AgendaView />
-        ) : (
+        ) : (page === 'kanban' && !hideTasks) ? (
           <TaskKanban
             tasks={tasks}
             clients={myClients}
@@ -146,8 +148,11 @@ export default function GenericSectorDashboard({ sectorId }) {
             onReject={rejectTask}
             onAddComment={addComment}
             onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
+        ) : (
+          <GenericOverview myTasks={myTasks} sectorId={sectorId} />
         )}
       </main>
     </div>

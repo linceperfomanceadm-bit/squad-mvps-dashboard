@@ -32,7 +32,7 @@ export default function WebDesignDashboard() {
   const { toast } = useToast();
   const { clients, loading, addClient, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, deleteClient } = useClients();
   const { collaborators } = useCollaborators();
-  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask } = useTasks();
+  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
 
   const [page, setPage] = useState('overview');
   const [prodSubTab, setProdSubTab] = useState('ecommerce');
@@ -106,6 +106,7 @@ export default function WebDesignDashboard() {
             onReject={rejectTask}
             onAddComment={addComment}
             onUpdateLinks={updateLinks}
+            onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
         ) : page === 'todo' ? (
