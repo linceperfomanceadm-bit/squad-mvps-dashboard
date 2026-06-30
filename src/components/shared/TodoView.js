@@ -17,14 +17,21 @@ export default function TodoView({ accent = 'var(--neon)' }) {
   const { user } = useAuth();
   const { tasks, loading, addTask, updateTask, completeTask, removeTask } = usePersonalTasks(user?.authUid);
 
-  const [quickTitle, setQuickTitle] = useState('');
   const [openId, setOpenId] = useState(null);
   const [exiting, setExiting] = useState({});
+  const [showTypeMenu, setShowTypeMenu] = useState(false);
 
-  const quickAdd = async () => {
-    if (!quickTitle.trim()) return;
-    await addTask({ title: quickTitle });
-    setQuickTitle('');
+  // Cria a atividade conforme o tipo escolhido e já abre para detalhar.
+  const createActivity = async (type) => {
+    setShowTypeMenu(false);
+    const defaults = {
+      note:     { title: 'Nova anotação', type: 'note' },
+      card:     { title: 'Novo card', type: 'card', checklist: [] },
+      reminder: { title: 'Novo lembrete', type: 'reminder' },
+    };
+    const r = await addTask(defaults[type] || defaults.note);
+    // abre o recém-criado para edição (se o hook retornar o id)
+    if (r?.id) setOpenId(r.id);
   };
 
   const onComplete = (id) => {
@@ -67,18 +74,38 @@ export default function TodoView({ accent = 'var(--neon)' }) {
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Suas tarefas pessoais — visíveis só para você.</p>
       </div>
 
-      {/* Criação rápida */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        <input
-          value={quickTitle}
-          onChange={e => setQuickTitle(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') quickAdd(); }}
-          placeholder="Nova tarefa e Enter — depois clique para detalhar..."
-          style={{ flex: 1, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 14px', color: 'var(--text)', fontSize: 14, outline: 'none', fontFamily: 'var(--f)' }}
-        />
-        <button onClick={quickAdd} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `linear-gradient(135deg,${accent},${accent}cc)`, border: 'none', borderRadius: 10, padding: '0 18px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
-          <Plus size={16} /> Adicionar
+      {/* Criar Atividade — botão único com escolha de tipo */}
+      <div style={{ marginBottom: 24, position: 'relative', display: 'inline-block' }}>
+        <button onClick={() => setShowTypeMenu(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: `linear-gradient(135deg,${accent},${accent}cc)`, border: 'none', borderRadius: 10, padding: '12px 20px', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          <Plus size={17} /> Criar Atividade
         </button>
+        {showTypeMenu && (
+          <>
+            <div onClick={() => setShowTypeMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+            <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: 'rgba(20,20,34,.99)', border: '1px solid var(--border)', borderRadius: 12, padding: 6, minWidth: 230, boxShadow: '0 16px 48px rgba(0,0,0,.6)' }}>
+              {[
+                { type: 'note', icon: StickyNote, label: 'Anotação', desc: 'Um texto rápido' },
+                { type: 'card', icon: ListChecks, label: 'Card', desc: 'Com checklist, tipo Trello' },
+                { type: 'reminder', icon: CalIcon, label: 'Lembrete', desc: 'Com data/prazo' },
+              ].map(opt => {
+                const Icon = opt.icon;
+                return (
+                  <button key={opt.type} onClick={() => createActivity(opt.type)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, background: 'none', border: 'none', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', textAlign: 'left' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.05)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'none'}>
+                    <span style={{ width: 34, height: 34, borderRadius: 9, background: `${accent}1a`, border: `1px solid ${accent}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={16} color={accent} />
+                    </span>
+                    <span>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>{opt.label}</span>
+                      <span style={{ display: 'block', fontSize: 11, color: 'var(--muted)' }}>{opt.desc}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
       </div>
 
       {loading ? (
