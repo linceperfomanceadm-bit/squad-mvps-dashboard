@@ -2,6 +2,46 @@ import React, { useState } from 'react';
 import { Plus, X, Search, Trash2, Check, Edit2 } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
 
+// Normaliza responsáveis de um setor para SEMPRE um array.
+// (clientes antigos guardam string; novos guardam array.)
+export function asArray(val) {
+  if (!val) return [];
+  return Array.isArray(val) ? val : [val];
+}
+
+// Seletor de múltiplos responsáveis (chips clicáveis) de um setor.
+function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
+  const sectorCollabs = collaborators.filter(c => c.sector === sector.id && c.active);
+  const sel = asArray(selected);
+  const toggle = (name) => {
+    if (sel.includes(name)) onChange(sel.filter(n => n !== name));
+    else onChange([...sel, name]);
+  };
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
+      <span style={{ fontSize: 13, color: sector.color, minWidth: 110, display: 'flex', alignItems: 'center', gap: 5, paddingTop: 4 }}>{sector.emoji} {sector.label}</span>
+      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {sectorCollabs.length === 0
+          ? <span style={{ fontSize: 12, color: 'var(--muted)', paddingTop: 4 }}>Sem colaboradores</span>
+          : sectorCollabs.map(c => {
+              const active = sel.includes(c.name);
+              return (
+                <button key={c.id} type="button" onClick={() => toggle(c.name)} style={{
+                  fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 16, cursor: 'pointer',
+                  background: active ? `${sector.color}22` : 'var(--surface)',
+                  color: active ? sector.color : 'var(--muted)',
+                  border: `1px solid ${active ? `${sector.color}66` : 'var(--border)'}`,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  {active && <Check size={11} />} {c.name}
+                </button>
+              );
+            })}
+      </div>
+    </div>
+  );
+}
+
 function AddClientModal({ collaborators, onClose, onAdd }) {
   const [form, setForm] = useState({ name: '', wdService: '', responsibles: {} });
   const [loading, setLoading] = useState(false);
@@ -42,18 +82,16 @@ function AddClientModal({ collaborators, onClose, onAdd }) {
           </div>
           <div style={MS.field}>
             <label style={MS.label}>RESPONSÁVEIS POR SETOR</label>
-            {Object.values(SECTORS).map(s => {
-              const sectorCollabs = collaborators.filter(c => c.sector === s.id && c.active);
-              return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 13, color: s.color, minWidth: 110, display: 'flex', alignItems: 'center', gap: 5 }}>{s.emoji} {s.label}</span>
-                  <select style={{ ...MS.select, flex: 1 }} value={form.responsibles[s.id] || ''} onChange={e => set('responsibles', { ...form.responsibles, [s.id]: e.target.value })}>
-                    <option value="">Não atribuído</option>
-                    {sectorCollabs.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-              );
-            })}
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Clique para adicionar/remover. Pode escolher mais de um por setor.</p>
+            {Object.values(SECTORS).map(s => (
+              <MultiResponsibleSelect
+                key={s.id}
+                sector={s}
+                collaborators={collaborators}
+                selected={form.responsibles[s.id]}
+                onChange={(arr) => set('responsibles', { ...form.responsibles, [s.id]: arr })}
+              />
+            ))}
           </div>
           {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -97,18 +135,15 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
         <div style={MS.body}>
           <div style={MS.field}>
             <label style={MS.label}>RESPONSÁVEIS POR SETOR</label>
-            {Object.values(SECTORS).map(s => {
-              const sectorCollabs = collaborators.filter(c => c.sector === s.id && c.active);
-              return (
-                <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                  <span style={{ fontSize: 13, color: s.color, minWidth: 110, display: 'flex', alignItems: 'center', gap: 5 }}>{s.emoji} {s.label}</span>
-                  <select style={{ ...MS.select, flex: 1 }} value={responsibles[s.id] || ''} onChange={e => setResponsibles(r => ({ ...r, [s.id]: e.target.value }))}>
-                    <option value="">Não atribuído</option>
-                    {sectorCollabs.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-              );
-            })}
+            {Object.values(SECTORS).map(s => (
+              <MultiResponsibleSelect
+                key={s.id}
+                sector={s}
+                collaborators={collaborators}
+                selected={responsibles[s.id]}
+                onChange={(arr) => setResponsibles(r => ({ ...r, [s.id]: arr }))}
+              />
+            ))}
           </div>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
             <button style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
@@ -172,13 +207,16 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                   <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--muted)' }}>
                     {c.wd?.service ? WD_SERVICE_CONFIG[c.wd.service]?.label : '—'}
                   </td>
-                  {Object.values(SECTORS).map(s => (
-                    <td key={s.id} style={{ padding: '12px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
-                      {c.responsibles?.[s.id]
-                        ? <span style={{ color: s.color, fontWeight: 500 }}>{c.responsibles[s.id]}</span>
-                        : <span style={{ color: 'var(--muted)' }}>—</span>}
-                    </td>
-                  ))}
+                  {Object.values(SECTORS).map(s => {
+                    const names = asArray(c.responsibles?.[s.id]);
+                    return (
+                      <td key={s.id} style={{ padding: '12px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
+                        {names.length > 0
+                          ? <span style={{ color: s.color, fontWeight: 500 }}>{names.join(', ')}</span>
+                          : <span style={{ color: 'var(--muted)' }}>—</span>}
+                      </td>
+                    );
+                  })}
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
                       <button style={S.iconBtnBlue} onClick={() => setEditClient(c)} title="Editar responsáveis">
