@@ -5,6 +5,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
 
+// Interpreta "YYYY-MM-DD" no fuso local (corrige o bug de 1 dia antes).
+function parseLocalDate(str) {
+  if (!str) return null;
+  const [y, m, d] = String(str).split('-').map(Number);
+  if (!y || !m || !d) return new Date(str);
+  return new Date(y, m - 1, d);
+}
+
 // ─── Success popup ────────────────────────────────────────────
 function CompletionPopup({ task, onClose }) {
   const tl = task.timeline || [];
@@ -91,7 +99,7 @@ function CompletionPopup({ task, onClose }) {
 }
 
 // ─── Main TaskModal ───────────────────────────────────────────
-export default function TaskModal({ task, currentUser, currentUserSector, collaborators, onClose, onMoveToProduction, onMoveToApproval, onApprove, onReject, onAddComment, onUpdateLinks, onDelete, isAdmin = false }) {
+export default function TaskModal({ task, currentUser, currentUserSector, collaborators, onClose, onMoveToProduction, onMoveToApproval, onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete, isAdmin = false }) {
   const [comment, setComment] = useState('');
   const [newLink, setNewLink] = useState('');
   const [newLinkName, setNewLinkName] = useState('');
@@ -102,9 +110,13 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const [newResponsible, setNewResponsible] = useState({ name: '', sector: '' });
   const [showCompletion, setShowCompletion] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showDeadlineForm, setShowDeadlineForm] = useState(false);
+  const [newDeadline, setNewDeadline] = useState(task.deadline || '');
+  const [deadlineReason, setDeadlineReason] = useState('');
   const chatEndRef = useRef(null);
 
-  const isResponsible = task.responsibleName === currentUser;
+  const respNames = (Array.isArray(task.responsibleNames) && task.responsibleNames.length) ? task.responsibleNames : (task.responsibleName ? [task.responsibleName] : []);
+  const isResponsible = respNames.includes(currentUser) || task.responsibleName === currentUser;
   const isRequester   = task.requestedBy === currentUser;
   const priority      = TASK_PRIORITIES.find(p => p.id === task.priority);
   const responsibleSector = SECTORS[task.responsibleSector];
@@ -211,17 +223,40 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
               {[
-                { label: 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${task.responsibleName}`, color: responsibleSector?.color },
+                { label: respNames.length > 1 ? 'RESPONSÁVEIS' : 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${respNames.join(', ')}`, color: responsibleSector?.color },
                 { label: 'SETOR',       value: responsibleSector?.label, color: responsibleSector?.color },
-                task.deadline ? { label: 'PRAZO', value: format(new Date(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: '#ddd' } : null,
+                task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: '#ddd', deadline: true } : null,
                 { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : '#888' },
               ].filter(Boolean).map(item => (
-                <div key={item.label} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div key={item.label} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
                   <span style={{ fontSize: 9, letterSpacing: '.1em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
                   <span style={{ fontSize: 13, color: item.color || '#ddd', fontWeight: 600 }}>{item.value}</span>
+                  {item.deadline && (isResponsible || isAdmin) && onChangeDeadline && (
+                    <button onClick={() => { setNewDeadline(task.deadline || ''); setDeadlineReason(''); setShowDeadlineForm(true); }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>alterar</button>
+                  )}
                 </div>
               ))}
             </div>
+
+            {/* Form de alteração de data */}
+            {showDeadlineForm && (
+              <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>Alterar data de entrega</p>
+                <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>NOVA DATA</label>
+                <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ width: '100%', background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, colorScheme: 'dark' }} />
+                <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>JUSTIFICATIVA *</label>
+                <textarea value={deadlineReason} onChange={e => setDeadlineReason(e.target.value)} rows={2} placeholder="Por que a data está mudando?" style={{ width: '100%', background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, resize: 'vertical', fontFamily: 'var(--f)' }} />
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={async () => {
+                    if (!newDeadline) return;
+                    if (!deadlineReason.trim()) return;
+                    const r = await onChangeDeadline(task.id, newDeadline, deadlineReason, currentUser, currentUserSector);
+                    if (r?.success) setShowDeadlineForm(false);
+                  }} style={{ flex: 1, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Salvar nova data</button>
+                  <button onClick={() => setShowDeadlineForm(false)} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '10px 16px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+                </div>
+              </div>
+            )}
 
             {/* Links */}
             <div style={{ marginBottom: 18 }}>

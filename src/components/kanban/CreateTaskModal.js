@@ -10,7 +10,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     deadline: '',
     priority: 'medium',
     responsibleSector: '',
-    responsibleName: '',
+    responsibleNames: [],
     comment: '',
   });
   const [links, setLinks] = useState([{ name: '', url: '' }]);
@@ -29,7 +29,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     if (!form.name.trim())           { setError('Preencha o nome da task.'); return; }
     if (!form.clientId)              { setError('Selecione o cliente.'); return; }
     if (!form.responsibleSector)     { setError('Selecione o setor responsável.'); return; }
-    if (!form.responsibleName)       { setError('Selecione o colaborador responsável.'); return; }
+    if (!form.responsibleNames.length) { setError('Selecione ao menos um responsável.'); return; }
 
     setLoading(true);
     const client = clients.find(c => c.id === form.clientId);
@@ -46,6 +46,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
 
     const res = await onSave({
       ...form,
+      responsibleName:   form.responsibleNames[0] || '',
       clientName:        client?.name || '',
       links:             validLinks,
       requestedBy:       currentUser,
@@ -138,20 +139,37 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
           </div>
 
           {/* Sector + Responsible */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <div style={S.field}>
               <label style={S.label}>SETOR RESPONSÁVEL *</label>
-              <select style={S.select} value={form.responsibleSector} onChange={e => { set('responsibleSector', e.target.value); set('responsibleName', ''); }}>
+              <select style={S.select} value={form.responsibleSector} onChange={e => { set('responsibleSector', e.target.value); set('responsibleNames', []); }}>
                 <option value="">Selecionar setor</option>
                 {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
               </select>
             </div>
             <div style={S.field}>
-              <label style={S.label}>COLABORADOR RESPONSÁVEL *</label>
-              <select style={S.select} value={form.responsibleName} onChange={e => set('responsibleName', e.target.value)} disabled={!form.responsibleSector}>
-                <option value="">Selecionar colaborador</option>
-                {sectorCollabs(form.responsibleSector).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-              </select>
+              <label style={S.label}>RESPONSÁVEIS * <span style={{ color: 'var(--muted)', fontWeight: 400, textTransform: 'none' }}>(pode escolher mais de um)</span></label>
+              {!form.responsibleSector
+                ? <p style={{ fontSize: 12, color: 'var(--muted)' }}>Selecione um setor primeiro.</p>
+                : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {sectorCollabs(form.responsibleSector).length === 0
+                      ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>Nenhum colaborador ativo neste setor.</span>
+                      : sectorCollabs(form.responsibleSector).map(c => {
+                          const active = form.responsibleNames.includes(c.name);
+                          return (
+                            <button key={c.id} type="button" onClick={() => set('responsibleNames', active ? form.responsibleNames.filter(n => n !== c.name) : [...form.responsibleNames, c.name])} style={{
+                              fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 16, cursor: 'pointer',
+                              background: active ? 'var(--neon-dim)' : '#12121f',
+                              color: active ? 'var(--neon)' : 'var(--muted)',
+                              border: `1px solid ${active ? 'var(--neon-border)' : 'rgba(255,255,255,.1)'}`,
+                            }}>
+                              {active ? '✓ ' : ''}{c.name}
+                            </button>
+                          );
+                        })}
+                  </div>
+                )}
             </div>
           </div>
 

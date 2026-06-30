@@ -11,7 +11,7 @@ export default function TaskKanban({
   isAdmin = false,
   adminFilters = null,
   onCreateTask, onMoveToProduction, onMoveToApproval,
-  onApprove, onReject, onAddComment, onUpdateLinks, onDelete,
+  onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete,
 }) {
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -195,6 +195,7 @@ export default function TaskKanban({
           onReject={onReject}
           onAddComment={onAddComment}
           onUpdateLinks={onUpdateLinks}
+          onChangeDeadline={onChangeDeadline}
           onDelete={async (...args) => { await onDelete(...args); setSelectedTaskId(null); }}
         />
       )}

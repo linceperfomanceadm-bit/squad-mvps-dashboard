@@ -4,11 +4,20 @@ import { ptBR } from 'date-fns/locale';
 import { Clock, AlertTriangle, MessageSquare, RefreshCw, Link } from 'lucide-react';
 import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
 
+// Interpreta "YYYY-MM-DD" no fuso LOCAL (evita o bug de 1 dia antes,
+// causado por new Date("YYYY-MM-DD") ser lido como meia-noite UTC).
+export function parseLocalDate(str) {
+  if (!str) return null;
+  const [y, m, d] = String(str).split('-').map(Number);
+  if (!y || !m || !d) return new Date(str);
+  return new Date(y, m - 1, d);
+}
+
 export default function TaskCard({ task, onClick }) {
   const priority = TASK_PRIORITIES.find(p => p.id === task.priority);
   const sector = SECTORS[task.responsibleSector];
   const now = new Date();
-  const deadline = task.deadline ? new Date(task.deadline) : null;
+  const deadline = task.deadline ? parseLocalDate(task.deadline) : null;
   const isOverdue = deadline && differenceInDays(now, deadline) > 0 && task.status !== 'done';
   const isUrgentDeadline = deadline && !isOverdue && differenceInDays(deadline, now) <= 1;
 
@@ -84,14 +93,30 @@ export default function TaskCard({ task, onClick }) {
 
       {/* Footer: responsible + comments + links */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-        <div style={{
-          width: 24, height: 24, borderRadius: 8,
-          background: sector ? `${sector.color}20` : 'var(--surface)',
-          border: `1px solid ${sector ? `${sector.color}35` : 'var(--border)'}`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 700, color: sector?.color || 'var(--muted)',
-        }}>
-          {task.responsibleName?.charAt(0).toUpperCase()}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          {(() => {
+            const names = (Array.isArray(task.responsibleNames) && task.responsibleNames.length) ? task.responsibleNames : (task.responsibleName ? [task.responsibleName] : []);
+            const shown = names.slice(0, 3);
+            return (
+              <>
+                {shown.map((n, i) => (
+                  <div key={i} title={n} style={{
+                    width: 24, height: 24, borderRadius: 8,
+                    background: sector ? `${sector.color}20` : 'var(--surface)',
+                    border: `1px solid ${sector ? `${sector.color}35` : 'var(--border)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 10, fontWeight: 700, color: sector?.color || 'var(--muted)',
+                    marginLeft: i === 0 ? 0 : -6,
+                  }}>
+                    {n.charAt(0).toUpperCase()}
+                  </div>
+                ))}
+                {names.length > 3 && (
+                  <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', marginLeft: 4 }}>+{names.length - 3}</span>
+                )}
+              </>
+            );
+          })()}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {(task.comments?.length > 0) && (
