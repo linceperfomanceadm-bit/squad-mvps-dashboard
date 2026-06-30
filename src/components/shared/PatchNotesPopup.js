@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { X, Sparkles } from 'lucide-react';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
-
+ 
 /*
  * Popup de novidades (patch notes). Aparece 1x quando o colaborador
  * loga e ainda não viu a versão atual das notas. Some ao fechar e só
@@ -13,9 +13,9 @@ import { db } from '../../lib/firebase';
  * edite PATCH_NOTES. Todos os colaboradores verão uma vez no próximo
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
-
+ 
 export const PATCH_VERSION = '2026-06-1';
-
+ 
 const PATCH_NOTES = {
   date: 'Junho de 2026',
   title: 'Novidades no painel',
@@ -27,37 +27,44 @@ const PATCH_NOTES = {
     { emoji: '🛠️', text: 'Corrigimos a data de entrega que aparecia um dia antes.' },
   ],
 };
-
+ 
 export default function PatchNotesPopup({ user }) {
   const [show, setShow] = useState(false);
-
+ 
   useEffect(() => {
-    if (!user?.authUid && !user?.id) return;
-    const uid = user.authUid || user.id;
+    if (!user?.id && !user?.authUid) return;
+    const docId = user.id || user.authUid;
+    const lsKey = `patchSeen_${docId}`;
     let cancelled = false;
     (async () => {
+      // 1 checagem local rapida: se ja viu nesta maquina, nem mostra
       try {
-        const ref = doc(db, 'collaborators', uid);
-        const snap = await getDoc(ref);
+        if (localStorage.getItem(lsKey) === PATCH_VERSION) return;
+      } catch {}
+      // 2 checagem no Firestore, persiste entre dispositivos
+      try {
+        const snap = await getDoc(doc(db, 'collaborators', docId));
         const seen = snap.exists() ? snap.data().lastPatchSeen : null;
         if (!cancelled && seen !== PATCH_VERSION) setShow(true);
       } catch {
-        // se não der para ler, não mostra (evita popup repetido sem controle)
+        // sem doc, ex admin master: cai no controle local apenas
+        if (!cancelled) setShow(true);
       }
     })();
     return () => { cancelled = true; };
   }, [user]);
-
+ 
   const close = async () => {
     setShow(false);
-    try {
-      const uid = user.authUid || user.id;
-      await updateDoc(doc(db, 'collaborators', uid), { lastPatchSeen: PATCH_VERSION });
-    } catch { /* best-effort */ }
+    const docId = user.id || user.authUid;
+    // grava local sempre, cobre admin master e falhas de escrita
+    try { localStorage.setItem(`patchSeen_${docId}`, PATCH_VERSION); } catch {}
+    // grava no Firestore quando há doc, persiste entre dispositivos
+    try { await updateDoc(doc(db, 'collaborators', docId), { lastPatchSeen: PATCH_VERSION }); } catch { /* best-effort */ }
   };
-
+ 
   if (!show) return null;
-
+ 
   return ReactDOM.createPortal(
     <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(18,18,32,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
