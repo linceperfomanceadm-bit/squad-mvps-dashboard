@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from './components/shared/Toast';
+import PatchNotesPopup from './components/shared/PatchNotesPopup';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import FirstAccessPage from './pages/FirstAccessPage';
@@ -79,9 +80,12 @@ function CommercialRedirect() {
 }
 
 function AppRoutes() {
+  const { user } = useAuth();
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
+    <>
+      {user && !user.firstAccess && <PatchNotesPopup user={user} />}
+      <Routes>
+        <Route path="/" element={<HomePage />} />
       <Route path="/login/:sectorId" element={<LoginPage />} />
       <Route path="/first-access" element={<FirstAccessPage />} />
 
@@ -127,6 +131,7 @@ function AppRoutes() {
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 
