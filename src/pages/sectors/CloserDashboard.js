@@ -15,12 +15,12 @@ import { useCommercialGoals, useObjections, sumSalesThisMonth } from '../../hook
 import BriefingForm from '../../components/commercial/BriefingForm';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
-
+ 
 const COLOR = SECTORS.comercial.color;
 // O comercial é quase-preto (emblema); para destaque na UI usamos um
 // tom de apoio legível no fundo escuro.
 const ACCENT = '#7C5CFF';
-
+ 
 export default function CloserDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -33,7 +33,7 @@ export default function CloserDashboard() {
   const { collaborators } = useCollaborators();
   const { goals } = useCommercialGoals();
   const objections = useObjections(user?.authUid);
-
+ 
   const [page, setPage] = useState('available');
   const [showtimeDealId, setShowtimeDealId] = useState(null);
   const [showManual, setShowManual] = useState(false);
@@ -41,15 +41,15 @@ export default function CloserDashboard() {
   const [passTarget, setPassTarget] = useState(null); // deal a passar a vez
   const [conflictPrompt, setConflictPrompt] = useState(null);
   const [startPrompt, setStartPrompt] = useState(null);
-
+ 
   const me = user?.name;
-
+ 
   // Lista de closers ativos (para fila e 2º closer).
   const closerNames = useMemo(() => {
     const closers = collaborators.filter(c => c.sector === 'comercial' && c.active && c.commercialRole === 'closer').map(c => c.name);
     return closers.length > 0 ? closers : collaborators.filter(c => c.sector === 'comercial' && c.active).map(c => c.name);
   }, [collaborators]);
-
+ 
   // ── Partição dos deals ───────────────────────────────────────
   // Disponíveis para MIM: as atribuídas a mim pela fila (assigned) +
   // as que estão no pool aberto (available, quando todos passaram).
@@ -65,13 +65,13 @@ export default function CloserDashboard() {
     () => deals.filter(d => ['mq', 'noshow'].includes(d.status) && d.closerName === me),
     [deals, me]
   );
-
+ 
   // metas — agora por VALOR de venda (não contagem de calls)
   const salesMe = useMemo(() => sumSalesThisMonth(deals, me), [deals, me]);
   const salesTeam = useMemo(() => sumSalesThisMonth(deals), [deals]);
   const goalMe = goals?.individual?.[me] || 0;
   const goalTeam = goals?.teamGoal || 0;
-
+ 
   const tryClaim = (deal) => {
     const conflict = hasConflict(deal.callAt, myAgenda);
     if (conflict) { setConflictPrompt({ deal, conflictsWith: conflict }); return; }
@@ -83,14 +83,14 @@ export default function CloserDashboard() {
     else toast(r.error, 'e');
     setConflictPrompt(null);
   };
-
+ 
   const tryStart = (deal) => {
     if (!deal.callAt) { setShowtimeDealId(deal.id); return; }
     const diff = Math.abs(new Date(deal.callAt).getTime() - Date.now());
     if (diff > 60 * 60 * 1000) { setStartPrompt(deal); return; }
     setShowtimeDealId(deal.id);
   };
-
+ 
   const NAV = [
     { key: 'available', label: 'Calls Disponíveis', icon: Inbox, badge: available.length, badgeDanger: available.length > 0 },
     { key: 'agenda-int', label: 'Minha Agenda', icon: CalendarClock, badge: myAgenda.length },
@@ -99,9 +99,9 @@ export default function CloserDashboard() {
     { key: 'todo', label: 'Meu Dia', icon: CheckSquare },
     { key: 'agenda', label: 'Agenda', icon: Calendar },
   ];
-
+ 
   const showtimeDeal = deals.find(d => d.id === showtimeDealId) || null;
-
+ 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar sectorId="comercial" navItems={NAV} activeKey={page} onNav={setPage} />
@@ -127,7 +127,7 @@ export default function CloserDashboard() {
             <StubView page={page} />
           )}
       </main>
-
+ 
       {/* Showtime */}
       {showtimeDeal && ReactDOM.createPortal(
         <Showtime
@@ -137,7 +137,7 @@ export default function CloserDashboard() {
           actions={{ closeNoShow, closeLost, closeWon, saveCallForm }}
           toast={toast}
         />, document.body)}
-
+ 
       {/* Passar a vez */}
       {passTarget && ReactDOM.createPortal(
         <PassTurnModal deal={passTarget} onClose={() => setPassTarget(null)} onConfirm={async (reason) => {
@@ -146,7 +146,7 @@ export default function CloserDashboard() {
           if (r.success) toast('Vez passada ao próximo closer da fila.');
           else toast(r.error, 'e');
         }} />, document.body)}
-
+ 
       {/* Modal de call manual */}
       {showManual && ReactDOM.createPortal(
         <ManualCallModal
@@ -158,7 +158,7 @@ export default function CloserDashboard() {
           }}
           myAgenda={myAgenda}
         />, document.body)}
-
+ 
       {/* Devolução com justificativa */}
       {releaseTarget && ReactDOM.createPortal(
         <ReleaseModal
@@ -170,7 +170,7 @@ export default function CloserDashboard() {
             else toast(r.error, 'e');
           }}
         />, document.body)}
-
+ 
       {/* Alerta de conflito ao puxar */}
       {conflictPrompt && ReactDOM.createPortal(
         <ConfirmModal
@@ -182,7 +182,7 @@ export default function CloserDashboard() {
           onConfirm={() => doClaim(conflictPrompt.deal)}
           onClose={() => setConflictPrompt(null)}
         />, document.body)}
-
+ 
       {/* Confirmação de início fora de hora */}
       {startPrompt && ReactDOM.createPortal(
         <ConfirmModal
@@ -197,14 +197,14 @@ export default function CloserDashboard() {
     </div>
   );
 }
-
+ 
 function Spinner() {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}><div className="spinner" style={{ width: 36, height: 36 }} /></div>;
 }
 function StubView({ page }) {
   return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '60px 0' }}>Seção "{page}" em breve.</p>;
 }
-
+ 
 function fmtDateTime(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -213,7 +213,7 @@ function fmtTime(iso) {
   if (!iso) return '--:--';
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
-
+ 
 // ── Calls Disponíveis (tela inicial) ───────────────────────────
 function AvailableView({ list, me, goalMe, salesMe, goalTeam, salesTeam, onClaim, onPass }) {
   return (
@@ -223,14 +223,14 @@ function AvailableView({ list, me, goalMe, salesMe, goalTeam, salesTeam, onClaim
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Calls Disponíveis</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Calls distribuídas para você pela fila. Aceite para adicionar à agenda, ou passe a vez ao próximo closer.</p>
       </div>
-
+ 
       {/* Metas do mês por VALOR (sempre visíveis) */}
       <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', marginBottom: 10 }}>📊 METAS DO MÊS (R$)</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
         <GoalBar label="Minhas vendas" value={salesMe} goal={goalMe} color="#22c55e" money />
         <GoalBar label="Vendas do time" value={salesTeam} goal={goalTeam} color={ACCENT} money />
       </div>
-
+ 
       {list.length === 0 ? (
         <Empty msg="Nenhuma call disponível no momento." />
       ) : (
@@ -265,11 +265,11 @@ function AvailableView({ list, me, goalMe, salesMe, goalTeam, salesTeam, onClaim
     </div>
   );
 }
-
+ 
 // ── Agenda interna (lista OU colunas por dia) ──────────────────
 function InternalAgenda({ list, me, closers, onStart, onRelease, onAddManual, onAddSecond, onRemoveSecond, onDelete }) {
   const [view, setView] = useState('list'); // 'list' | 'columns'
-
+ 
   const days = useMemo(() => {
     const map = {};
     list.forEach(d => {
@@ -279,7 +279,7 @@ function InternalAgenda({ list, me, closers, onStart, onRelease, onAddManual, on
     Object.values(map).forEach(arr => arr.sort((a, b) => new Date(a.callAt || 0) - new Date(b.callAt || 0)));
     return Object.entries(map).sort(([a], [b]) => (a === 'sem-data' ? 1 : b === 'sem-data' ? -1 : a.localeCompare(b)));
   }, [list]);
-
+ 
   return (
     <div className="fade-up">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
@@ -302,7 +302,7 @@ function InternalAgenda({ list, me, closers, onStart, onRelease, onAddManual, on
           </button>
         </div>
       </div>
-
+ 
       {list.length === 0 ? (
         <Empty msg="Nenhuma call na sua agenda. Puxe uma das disponíveis ou cadastre manualmente." />
       ) : view === 'list' ? (
@@ -340,7 +340,7 @@ function InternalAgenda({ list, me, closers, onStart, onRelease, onAddManual, on
     </div>
   );
 }
-
+ 
 // Card de call reutilizado nos dois modos.
 function CallCard({ d, me, closers = [], onStart, onRelease, onAddSecond, onRemoveSecond, onDelete, compact }) {
   const [pickSecond, setPickSecond] = useState(false);
@@ -398,7 +398,7 @@ function CallCard({ d, me, closers = [], onStart, onRelease, onAddSecond, onRemo
     </div>
   );
 }
-
+ 
 // ── Recuperar (mq / noshow) ────────────────────────────────────
 function RecoverView({ list, onRecover }) {
   const label = { mq: 'MQ (mal qualif.)', noshow: 'No-show' };
@@ -429,7 +429,7 @@ function RecoverView({ list, onRecover }) {
     </div>
   );
 }
-
+ 
 function dayLabel(key) {
   if (key === 'sem-data') return 'Sem data definida';
   const d = new Date(key + 'T00:00:00');
@@ -440,7 +440,7 @@ function dayLabel(key) {
   if (diff === 1) return `Amanhã · ${wd}`;
   return wd.charAt(0).toUpperCase() + wd.slice(1);
 }
-
+ 
 // ── Modais ─────────────────────────────────────────────────────
 function ManualCallModal({ onClose, onSave, myAgenda }) {
   const [leadName, setLeadName] = useState('');
@@ -449,7 +449,7 @@ function ManualCallModal({ onClose, onSave, myAgenda }) {
   const [meetLink, setMeetLink] = useState('');
   const [pains, setPains] = useState('');
   const [warn, setWarn] = useState(null);
-
+ 
   const submit = () => {
     if (!leadName.trim()) { setWarn('Informe o nome do lead.'); return; }
     if (!callAt) { setWarn('Defina data e hora.'); return; }
@@ -461,7 +461,7 @@ function ManualCallModal({ onClose, onSave, myAgenda }) {
     }
     onSave({ leadName, company, callAt: iso, meetLink, pains });
   };
-
+ 
   return (
     <Overlay onClose={onClose}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 460, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
@@ -485,7 +485,7 @@ function ManualCallModal({ onClose, onSave, myAgenda }) {
     </Overlay>
   );
 }
-
+ 
 function ReleaseModal({ deal, onClose, onConfirm }) {
   const [reason, setReason] = useState('');
   return (
@@ -502,7 +502,7 @@ function ReleaseModal({ deal, onClose, onConfirm }) {
     </Overlay>
   );
 }
-
+ 
 function ConfirmModal({ icon, title, message, confirmLabel, confirmColor, onConfirm, onClose }) {
   return (
     <Overlay onClose={onClose}>
@@ -518,7 +518,7 @@ function ConfirmModal({ icon, title, message, confirmLabel, confirmColor, onConf
     </Overlay>
   );
 }
-
+ 
 function GoalBar({ label, value, goal, color, money = false }) {
   const hasGoal = goal > 0;
   const pct = hasGoal ? Math.min(100, Math.round((value / goal) * 100)) : 0;
@@ -544,11 +544,11 @@ function GoalBar({ label, value, goal, color, money = false }) {
     </div>
   );
 }
-
+ 
 function Empty({ msg }) { return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>{msg}</p>; }
 const BTN_BIG = { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: 'none', borderRadius: 10, padding: '12px', fontSize: 14, fontWeight: 700, cursor: 'pointer', color: '#fff', width: '100%' };
 const CARD = { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 };
-
+ 
 // ════════════════════════════════════════════════════════════════
 // MODO SHOWTIME
 // ════════════════════════════════════════════════════════════════
@@ -565,12 +565,12 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
   const notesRef = React.useRef(null);
   const savedRef = React.useRef(deal.callNotes || '');
   const formSavedRef = React.useRef(JSON.stringify(deal.callForm || {}));
-
+ 
   React.useEffect(() => {
     const id = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => clearInterval(id);
   }, []);
-
+ 
   React.useEffect(() => {
     const id = setInterval(() => {
       const html = notesRef.current?.innerHTML || '';
@@ -580,11 +580,11 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
     }, 5000);
     return () => clearInterval(id);
   }, [deal.id, onSaveNotes, form, actions]);
-
+ 
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const exec = (cmd) => { document.execCommand(cmd, false, null); notesRef.current?.focus(); };
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
+ 
   // Validação do mini-formulário (todos obrigatórios).
   const formComplete = (
     form.clientCompany?.trim() && form.responsibleName?.trim() && form.whatSells?.trim() &&
@@ -594,7 +594,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
     (form.hasSite !== true || form.siteLink?.trim()) &&
     (form.hasInstagram !== true || form.hasInstagramAccess !== null)
   );
-
+ 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#07070e', zIndex: 1200, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: `1px solid ${COLOR}30`, background: 'rgba(12,12,24,.96)', flexShrink: 0 }}>
@@ -613,7 +613,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
           Encerrar Call
         </button>
       </div>
-
+ 
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '360px 1fr 320px', overflow: 'hidden' }}>
         {/* Esquerda: dados do SDR + MINI-FORMULÁRIO OBRIGATÓRIO */}
         <div style={{ borderRight: '1px solid var(--border)', padding: 20, overflowY: 'auto' }}>
@@ -624,7 +624,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
             <p style={ST_LBL}>DORES</p>
             <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginTop: 4, whiteSpace: 'pre-wrap' }}>{deal.pains || '—'}</p>
           </div>
-
+ 
           <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
             <h3 style={{ ...ST_H, marginBottom: 4 }}>Formulário da Call *</h3>
             <p style={{ fontSize: 11, color: formComplete ? '#22c55e' : 'var(--amber)', marginBottom: 12 }}>
@@ -646,7 +646,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
             <MiniBool label="Ciente do investimento?" value={form.awareOfInvestment} onChange={v => setF('awareOfInvestment', v)} />
           </div>
         </div>
-
+ 
         {/* Centro: rich text */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
@@ -665,7 +665,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
             style={{ flex: 1, background: 'rgba(12,12,24,.6)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, color: 'var(--text)', fontSize: 14, lineHeight: 1.7, outline: 'none', overflowY: 'auto' }}
           />
         </div>
-
+ 
         {/* Direita: Máquina de Objeções */}
         <div style={{ borderLeft: '1px solid var(--border)', padding: 20, overflowY: 'auto' }}>
           <h3 style={ST_H}>Máquina de Objeções</h3>
@@ -674,7 +674,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
             : objections.map(o => <Accordion key={o.id} item={o} />)}
         </div>
       </div>
-
+ 
       {showClose && (
         <CloseModal
           deal={deal} me={me} actions={actions} toast={toast} callForm={form} formComplete={!!formComplete}
@@ -685,7 +685,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
     </div>
   );
 }
-
+ 
 // Campo de texto do mini-formulário.
 function MiniField({ label, value, onChange, area = false }) {
   return (
@@ -709,7 +709,7 @@ function MiniBool({ label, value, onChange }) {
     </div>
   );
 }
-
+ 
 function Info({ label, value }) {
   return <div style={{ marginBottom: 8 }}><p style={ST_LBL}>{label.toUpperCase()}</p><p style={{ fontSize: 13, color: 'var(--text)', marginTop: 2 }}>{value}</p></div>;
 }
@@ -725,22 +725,17 @@ function Accordion({ item }) {
     </div>
   );
 }
-function logLabel(l) {
-  const map = { message_sent: 'Mensagem enviada', followup: 'Follow-up agendado', cold: 'Marcado frio', call_scheduled: 'Call agendada', reopened: 'Reaberto', lost: 'Perdido' };
-  return map[l.type] || l.type;
-}
-
 const ST_H = { fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '.06em' };
 const ST_LBL = { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' };
 const RT_BTN = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 9px', color: 'var(--text)', cursor: 'pointer', fontSize: 13, display: 'flex', alignItems: 'center' };
-
+ 
 // ════════════════════════════════════════════════════════════════
 // MODAL DE ENCERRAMENTO (forçado)
 // ════════════════════════════════════════════════════════════════
 function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose, onDone }) {
   const [outcome, setOutcome] = useState(null); // noshow | mq | venda_fechada
   const [mqReason, setMqReason] = useState('');
-
+ 
   const confirm = async () => {
     let r;
     if (outcome === 'noshow') r = await actions.closeNoShow(deal.id, me);
@@ -751,13 +746,13 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
     if (r?.success) { toast('Call encerrada.'); onDone(); }
     else if (r) toast(r.error, 'e');
   };
-
+ 
   const submitBriefing = async (briefing) => {
     const r = await actions.closeWon(deal.id, me, briefing);
     if (r.success) { toast('Venda registrada! Enviado para o CS. 🎉'); onDone(); }
     else toast(r.error, 'e');
   };
-
+ 
   // Trava: o mini-formulário da call precisa estar completo para encerrar.
   if (!formComplete) {
     return (
@@ -775,7 +770,7 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
       </Overlay>
     );
   }
-
+ 
   // Briefing (Venda Fechada) ocupa o modal inteiro.
   if (outcome === 'venda_fechada') {
     return (
@@ -793,7 +788,7 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
       </Overlay>
     );
   }
-
+ 
   return (
     <Overlay onClose={onClose}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 460, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
@@ -802,13 +797,13 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
         </div>
         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 18 }}>Escolha um resultado para encerrar.</p>
-
+ 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
           <OutcomeBtn active={outcome === 'venda_fechada'} onClick={() => setOutcome('venda_fechada')} color="#22c55e" label="Venda Fechada" />
           <OutcomeBtn active={outcome === 'mq'} onClick={() => setOutcome('mq')} color="var(--neon)" label="MQ (mal qualif.)" />
           <OutcomeBtn active={outcome === 'noshow'} onClick={() => setOutcome('noshow')} color="var(--muted)" label="No-Show" />
         </div>
-
+ 
         {outcome === 'mq' && (
           <div style={{ marginBottom: 16 }}>
             <label style={ST_LBL}>MOTIVO DO MQ *</label>
@@ -819,7 +814,7 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
         {outcome === 'noshow' && (
           <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>O lead volta para o painel do SDR com a marcação de No-Show, para reagendamento.</p>
         )}
-
+ 
         {outcome && outcome !== 'venda_fechada' && (
           <button onClick={confirm} style={{ ...BTN_BIG, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)` }}>Confirmar encerramento</button>
         )}
@@ -827,11 +822,11 @@ function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose,
     </Overlay>
   );
 }
-
+ 
 function Overlay({ children, onClose }) {
   return <div onClick={onClose || undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 20 }}>{children}</div>;
 }
-
+ 
 // Passar a vez ao próximo closer da fila (motivo obrigatório).
 function PassTurnModal({ deal, onClose, onConfirm }) {
   const [reason, setReason] = useState('');
@@ -863,7 +858,7 @@ function OutcomeBtn({ active, onClick, color, label }) {
     }}>{label}</button>
   );
 }
-
+ 
 // ════════════════════════════════════════════════════════════════
 // OBJEÇÕES (CRUD do closer)
 // ════════════════════════════════════════════════════════════════
@@ -871,19 +866,19 @@ function ObjectionsView({ items, addItem, updateItem, removeItem, toast }) {
   const [objection, setObjection] = useState('');
   const [response, setResponse] = useState('');
   const [editId, setEditId] = useState(null);
-
+ 
   const submit = async () => {
     if (!objection.trim() || !response.trim()) { toast('Preencha objeção e resposta.', 'e'); return; }
     if (editId) { await updateItem(editId, { objection, response }); setEditId(null); }
     else await addItem(objection, response);
     setObjection(''); setResponse('');
   };
-
+ 
   return (
     <div className="fade-up">
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Máquina de Objeções</h1>
       <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>Suas respostas prontas — aparecem no Modo Showtime.</p>
-
+ 
       <div style={{ ...CARD, marginBottom: 20 }}>
         <label style={ST_LBL}>OBJEÇÃO</label>
         <input value={objection} onChange={e => setObjection(e.target.value)} placeholder='Ex: "Está caro"' style={{ ...INP_M, marginTop: 6, marginBottom: 12 }} />
@@ -894,7 +889,7 @@ function ObjectionsView({ items, addItem, updateItem, removeItem, toast }) {
         </button>
         {editId && <button onClick={() => { setEditId(null); setObjection(''); setResponse(''); }} style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', marginLeft: 12, textDecoration: 'underline' }}>cancelar</button>}
       </div>
-
+ 
       {items.length === 0 ? <Empty msg="Nenhuma objeção cadastrada." /> : (
         <div style={{ display: 'grid', gap: 10 }}>
           {items.map(o => (
@@ -914,6 +909,6 @@ function ObjectionsView({ items, addItem, updateItem, removeItem, toast }) {
     </div>
   );
 }
-
+ 
 const INP_M = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' };
 const ICON_BTN_M = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' };
