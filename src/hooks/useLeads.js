@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, query, orderBy, writeBatch,
+  doc, getDoc, setDoc, serverTimestamp, query, orderBy, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
-export const DEFAULT_ATTEMPTS = 5;
+export const DEFAULT_ATTEMPTS = 10;
+
+// Tipos de contato que o SDR registra.
+export const CONTACT_TYPES = [
+  { id: 'ligacao',  label: 'Ligação' },
+  { id: 'mensagem', label: 'Mensagem' },
+  { id: 'whatsapp', label: 'WhatsApp' },
+  { id: 'email',    label: 'E-mail' },
+  { id: 'outro',    label: 'Outro' },
+];
 
 /*
  * Coleção `leads` — base de prospecção do SDR.
@@ -56,10 +65,12 @@ export function useLeads() {
 
   // ── Admin: inserir em lote ───────────────────────────────────
   // rows: array de { name, phone, company?, notes? }
-  const addLeadsBulk = async (rows) => {
+  const addLeadsBulk = async (rows, uploadedBy = null) => {
     try {
       const valid = rows.filter(r => (r.name || '').trim() || (r.phone || '').trim());
       if (!valid.length) return { success: false, error: 'Nenhum lead válido para importar.' };
+      const now = new Date().toISOString();
+      const batchId = `imp_${Date.now()}`; // agrupa a importação
       // writeBatch suporta até 500 ops; particiona se necessário.
       const chunks = [];
       for (let i = 0; i < valid.length; i += 450) chunks.push(valid.slice(i, i + 450));
@@ -78,6 +89,10 @@ export function useLeads() {
             claimedAt: null,
             followupAt: null,
             logs: [],
+            // Rastro de quem importou a planilha.
+            importedBy: uploadedBy,
+            importedAt: now,
+            importBatchId: batchId,
             createdAt: serverTimestamp(),
           });
         });
@@ -113,36 +128,65 @@ export function useLeads() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── SDR: log "Mensagem Enviada" (consome 1 tentativa) ────────
-  const logMessageSent = async (leadId, sdrName) => {
+  // ── SDR: "Registrar Contato" (consome 1 tentativa) ───────────
+  // Guarda tipo (ligação/mensagem/...), se houve retorno, e nota,
+  // num histórico detalhado (contactHistory) além do log.
+  const registerContact = async (leadId, sdrName, { contactType, hadReturn, note = '' }) => {
     try {
       const lead = leads.find(l => l.id === leadId);
       if (!lead) throw new Error('Lead não encontrado');
+      if (!contactType) return { success: false, error: 'Informe o tipo de contato.' };
       const now = new Date().toISOString();
       const left = Math.max(0, (lead.attemptsLeft ?? DEFAULT_ATTEMPTS) - 1);
-      const logs = appendLog(lead, { type: 'message_sent', by: sdrName, at: now });
+      const entry = {
+        id: `ct_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        type: contactType, hadReturn: !!hadReturn, note: note.trim(),
+        by: sdrName, at: now,
+      };
+      const contactHistory = [...(lead.contactHistory || []), entry];
+      const logs = appendLog(lead, { type: 'contact', by: sdrName, at: now, contactType, hadReturn: !!hadReturn });
       const patch = {
         claimedBy: lead.claimedBy || sdrName,
         claimedAt: lead.claimedAt || now,
         attemptsLeft: left,
-        logs,
+        contactHistory, logs,
       };
-      // Esgotou tentativas → perdido (arquivado).
-      if (left === 0) { patch.status = 'lost'; patch.lostReason = 'Tentativas esgotadas'; patch.lostAt = now; }
+      // Ao zerar as tentativas pela 1ª vez, libera "Sem Interação".
+      if (left === 0) patch.attemptsExhausted = true;
       await updateDoc(doc(db, 'leads', leadId), patch);
       return { success: true, exhausted: left === 0 };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── SDR: "Ignorou / Frio" → perdido ──────────────────────────
-  const markLost = async (leadId, sdrName, reason = 'Ignorou / Frio') => {
+  // ── SDR: "Sem Interação" → vai para Recuperáveis ─────────────
+  // Só permitido depois de esgotar as tentativas ao menos uma vez.
+  const markSemInteracao = async (leadId, sdrName) => {
     try {
       const lead = leads.find(l => l.id === leadId);
       if (!lead) throw new Error('Lead não encontrado');
+      if ((lead.attemptsLeft ?? DEFAULT_ATTEMPTS) > 0 && !lead.attemptsExhausted) {
+        return { success: false, error: 'Só é possível após esgotar as tentativas de contato.' };
+      }
       const now = new Date().toISOString();
-      const logs = appendLog(lead, { type: 'lost', by: sdrName, reason, at: now });
+      const logs = appendLog(lead, { type: 'sem_interacao', by: sdrName, at: now });
       await updateDoc(doc(db, 'leads', leadId), {
-        status: 'lost', lostReason: reason, lostAt: now,
+        status: 'recoverable', recoverReason: 'Sem interação', lostAt: now,
+        claimedBy: lead.claimedBy || sdrName, logs,
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── SDR: "Lead Frio" → aba Frios (exige motivo) ──────────────
+  const markCold = async (leadId, sdrName, reason) => {
+    try {
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead) throw new Error('Lead não encontrado');
+      if (!reason || !reason.trim()) return { success: false, error: 'Informe o motivo de marcar como frio.' };
+      const now = new Date().toISOString();
+      const logs = appendLog(lead, { type: 'cold', by: sdrName, at: now, reason: reason.trim() });
+      await updateDoc(doc(db, 'leads', leadId), {
+        status: 'cold', coldReason: reason.trim(), coldAt: now,
         claimedBy: lead.claimedBy || sdrName, logs,
       });
       return { success: true };
@@ -167,20 +211,6 @@ export function useLeads() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── SDR: marcar frio manual (aba Frios, reabre manualmente) ──
-  const markCold = async (leadId, sdrName) => {
-    try {
-      const lead = leads.find(l => l.id === leadId);
-      if (!lead) throw new Error('Lead não encontrado');
-      const now = new Date().toISOString();
-      const logs = appendLog(lead, { type: 'cold', by: sdrName, at: now });
-      await updateDoc(doc(db, 'leads', leadId), {
-        status: 'cold', claimedBy: lead.claimedBy || sdrName, logs,
-      });
-      return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
-  };
-
   // ── SDR: reabrir lead (qualquer estado) → volta para a fila ──
   // Restaura tentativas (senão um lead esgotado voltaria com 0 e não
   // poderia ser trabalhado) e limpa flags de no-show/perdido.
@@ -190,13 +220,20 @@ export function useLeads() {
       if (!lead) throw new Error('Lead não encontrado');
       const now = new Date().toISOString();
       const logs = appendLog(lead, { type: 'reopened', by: sdrName, at: now });
+      // De onde está sendo recuperado (para a tag no card).
+      const from = lead.status === 'cold' ? 'Frio' : (lead.status === 'recoverable' ? 'Recuperável' : 'Arquivado');
       await updateDoc(doc(db, 'leads', leadId), {
         status: 'queue',
         followupAt: null,
         attemptsLeft: DEFAULT_ATTEMPTS, // recomeça com tentativas cheias
+        attemptsExhausted: false,
         lostReason: null,
         lostAt: null,
+        coldReason: null,
+        recoverReason: null,
         noShowFlag: false,
+        recoveredFrom: from, // tag: "recuperado de Frio/Recuperável"
+        recoveredAt: now,
         logs,
       });
       return { success: true };
@@ -221,34 +258,52 @@ export function useLeads() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── SDR: Call Agendada → cria deal (base do Closer) ──────────
-  const scheduleCall = async (leadId, sdrName, { datetime, meetLink, pains }) => {
+  // ── SDR: Call Agendada → cria deal e distribui via fila rotativa ──
+  // closers: lista de nomes dos closers ativos (round-robin).
+  const scheduleCall = async (leadId, sdrName, { datetime, meetLink, pains }, closers = []) => {
     try {
       const lead = leads.find(l => l.id === leadId);
       if (!lead) throw new Error('Lead não encontrado');
+      if (!datetime) return { success: false, error: 'Defina a data/hora da call.' };
+      if (!pains || pains.trim().length < 150) {
+        return { success: false, error: `As dores mapeadas precisam ter ao menos 150 caracteres (tem ${(pains || '').trim().length}).` };
+      }
       const now = new Date().toISOString();
 
-      // 1. Cria o deal que o Closer vai consumir.
+      // Fila rotativa: pega o próximo closer da vez.
+      let assignedCloser = null;
+      let queueIndex = 0;
+      if (closers.length > 0) {
+        const cfgRef = doc(db, 'commercial_config', 'closerQueue');
+        const cfgSnap = await getDoc(cfgRef);
+        const lastIndex = cfgSnap.exists() ? (cfgSnap.data().lastIndex ?? -1) : -1;
+        queueIndex = (lastIndex + 1) % closers.length;
+        assignedCloser = closers[queueIndex];
+        await setDoc(cfgRef, { lastIndex: queueIndex, updatedAt: now }, { merge: true });
+      }
+
       const dealRef = await addDoc(collection(db, 'deals'), {
         leadId,
         leadName: lead.name,
         leadPhone: lead.phone || '',
         company: lead.company || '',
         sdrName,
-        // Dados mapeados pelo SDR (read-only para o Closer no Showtime).
         callAt: datetime,
         meetLink: (meetLink || '').trim(),
-        pains: (pains || '').trim(),
+        pains: pains.trim(),
         sdrLogs: lead.logs || [],
-        // Estado do Closer: disponível para qualquer closer puxar.
-        status: 'available',
-        closerName: null,
+        // Distribuição: já nasce atribuído ao closer da vez (fila).
+        status: assignedCloser ? 'assigned' : 'available',
+        assignedTo: assignedCloser,       // closer da vez
+        queueIndex,                        // posição na fila quando criado
+        closerName: null,                  // preenchido quando ACEITA
+        secondCloser: null,                // segundo closer opcional
+        passedBy: [],                      // closers que passaram a vez
         outcome: null,
         briefing: null,
         createdAt: serverTimestamp(),
       });
 
-      // 2. Marca o lead como agendado (sai das filas do SDR).
       const logs = appendLog(lead, { type: 'call_scheduled', by: sdrName, at: now, dealId: dealRef.id });
       await updateDoc(doc(db, 'leads', leadId), {
         status: 'scheduled', dealId: dealRef.id,
@@ -261,7 +316,7 @@ export function useLeads() {
   return {
     leads, loading,
     addLead, addLeadsBulk, updateLead, deleteLead,
-    claimLead, logMessageSent, markLost, scheduleFollowup,
+    claimLead, registerContact, markSemInteracao, scheduleFollowup,
     markCold, reopenLead, returnFromNoShow, scheduleCall,
   };
 }

@@ -37,14 +37,54 @@ export function useDeals() {
   };
 
   // ── Closer puxa uma call disponível para a agenda dele ───────
+  // Aceitar a call. Se veio da fila (assigned), só o closer da vez
+  // aceita. Vira 'claimed' (na agenda do closer).
   const claimCall = async (dealId, closerName) => {
     const d = deals.find(x => x.id === dealId);
+    if (d && d.status === 'assigned' && d.assignedTo && d.assignedTo !== closerName) {
+      return { success: false, error: 'Essa call foi atribuída a outro closer da fila.' };
+    }
     if (d && d.status === 'claimed' && d.closerName && d.closerName !== closerName) {
-      return { success: false, error: 'Essa call já foi puxada por outro closer.' };
+      return { success: false, error: 'Essa call já foi aceita por outro closer.' };
     }
     return updateDeal(dealId, {
       status: 'claimed', closerName, claimedAt: new Date().toISOString(),
     });
+  };
+
+  // ── Passar a vez: recusa e envia ao próximo closer da fila ────
+  // closers: lista de nomes ativos (mesma ordem da distribuição).
+  const passTurn = async (dealId, closerName, reason, closers = []) => {
+    if (!reason || !reason.trim()) return { success: false, error: 'Descreva o motivo de passar a vez.' };
+    const d = deals.find(x => x.id === dealId);
+    if (!d) return { success: false, error: 'Call não encontrada.' };
+    const passedBy = [...(d.passedBy || []), { by: closerName, reason: reason.trim(), at: new Date().toISOString() }];
+
+    // Descobre o próximo closer que ainda não passou (evita loop infinito).
+    let next = null;
+    if (closers.length > 0) {
+      const already = new Set(passedBy.map(p => p.by));
+      const startIdx = closers.indexOf(closerName);
+      for (let i = 1; i <= closers.length; i++) {
+        const cand = closers[(startIdx + i) % closers.length];
+        if (!already.has(cand)) { next = cand; break; }
+      }
+    }
+    if (!next) {
+      // Todos passaram → volta para pool disponível a qualquer um.
+      return updateDeal(dealId, { status: 'available', assignedTo: null, closerName: null, passedBy });
+    }
+    return updateDeal(dealId, { status: 'assigned', assignedTo: next, closerName: null, passedBy });
+  };
+
+  // ── Adicionar 2º closer (split de comissão na venda) ─────────
+  const addSecondCloser = async (dealId, secondCloserName) => {
+    if (!secondCloserName) return { success: false, error: 'Selecione o segundo closer.' };
+    return updateDeal(dealId, { secondCloser: secondCloserName });
+  };
+
+  const removeSecondCloser = async (dealId) => {
+    return updateDeal(dealId, { secondCloser: null });
   };
 
   // ── Closer devolve a call para "disponíveis" (exige justificativa) ──
@@ -92,41 +132,42 @@ export function useDeals() {
     });
   };
 
+  // MQ (mal qualificado) — antigo "Perdido". Vira métrica do SDR.
   const closeLost = async (dealId, closerName, reason) => {
     return updateDeal(dealId, {
-      status: 'lost', closerName, outcome: 'lost',
-      lostReason: (reason || '').trim(),
+      status: 'mq', closerName, outcome: 'mq',
+      mqReason: (reason || '').trim(),
       closedAt: new Date().toISOString(),
     });
   };
 
-  const closeStandby = async (dealId, closerName, standbyAtISO) => {
-    return updateDeal(dealId, {
-      status: 'standby', closerName, outcome: 'standby',
-      standbyAt: standbyAtISO,
-      closedAt: new Date().toISOString(),
-    });
-  };
-
-  // Ganho: grava briefing (com valor da venda) e manda para o CS.
+  // Venda Fechada — antigo "Ganho". Grava briefing (com valor) e vai
+  // para o CS. Se houver 2º closer, o valor é dividido por 2 (split).
   const closeWon = async (dealId, closerName, briefing) => {
+    const d = deals.find(x => x.id === dealId);
+    const total = briefing?.saleTotal != null ? Number(briefing.saleTotal)
+      : (briefing?.saleMonthly && briefing?.saleMonths)
+        ? Number(briefing.saleMonthly) * Number(briefing.saleMonths)
+        : (briefing?.saleMonthly ? Number(briefing.saleMonthly) : null);
+    const hasSecond = !!d?.secondCloser;
+    const perCloser = (total != null && hasSecond) ? total / 2 : total;
     return updateDeal(dealId, {
-      status: 'awaiting_cs', closerName, outcome: 'won',
+      status: 'awaiting_cs', closerName, outcome: 'venda_fechada',
       briefing,
-      saleValue: briefing?.saleMonthly ? Number(briefing.saleMonthly) : null,
-      saleMonths: briefing?.saleMonths ? Number(briefing.saleMonths) : null,
-      saleTotal: (briefing?.saleMonthly && briefing?.saleMonths)
-        ? Number(briefing.saleMonthly) * Number(briefing.saleMonths) : null,
+      saleTotal: total,
+      // valor que conta para a meta de CADA closer (split se 2 closers)
+      saleValuePerCloser: perCloser,
+      splitCount: hasSecond ? 2 : 1,
       wonAt: new Date().toISOString(),
       closedAt: new Date().toISOString(),
     });
   };
 
-  // ── Recuperar deal encerrado (standby/lost/noshow) → agenda do closer ──
+  // ── Recuperar deal encerrado (mq/noshow) → agenda do closer ──
   const recoverDeal = async (dealId, closerName) => {
     return updateDeal(dealId, {
       status: 'claimed', closerName, outcome: null,
-      lostReason: null, standbyAt: null, closedAt: null,
+      mqReason: null, closedAt: null,
       recoveredAt: new Date().toISOString(),
     });
   };
@@ -146,11 +187,28 @@ export function useDeals() {
     return updateDeal(dealId, { callNotes: notesHtml });
   };
 
+  // Salva o mini-formulário preenchido durante a call.
+  const saveCallForm = async (dealId, callForm) => {
+    return updateDeal(dealId, { callForm });
+  };
+
+  // ── CS devolve o contrato ao Closer (falta informação) ───────
+  const returnToCloser = async (dealId, csName, reason) => {
+    if (!reason || !reason.trim()) return { success: false, error: 'Justifique o que ficou faltando.' };
+    const d = deals.find(x => x.id === dealId);
+    const returns = [...(d?.csReturns || []), { by: csName, reason: reason.trim(), at: new Date().toISOString() }];
+    // Volta para a agenda do closer que fechou (status claimed de novo).
+    return updateDeal(dealId, {
+      status: 'claimed', outcome: null, csReturns: returns, returnedByCs: true,
+    });
+  };
+
   return {
     deals, loading, updateDeal,
     claimCall, releaseCall, addManualCall,
-    closeNoShow, closeLost, closeStandby, closeWon,
-    recoverDeal, saveCallNotes, deleteManualCall,
+    passTurn, addSecondCloser, removeSecondCloser,
+    closeNoShow, closeLost, closeWon,
+    recoverDeal, saveCallNotes, saveCallForm, returnToCloser, deleteManualCall,
   };
 }
 

@@ -221,11 +221,35 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Onboarding: marca o "ok" de um setor no checklist ────────
+  // Cada colaborador marca apenas o próprio setor. Quando todos os
+  // setores envolvidos estão ok, o status vira 'ready' (pronto p/ CS).
+  const markOnboardingSector = async (clientId, sector, byName, done = true) => {
+    try {
+      const client = clients.find(c => c.id === clientId);
+      if (!client || !client.onboarding) return { success: false, error: 'Cliente sem onboarding ativo.' };
+      const checklist = { ...(client.onboarding.checklist || {}) };
+      checklist[sector] = done
+        ? { ok: true, by: byName, at: new Date().toISOString() }
+        : { ok: false, by: null, at: null };
+      const sectors = client.onboarding.sectors || Object.keys(checklist);
+      const allOk = sectors.every(s => checklist[s]?.ok);
+      const patch = {
+        'onboarding.checklist': checklist,
+        'onboarding.status': allOk ? 'ready' : 'running',
+      };
+      if (allOk) patch['onboarding.readyAt'] = new Date().toISOString();
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true, allOk };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   return {
     clients, loading, addClient, updateClient, deleteClient,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     smAddPost, smAddBulkPosts, smUpdatePostStatus,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
+    markOnboardingSector,
   };
 }

@@ -66,14 +66,54 @@ export function useObjections(authUid) {
   return { items, loading, addItem, updateItem, removeItem };
 }
 
-// Conta vendas ganhas no mês corrente.
+// Soma o VALOR das vendas fechadas no mês corrente.
+// Para um closer específico, considera o split: se ele foi 2º closer
+// ou dividiu com outro, conta apenas a parte dele (saleValuePerCloser).
+export function sumSalesThisMonth(deals, closerName = null) {
+  const now = new Date();
+  const m = now.getMonth(), y = now.getFullYear();
+  let total = 0;
+  for (const d of deals) {
+    if (d.outcome !== 'venda_fechada') continue;
+    const ts = d.wonAt || d.closedAt;
+    if (!ts) continue;
+    const dt = new Date(ts);
+    if (dt.getMonth() !== m || dt.getFullYear() !== y) continue;
+
+    const full = d.saleTotal != null ? Number(d.saleTotal) : 0;
+    const per = d.saleValuePerCloser != null ? Number(d.saleValuePerCloser) : full;
+
+    if (!closerName) {
+      total += full; // visão de equipe: valor cheio da venda
+    } else if (d.closerName === closerName || d.secondCloser === closerName) {
+      total += per;  // visão individual: parte do closer (split se houver)
+    }
+  }
+  return total;
+}
+
+// Conta o NÚMERO de vendas fechadas no mês (para exibição auxiliar).
 export function countWonThisMonth(deals, closerName = null) {
   const now = new Date();
   const m = now.getMonth(), y = now.getFullYear();
   return deals.filter(d => {
-    if (d.outcome !== 'won') return false;
-    if (closerName && d.closerName !== closerName) return false;
+    if (d.outcome !== 'venda_fechada') return false;
+    if (closerName && d.closerName !== closerName && d.secondCloser !== closerName) return false;
     const ts = d.wonAt || d.closedAt;
+    if (!ts) return false;
+    const dt = new Date(ts);
+    return dt.getMonth() === m && dt.getFullYear() === y;
+  }).length;
+}
+
+// Conta MQ (mal qualificado) de um SDR no mês — métrica de KPI do SDR.
+export function countMQThisMonth(deals, sdrName = null) {
+  const now = new Date();
+  const m = now.getMonth(), y = now.getFullYear();
+  return deals.filter(d => {
+    if (d.outcome !== 'mq') return false;
+    if (sdrName && d.sdrName !== sdrName) return false;
+    const ts = d.closedAt;
     if (!ts) return false;
     const dt = new Date(ts);
     return dt.getMonth() === m && dt.getFullYear() === y;
