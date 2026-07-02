@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban, CheckSquare, Calendar } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Trophy, Kanban, CheckSquare, Calendar, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useTasks } from '../../hooks/useTasks';
@@ -10,12 +10,14 @@ import CreativeOverview from '../../components/sectors/creative/CreativeOverview
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import HallOfFame from '../../components/sectors/creative/HallOfFame';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 
 const NAV = [
   { key: 'overview',  label: 'Visão Geral', icon: LayoutDashboard },
   { key: 'kanban',    label: 'Tasks',        icon: Kanban },
+  { key: 'onboarding', label: 'Onboarding',  icon: ClipboardList },
   { key: 'vault',     label: 'Brand Hub',     icon: BookOpen },
   { key: 'hallofame', label: 'Hall da Fama', icon: Trophy },
   { key: 'todo',      label: 'Meu Dia',      icon: CheckSquare },
@@ -99,6 +101,8 @@ export default function CreativeDashboard({ sectorId }) {
             onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
+        ) : page === 'onboarding' ? (
+          <OnboardingBoard sectorId={sectorId} />
         ) : page === 'vault' ? (
           <VaultPage clients={clients} sectorId={sectorId} onUpdateBrandbook={handleUpdateBrandbook}
             onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, sectorId)}

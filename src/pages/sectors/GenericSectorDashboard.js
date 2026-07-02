@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Kanban, CheckSquare, Calendar } from 'lucide-react';
+import { LayoutDashboard, Kanban, CheckSquare, Calendar, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
@@ -9,6 +9,7 @@ import { useTasks } from '../../hooks/useTasks';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import { SECTORS, TASK_PRIORITIES } from '../../lib/firebase';
 import { differenceInDays } from 'date-fns';
 
@@ -113,9 +114,14 @@ export default function GenericSectorDashboard({ sectorId }) {
 
   // CS e Comercial não têm a ferramenta de Tasks (Kanban).
   const hideTasks = sectorId === 'cs' || sectorId === 'comercial';
+  // Onboarding de novos clientes: setores operacionais (não CS/Comercial).
+  const showOnboarding = sectorId !== 'cs' && sectorId !== 'comercial';
+  // Badge: nº de clientes em onboarding aguardando este setor (qualquer um do setor pode marcar).
+  const onboardingCount = clients.filter(c => c.onboarding && c.onboarding.status === 'running' && (c.onboarding.sectors || []).includes(sectorId) && !c.onboarding.checklist?.[sectorId]?.ok).length;
   const NAV = [
     { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard, badge: 0 },
     ...(hideTasks ? [] : [{ key: 'kanban', label: 'Tasks', icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 }]),
+    ...(showOnboarding ? [{ key: 'onboarding', label: 'Onboarding', icon: ClipboardList, badge: onboardingCount, badgeDanger: onboardingCount > 0 }] : []),
     { key: 'todo',     label: 'Meu Dia',      icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];
@@ -130,6 +136,8 @@ export default function GenericSectorDashboard({ sectorId }) {
           </div>
         ) : page === 'overview' ? (
           <GenericOverview myTasks={myTasks} sectorId={sectorId} />
+        ) : page === 'onboarding' && showOnboarding ? (
+          <OnboardingBoard sectorId={sectorId} />
         ) : page === 'todo' ? (
           <TodoView accent={SECTORS[sectorId]?.color || 'var(--neon)'} />
         ) : page === 'agenda' ? (

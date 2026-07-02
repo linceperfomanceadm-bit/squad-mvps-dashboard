@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar } from 'lucide-react';
+import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
@@ -10,6 +10,7 @@ import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import SMOverview from '../../components/sectors/socialMedia/SMOverview';
 import SMKanban from '../../components/sectors/socialMedia/SMKanban';
+import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import SMBulkInput from '../../components/sectors/socialMedia/SMBulkInput';
 import TaskKanban from '../../components/kanban/TaskKanban';
 
@@ -18,6 +19,7 @@ const NAV = [
   { key: 'smkanban',  label: 'Posts',         icon: Columns },
   { key: 'planning',  label: 'Planejamento',  icon: Plus },
   { key: 'kanban',    label: 'Tasks',          icon: Kanban },
+  { key: 'onboarding', label: 'Onboarding',    icon: ClipboardList },
   { key: 'todo',      label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',    label: 'Agenda',         icon: Calendar },
 ];
@@ -75,6 +77,8 @@ export default function SocialMediaDashboard() {
           <SMKanban myPosts={myPosts} onStatusChange={smUpdatePostStatus} />
         ) : page === 'planning' ? (
           <SMBulkInput clients={myClients} responsible={user?.name} onSave={handleBulkSave} />
+        ) : page === 'onboarding' ? (
+          <OnboardingBoard sectorId="socialmedia" />
         ) : page === 'todo' ? (
           <TodoView accent="#38bdf8" />
         ) : page === 'agenda' ? (

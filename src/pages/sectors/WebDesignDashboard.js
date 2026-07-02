@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar, Package } from 'lucide-react';
+import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar, Package, ClipboardList } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -13,6 +13,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
+import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',  icon: LayoutDashboard },
@@ -22,6 +23,7 @@ const NAV = [
   { key: 'recurrence', label: 'Recorrência',   icon: RefreshCw },
   { key: 'finished',   label: 'Finalizados',   icon: CheckCircle },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
+  { key: 'client_onboarding', label: 'Onboarding Clientes', icon: ClipboardList },
   { key: 'portal',     label: 'Portal de Produtos', icon: Package },
   { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',     label: 'Agenda',         icon: Calendar },
@@ -115,6 +117,8 @@ export default function WebDesignDashboard() {
           <AgendaView />
         ) : page === 'portal' ? (
           <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
+        ) : page === 'client_onboarding' ? (
+          <OnboardingBoard sectorId="webdesign" />
         ) : (
           <WDClientList
             clients={wdClients}

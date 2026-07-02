@@ -4,6 +4,7 @@ import {
   LayoutDashboard, ClipboardList, CheckSquare, Calendar, X, Check, FileText, Activity,
 } from 'lucide-react';
 import { useToast } from '../../components/shared/Toast';
+import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useDeals } from '../../hooks/useDeals';
@@ -18,34 +19,55 @@ import AgendaView from '../../components/shared/AgendaView';
 const COLOR = SECTORS.cs.color;
 
 export default function CSDashboard() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const { clients, addClient, updateClient } = useClients();
   const { collaborators } = useCollaborators();
-  const { deals, loading, updateDeal } = useDeals();
+  const { deals, loading, updateDeal, returnToCloser } = useDeals();
   const { tasks } = useTasks();
 
-  const [page, setPage] = useState('onboarding');
-  const [openDeal, setOpenDeal] = useState(null);   // deal aberto (briefing)
-  const [activateDeal, setActivateDeal] = useState(null); // deal em ativação
+  const [page, setPage] = useState('contracts');
+  const [openDeal, setOpenDeal] = useState(null);
+  const [activateDeal, setActivateDeal] = useState(null);
+  const [returnTarget, setReturnTarget] = useState(null);
 
+  const me = user?.name;
+  // Novos contratos: vendas fechadas aguardando o CS conferir e ativar.
   const queue = useMemo(() => deals.filter(d => d.status === 'awaiting_cs'), [deals]);
-  const activated = useMemo(() => deals.filter(d => d.status === 'active'), [deals]);
+  // Em onboarding: já ativados, kanban rodando (nem todos os setores ok).
+  const inOnboarding = useMemo(() => clients.filter(c => c.onboarding && c.onboarding.status === 'running'), [clients]);
+  // Prontos para call de onboarding: todos os setores deram ok.
+  const readyForCall = useMemo(() => clients.filter(c => c.onboarding && c.onboarding.status === 'ready'), [clients]);
 
   const NAV = [
-    { key: 'onboarding', label: 'Onboarding', icon: ClipboardList, badge: queue.length, badgeDanger: queue.length > 0 },
-    { key: 'health',     label: 'Saúde',       icon: Activity },
-    { key: 'overview',   label: 'Visão Geral', icon: LayoutDashboard },
-    { key: 'todo',       label: 'Meu Dia',     icon: CheckSquare },
-    { key: 'agenda',     label: 'Agenda',      icon: Calendar },
+    { key: 'contracts',  label: 'Novos Contratos', icon: ClipboardList, badge: queue.length, badgeDanger: queue.length > 0 },
+    { key: 'onboarding', label: 'Onboarding',      icon: Activity, badge: readyForCall.length },
+    { key: 'health',     label: 'Saúde',           icon: Activity },
+    { key: 'overview',   label: 'Visão Geral',     icon: LayoutDashboard },
+    { key: 'todo',       label: 'Meu Dia',         icon: CheckSquare },
+    { key: 'agenda',     label: 'Agenda',          icon: Calendar },
   ];
 
-  const handleActivated = async (clientData, deal) => {
-    // 1. Cria o cliente no sistema (estrutura completa via useClients).
-    const res = await addClient(clientData);
+  const handleActivated = async (clientData, deal, setupResponsibles) => {
+    // 1. Cria o cliente com estrutura de onboarding (kanban por setor).
+    const sectorsInvolved = Object.keys(setupResponsibles).filter(s => (setupResponsibles[s] || []).length > 0);
+    const checklist = {};
+    sectorsInvolved.forEach(s => { checklist[s] = { ok: false, by: null, at: null }; });
+    const withOnboarding = {
+      ...clientData,
+      responsibles: setupResponsibles,
+      onboarding: {
+        status: 'running',        // running → ready (todos ok)
+        sectors: sectorsInvolved,
+        checklist,                 // { setor: { ok, by, at } }
+        startedAt: new Date().toISOString(),
+        dealId: deal.id,
+      },
+    };
+    const res = await addClient(withOnboarding);
     if (!res.success) { toast(res.error, 'e'); return; }
-    // 2. Marca o deal como ativo.
     await updateDeal(deal.id, { status: 'active', activatedAt: new Date().toISOString(), clientName: clientData.name });
-    toast(`${clientData.name} ativado e cadastrado! 🎉`);
+    toast(`${clientData.name} ativado! Enviado ao kanban de onboarding dos setores. 🎉`);
     setActivateDeal(null);
     setOpenDeal(null);
   };
@@ -55,12 +77,14 @@ export default function CSDashboard() {
       <Sidebar sectorId="cs" navItems={NAV} activeKey={page} onNav={setPage} />
       <main style={{ flex: 1, marginLeft: 224, padding: 28, minHeight: '100vh', overflow: 'auto' }}>
         {loading ? <Spinner /> :
-          page === 'onboarding' ? (
+          page === 'contracts' ? (
             <Onboarding queue={queue} onOpen={setOpenDeal} />
+          ) : page === 'onboarding' ? (
+            <OnboardingTracking inOnboarding={inOnboarding} readyForCall={readyForCall} />
           ) : page === 'health' ? (
             <CSHealth clients={clients} tasks={tasks} onUpdateClient={updateClient} toast={toast} />
           ) : page === 'overview' ? (
-            <Overview queue={queue} activated={activated} />
+            <Overview queue={queue} activated={readyForCall} />
           ) : page === 'todo' ? (
             <TodoView accent={COLOR} />
           ) : page === 'agenda' ? (
@@ -70,23 +94,34 @@ export default function CSDashboard() {
           )}
       </main>
 
-      {/* Briefing read-only + trava */}
+      {/* Contrato + conferência */}
       {openDeal && ReactDOM.createPortal(
         <DealDrawer
           deal={openDeal}
           onClose={() => setOpenDeal(null)}
-          onUpdateChecks={async (patch) => { await updateDeal(openDeal.id, patch); setOpenDeal(d => ({ ...d, ...patch })); }}
           onConcludeSetup={() => setActivateDeal(openDeal)}
+          onReturnToCloser={() => setReturnTarget(openDeal)}
         />, document.body)}
 
-      {/* Modal de ativação (cadastro de cliente) */}
+      {/* Modal de conclusão de setup (responsáveis por setor) */}
       {activateDeal && ReactDOM.createPortal(
         <CSActivateModal
           deal={activateDeal}
           collaborators={collaborators}
           onClose={() => setActivateDeal(null)}
-          onActivate={(clientData) => handleActivated(clientData, activateDeal)}
+          onActivate={(clientData, responsibles) => handleActivated(clientData, activateDeal, responsibles)}
         />, document.body)}
+
+      {/* Devolver ao closer */}
+      {returnTarget && ReactDOM.createPortal(
+        <ReturnToCloserModal
+          deal={returnTarget}
+          onClose={() => setReturnTarget(null)}
+          onConfirm={async (reason) => {
+            const r = await returnToCloser(returnTarget.id, me, reason);
+            if (r.success) { toast('Contrato devolvido ao closer.'); setReturnTarget(null); setOpenDeal(null); }
+            else toast(r.error, 'e');
+          }} />, document.body)}
     </div>
   );
 }
@@ -109,8 +144,8 @@ function Onboarding({ queue, onOpen }) {
     <div className="fade-up">
       <div style={{ marginBottom: 22 }}>
         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CUSTOMER SUCCESS</span>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Fila de Onboarding</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Vendas ganhas aguardando ativação · {queue.length}</p>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Novos Contratos</h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Vendas fechadas aguardando conferência e ativação · {queue.length}</p>
       </div>
       {queue.length === 0 ? (
         <Empty msg="Nenhum cliente aguardando onboarding. ✨" />
@@ -126,15 +161,11 @@ function Onboarding({ queue, onOpen }) {
                 </div>
                 {b.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>👤 {b.contactName}</p>}
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-                  {(b.services || []).map(s => {
-                    const sec = SECTORS[s];
-                    return sec ? <span key={s} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: `${sec.color}1a`, color: sec.color, fontFamily: 'var(--fm)' }}>{sec.emoji} {sec.label}</span> : null;
-                  })}
+                  {(b.servicesSummary || []).map(s => (
+                    <span key={s.id} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: `${COLOR}1a`, color: COLOR, fontFamily: 'var(--fm)' }}>{s.label}</span>
+                  ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <CheckPill on={d.hasSignedContract} label="Contrato" />
-                  <CheckPill on={d.hasPaid} label="Pagamento" />
-                </div>
+                {b.saleTotal && <p style={{ fontSize: 12, color: 'var(--green)', fontWeight: 700, marginTop: 10 }}>{Number(b.saleTotal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>}
               </button>
             );
           })}
@@ -144,18 +175,10 @@ function Onboarding({ queue, onOpen }) {
   );
 }
 
-function CheckPill({ on, label }) {
-  return (
-    <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 8, fontFamily: 'var(--fm)', background: on ? 'var(--green-dim)' : 'var(--surface)', color: on ? 'var(--green)' : 'var(--muted)', border: `1px solid ${on ? 'var(--green-b)' : 'var(--border)'}` }}>
-      {on ? '✓' : '○'} {label}
-    </span>
-  );
-}
-
-// ── Drawer: briefing read-only + checklist de trava ────────────
-function DealDrawer({ deal, onClose, onUpdateChecks, onConcludeSetup }) {
+// ── Drawer: contrato + conferência ─────────────────────────────
+function DealDrawer({ deal, onClose, onConcludeSetup, onReturnToCloser }) {
   const b = deal.briefing || {};
-  const canConclude = deal.hasSignedContract && deal.hasPaid;
+  const money = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'flex-end', zIndex: 1100 }}>
@@ -163,66 +186,148 @@ function DealDrawer({ deal, onClose, onUpdateChecks, onConcludeSetup }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{b.companyName || deal.leadName}</h2>
-            <p style={{ fontSize: 12, color: 'var(--muted)' }}>Briefing · fechado por {deal.closerName}</p>
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>Contrato · fechado por {deal.closerName}{deal.secondCloser ? ` + ${deal.secondCloser}` : ''}</p>
           </div>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
         </div>
 
-        {/* Checklist de trava */}
+        {deal.returnedByCs && (
+          <div style={{ background: '#ef444415', border: '1px solid #ef444444', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: '#fca5a5' }}>
+            Este contrato já foi devolvido ao closer uma vez e voltou.
+          </div>
+        )}
+
+        {/* Ações do CS */}
         <div style={{ background: `${COLOR}10`, border: `1px solid ${COLOR}30`, borderRadius: 12, padding: 16, marginBottom: 20 }}>
-          <p style={{ fontSize: 11, letterSpacing: '.1em', color: COLOR, fontWeight: 700, fontFamily: 'var(--fm)', marginBottom: 12 }}>VALIDAÇÕES OBRIGATÓRIAS</p>
-          <CheckRow checked={deal.hasSignedContract} label="Contrato assinado" onToggle={() => onUpdateChecks({ hasSignedContract: !deal.hasSignedContract })} />
-          <CheckRow checked={deal.hasPaid} label="Pagamento confirmado" onToggle={() => onUpdateChecks({ hasPaid: !deal.hasPaid })} />
-          <button
-            disabled={!canConclude}
-            onClick={onConcludeSetup}
-            style={{ width: '100%', marginTop: 14, padding: '12px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, cursor: canConclude ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: canConclude ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'var(--surface)', color: canConclude ? '#fff' : 'var(--muted)', boxShadow: canConclude ? '0 4px 16px rgba(34,197,94,.3)' : 'none' }}
-          >
+          <p style={{ fontSize: 11, letterSpacing: '.1em', color: COLOR, fontWeight: 700, fontFamily: 'var(--fm)', marginBottom: 12 }}>CONFERÊNCIA DO CS</p>
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
+            Confira os dados do contrato. Se estiver tudo certo, conclua o setup e defina os responsáveis por setor. Se faltar algo, devolva ao closer.
+          </p>
+          <button onClick={onConcludeSetup} style={{ width: '100%', padding: '12px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', boxShadow: '0 4px 16px rgba(34,197,94,.3)' }}>
             <Check size={16} /> Concluir Setup
           </button>
-          {!canConclude && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, textAlign: 'center' }}>Marque as duas validações para liberar.</p>}
+          <button onClick={onReturnToCloser} style={{ width: '100%', marginTop: 8, padding: '11px', borderRadius: 10, border: '1px solid var(--border)', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'var(--surface)', color: 'var(--neon)' }}>
+            <X size={14} /> Devolver ao closer (falta informação)
+          </button>
         </div>
 
-        {/* Briefing read-only */}
-        <Section title="Cadastral">
+        {/* Dados do contrato */}
+        <Section title="Cliente">
           <RO label="Empresa" value={b.companyName} />
-          <RO label="CNPJ" value={b.cnpj} />
-          <RO label="Contato" value={b.contactName} />
+          <RO label="CNPJ/CPF" value={b.docId} />
+          <RO label="Responsável" value={b.contactName} />
           <RO label="Telefone" value={b.contactPhone} />
           <RO label="E-mail" value={b.contactEmail} />
         </Section>
-        <Section title="Escopo">
-          <RO label="Serviços" value={(b.services || []).map(s => SECTORS[s]?.label || s).join(', ')} />
-          <RO label="Escopo" value={b.scope} block />
-          <RO label="Verba" value={b.budget} />
+        <Section title="Serviços vendidos">
+          {(b.servicesSummary || []).length === 0
+            ? <p style={{ fontSize: 13, color: 'var(--muted)' }}>—</p>
+            : b.servicesSummary.map(s => (
+                <div key={s.id} style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{s.label}</p>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, marginTop: 2, whiteSpace: 'pre-wrap' }}>{s.desc}</p>
+                </div>
+              ))}
         </Section>
-        <Section title="Inteligência">
-          <RO label="Dores" value={b.pains} block />
-          <RO label="Objetivos" value={b.goals} block />
-          <RO label="Concorrentes" value={b.competitors} />
-          <RO label="Decisor" value={b.decisionMaker} />
-        </Section>
-        <Section title="Técnico">
-          <RO label="Site" value={b.hasWebsite} />
-          <RO label="Ferramentas" value={b.currentTools} />
-          <RO label="Assets" value={b.assetsLink} />
-          <RO label="Observações" value={b.observations} block />
+        <Section title="Financeiro">
+          <RO label="Valor total" value={b.saleTotal ? money(b.saleTotal) : null} />
+          <RO label="Pagamento" value={
+            b.payment?.type === 'avista' ? 'À vista'
+            : b.payment?.custom ? `A prazo — ${b.payment.plan}`
+            : b.payment ? `${b.payment.installments}x de ${money(b.payment.installmentValue)}` : null
+          } />
+          <RO label="Prazo de contrato" value={b.contractMonths ? `${b.contractMonths} meses` : null} />
         </Section>
       </div>
     </div>
   );
 }
 
-function CheckRow({ checked, label, onToggle }) {
+// ── Acompanhamento do onboarding (kanban dos setores) ──────────
+function OnboardingTracking({ inOnboarding, readyForCall }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
-      <span onClick={onToggle} style={{ width: 22, height: 22, borderRadius: 6, border: `2px solid ${checked ? 'var(--green)' : 'var(--border)'}`, background: checked ? 'var(--green)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        {checked && <Check size={14} color="#07070e" />}
-      </span>
-      <span style={{ fontSize: 14, color: 'var(--text)', fontWeight: 500 }}>{label}</span>
-    </label>
+    <div className="fade-up">
+      <div style={{ marginBottom: 22 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CUSTOMER SUCCESS</span>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Onboarding</h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Acompanhe o ok dos setores. Quando todos confirmam, o cliente fica pronto para a call.</p>
+      </div>
+
+      {/* Prontos para a call */}
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', marginBottom: 10 }}>✓ Prontos para call de onboarding ({readyForCall.length})</h3>
+      {readyForCall.length === 0 ? <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>Nenhum cliente pronto ainda.</p> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 10, marginBottom: 28 }}>
+          {readyForCall.map(c => (
+            <div key={c.id} style={{ ...CARD, border: '1px solid var(--green-b)' }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{c.name}</span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+                {(c.onboarding?.sectors || []).map(s => (
+                  <span key={s} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'var(--green-dim)', color: 'var(--green)', fontFamily: 'var(--fm)' }}>{SECTORS[s]?.label || s} ✓</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Em andamento */}
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--amber)', marginBottom: 10 }}>⏳ Em onboarding ({inOnboarding.length})</h3>
+      {inOnboarding.length === 0 ? <p style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum cliente em onboarding.</p> : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 12 }}>
+          {inOnboarding.map(c => {
+            const cl = c.onboarding?.checklist || {};
+            const sectors = c.onboarding?.sectors || [];
+            const done = sectors.filter(s => cl[s]?.ok).length;
+            return (
+              <div key={c.id} style={CARD}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{c.name}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{done}/{sectors.length}</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+                  {sectors.map(s => {
+                    const ok = cl[s]?.ok;
+                    return (
+                      <div key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: SECTORS[s]?.color || 'var(--text)' }}>{SECTORS[s]?.emoji} {SECTORS[s]?.label || s}</span>
+                        {ok
+                          ? <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--fm)' }}>✓ {cl[s].by || 'ok'}</span>
+                          : <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>pendente</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
+
+// ── Devolver ao closer (motivo obrigatório) ────────────────────
+function ReturnToCloserModal({ deal, onClose, onConfirm }) {
+  const [reason, setReason] = useState('');
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 440 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Devolver ao closer</h3>
+          <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
+          O contrato de <strong>{deal.briefing?.companyName || deal.leadName}</strong> volta para a agenda do closer. Descreva o que ficou faltando.
+        </p>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Ex: falta CNPJ, telefone incorreto, descrição do serviço incompleta..." style={{ width: '100%', background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, resize: 'vertical', fontFamily: 'var(--f)' }} />
+        <button disabled={!reason.trim()} onClick={() => onConfirm(reason)} style={{ width: '100%', marginTop: 14, padding: '12px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, cursor: reason.trim() ? 'pointer' : 'not-allowed', opacity: reason.trim() ? 1 : .5, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', color: '#fff' }}>
+          Devolver ao closer
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children }) {
   return (
     <div style={{ marginBottom: 18 }}>

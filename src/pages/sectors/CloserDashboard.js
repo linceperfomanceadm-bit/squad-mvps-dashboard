@@ -3,14 +3,15 @@ import ReactDOM from 'react-dom';
 import {
   CalendarClock, CheckSquare, Calendar, MessageSquare,
   Video, X, Plus, Trash2, Edit2, Check, ChevronDown, Bold, List,
-  AlertTriangle, RotateCcw, Inbox, Undo2, Columns,
+  AlertTriangle, RotateCcw, Inbox, Undo2, Columns, UserPlus, SkipForward,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import { SECTORS } from '../../lib/firebase';
 import { useDeals, hasConflict } from '../../hooks/useDeals';
-import { useCommercialGoals, useObjections, countWonThisMonth } from '../../hooks/useCloserData';
+import { useCollaborators } from '../../hooks/useCollaborators';
+import { useCommercialGoals, useObjections, sumSalesThisMonth } from '../../hooks/useCloserData';
 import BriefingForm from '../../components/commercial/BriefingForm';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
@@ -26,38 +27,51 @@ export default function CloserDashboard() {
   const {
     deals, loading,
     claimCall, releaseCall, addManualCall,
-    closeNoShow, closeLost, closeStandby, closeWon, recoverDeal, saveCallNotes, deleteManualCall,
+    passTurn, addSecondCloser, removeSecondCloser,
+    closeNoShow, closeLost, closeWon, recoverDeal, saveCallNotes, saveCallForm, deleteManualCall,
   } = useDeals();
+  const { collaborators } = useCollaborators();
   const { goals } = useCommercialGoals();
   const objections = useObjections(user?.authUid);
 
   const [page, setPage] = useState('available');
   const [showtimeDealId, setShowtimeDealId] = useState(null);
   const [showManual, setShowManual] = useState(false);
-  const [releaseTarget, setReleaseTarget] = useState(null); // deal a devolver
-  const [conflictPrompt, setConflictPrompt] = useState(null); // { deal, conflictsWith }
-  const [startPrompt, setStartPrompt] = useState(null); // deal a iniciar fora de hora
+  const [releaseTarget, setReleaseTarget] = useState(null);
+  const [passTarget, setPassTarget] = useState(null); // deal a passar a vez
+  const [conflictPrompt, setConflictPrompt] = useState(null);
+  const [startPrompt, setStartPrompt] = useState(null);
 
   const me = user?.name;
 
+  // Lista de closers ativos (para fila e 2º closer).
+  const closerNames = useMemo(() => {
+    const closers = collaborators.filter(c => c.sector === 'comercial' && c.active && c.commercialRole === 'closer').map(c => c.name);
+    return closers.length > 0 ? closers : collaborators.filter(c => c.sector === 'comercial' && c.active).map(c => c.name);
+  }, [collaborators]);
+
   // ── Partição dos deals ───────────────────────────────────────
-  const available = useMemo(() => deals.filter(d => d.status === 'available'), [deals]);
+  // Disponíveis para MIM: as atribuídas a mim pela fila (assigned) +
+  // as que estão no pool aberto (available, quando todos passaram).
+  const available = useMemo(
+    () => deals.filter(d => (d.status === 'assigned' && d.assignedTo === me) || d.status === 'available'),
+    [deals, me]
+  );
   const myAgenda = useMemo(
-    () => deals.filter(d => d.status === 'claimed' && d.closerName === me),
+    () => deals.filter(d => d.status === 'claimed' && (d.closerName === me || d.secondCloser === me)),
     [deals, me]
   );
   const recoverable = useMemo(
-    () => deals.filter(d => ['standby', 'lost', 'noshow'].includes(d.status) && d.closerName === me),
+    () => deals.filter(d => ['mq', 'noshow'].includes(d.status) && d.closerName === me),
     [deals, me]
   );
 
-  // metas
-  const wonMe = useMemo(() => countWonThisMonth(deals, me), [deals, me]);
-  const wonTeam = useMemo(() => countWonThisMonth(deals), [deals]);
+  // metas — agora por VALOR de venda (não contagem de calls)
+  const salesMe = useMemo(() => sumSalesThisMonth(deals, me), [deals, me]);
+  const salesTeam = useMemo(() => sumSalesThisMonth(deals), [deals]);
   const goalMe = goals?.individual?.[me] || 0;
   const goalTeam = goals?.teamGoal || 0;
 
-  // ── Puxar uma call (com checagem de conflito) ────────────────
   const tryClaim = (deal) => {
     const conflict = hasConflict(deal.callAt, myAgenda);
     if (conflict) { setConflictPrompt({ deal, conflictsWith: conflict }); return; }
@@ -65,16 +79,15 @@ export default function CloserDashboard() {
   };
   const doClaim = async (deal) => {
     const r = await claimCall(deal.id, me);
-    if (r.success) toast('Call adicionada à sua agenda!');
+    if (r.success) toast('Call aceita e adicionada à sua agenda!');
     else toast(r.error, 'e');
     setConflictPrompt(null);
   };
 
-  // ── Iniciar call (pop-up se estiver fora do horário) ─────────
   const tryStart = (deal) => {
     if (!deal.callAt) { setShowtimeDealId(deal.id); return; }
     const diff = Math.abs(new Date(deal.callAt).getTime() - Date.now());
-    if (diff > 60 * 60 * 1000) { setStartPrompt(deal); return; } // >1h fora
+    if (diff > 60 * 60 * 1000) { setStartPrompt(deal); return; }
     setShowtimeDealId(deal.id);
   };
 
@@ -95,9 +108,12 @@ export default function CloserDashboard() {
       <main style={{ flex: 1, marginLeft: 224, padding: 28, minHeight: '100vh', overflow: 'auto' }}>
         {loading ? <Spinner /> :
           page === 'available' ? (
-            <AvailableView list={available} me={me} goalMe={goalMe} wonMe={wonMe} goalTeam={goalTeam} wonTeam={wonTeam} onClaim={tryClaim} />
+            <AvailableView list={available} me={me} goalMe={goalMe} salesMe={salesMe} goalTeam={goalTeam} salesTeam={salesTeam} onClaim={tryClaim} onPass={setPassTarget} />
           ) : page === 'agenda-int' ? (
-            <InternalAgenda list={myAgenda} onStart={tryStart} onRelease={setReleaseTarget} onAddManual={() => setShowManual(true)}
+            <InternalAgenda list={myAgenda} me={me} closers={closerNames}
+              onStart={tryStart} onRelease={setReleaseTarget} onAddManual={() => setShowManual(true)}
+              onAddSecond={async (id, name) => { const r = await addSecondCloser(id, name); if (r.success) toast('Segundo closer adicionado (comissão dividida).'); else toast(r.error, 'e'); }}
+              onRemoveSecond={async (id) => { await removeSecondCloser(id); toast('Segundo closer removido.'); }}
               onDelete={async (id) => { const r = await deleteManualCall(id, user); if (r.success) toast('Call manual excluída.'); else toast(r.error, 'e'); }} />
           ) : page === 'recover' ? (
             <RecoverView list={recoverable} onRecover={async (id) => { const r = await recoverDeal(id, me); if (r.success) toast('Call recuperada para sua agenda.'); else toast(r.error, 'e'); }} />
@@ -118,9 +134,18 @@ export default function CloserDashboard() {
           deal={showtimeDeal} me={me} objections={objections.items}
           onSaveNotes={saveCallNotes}
           onClose={() => setShowtimeDealId(null)}
-          actions={{ closeNoShow, closeLost, closeStandby, closeWon }}
+          actions={{ closeNoShow, closeLost, closeWon, saveCallForm }}
           toast={toast}
         />, document.body)}
+
+      {/* Passar a vez */}
+      {passTarget && ReactDOM.createPortal(
+        <PassTurnModal deal={passTarget} onClose={() => setPassTarget(null)} onConfirm={async (reason) => {
+          const r = await passTurn(passTarget.id, me, reason, closerNames);
+          setPassTarget(null);
+          if (r.success) toast('Vez passada ao próximo closer da fila.');
+          else toast(r.error, 'e');
+        }} />, document.body)}
 
       {/* Modal de call manual */}
       {showManual && ReactDOM.createPortal(
@@ -190,40 +215,51 @@ function fmtTime(iso) {
 }
 
 // ── Calls Disponíveis (tela inicial) ───────────────────────────
-function AvailableView({ list, goalMe, wonMe, goalTeam, wonTeam, onClaim }) {
+function AvailableView({ list, me, goalMe, salesMe, goalTeam, salesTeam, onClaim, onPass }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 20 }}>
         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${ACCENT}1a`, color: ACCENT, border: `1px solid ${ACCENT}40`, fontFamily: 'var(--fm)' }}>💼 CLOSER</span>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Calls Disponíveis</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Puxe uma call para sua agenda. Uma vez puxada, some para os outros closers.</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Calls distribuídas para você pela fila. Aceite para adicionar à agenda, ou passe a vez ao próximo closer.</p>
       </div>
 
-      {/* Metas do mês (sempre visíveis) */}
-      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', marginBottom: 10 }}>📊 METAS DO MÊS</p>
+      {/* Metas do mês por VALOR (sempre visíveis) */}
+      <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', marginBottom: 10 }}>📊 METAS DO MÊS (R$)</p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
-        <GoalBar label="Minhas vendas" value={wonMe} goal={goalMe} color="#22c55e" />
-        <GoalBar label="Vendas do time" value={wonTeam} goal={goalTeam} color={ACCENT} />
+        <GoalBar label="Minhas vendas" value={salesMe} goal={goalMe} color="#22c55e" money />
+        <GoalBar label="Vendas do time" value={salesTeam} goal={goalTeam} color={ACCENT} money />
       </div>
 
       {list.length === 0 ? (
         <Empty msg="Nenhuma call disponível no momento." />
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 }}>
-          {list.map(d => (
-            <div key={d.id} style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: `${ACCENT}1a`, color: ACCENT, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{fmtDateTime(d.callAt)}</span>
+          {list.map(d => {
+            const assignedToMe = d.status === 'assigned' && d.assignedTo === me;
+            return (
+              <div key={d.id} style={{ background: 'rgba(12,12,24,.9)', border: `1px solid ${assignedToMe ? `${ACCENT}55` : 'var(--border)'}`, borderRadius: 14, padding: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{d.leadName}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: `${ACCENT}1a`, color: ACCENT, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{fmtDateTime(d.callAt)}</span>
+                </div>
+                {assignedToMe
+                  ? <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: '#22c55e20', color: '#22c55e', fontFamily: 'var(--fm)', marginTop: 6 }}>➤ SUA VEZ NA FILA</span>
+                  : <span style={{ display: 'inline-block', fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 6 }}>POOL ABERTO</span>}
+                {d.company && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>🏢 {d.company}</p>}
+                {d.sdrName && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--fm)' }}>SDR: {d.sdrName}</p>}
+                {d.pains && <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 8, lineHeight: 1.5, maxHeight: 60, overflow: 'hidden' }}>{d.pains}</p>}
+                <button onClick={() => onClaim(d)} style={{ ...BTN_BIG, marginTop: 12, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)` }}>
+                  <Check size={15} /> Aceitar call
+                </button>
+                {assignedToMe && (
+                  <button onClick={() => onPass(d)} style={{ ...BTN_BIG, marginTop: 8, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
+                    <SkipForward size={14} /> Passar a vez
+                  </button>
+                )}
               </div>
-              {d.company && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>🏢 {d.company}</p>}
-              {d.sdrName && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, fontFamily: 'var(--fm)' }}>SDR: {d.sdrName}</p>}
-              {d.pains && <p style={{ fontSize: 12, color: 'var(--text)', marginTop: 8, lineHeight: 1.5, maxHeight: 60, overflow: 'hidden' }}>{d.pains}</p>}
-              <button onClick={() => onClaim(d)} style={{ ...BTN_BIG, marginTop: 12, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)` }}>
-                <Plus size={15} /> Puxar para minha agenda
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -231,7 +267,7 @@ function AvailableView({ list, goalMe, wonMe, goalTeam, wonTeam, onClaim }) {
 }
 
 // ── Agenda interna (lista OU colunas por dia) ──────────────────
-function InternalAgenda({ list, onStart, onRelease, onAddManual, onDelete }) {
+function InternalAgenda({ list, me, closers, onStart, onRelease, onAddManual, onAddSecond, onRemoveSecond, onDelete }) {
   const [view, setView] = useState('list'); // 'list' | 'columns'
 
   const days = useMemo(() => {
@@ -280,7 +316,7 @@ function InternalAgenda({ list, onStart, onRelease, onAddManual, onDelete }) {
                 <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{items.length} call{items.length > 1 ? 's' : ''}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingLeft: 16, borderLeft: `2px solid ${ACCENT}30` }}>
-                {items.map(d => <CallCard key={d.id} d={d} onStart={onStart} onRelease={onRelease} onDelete={onDelete} />)}
+                {items.map(d => <CallCard key={d.id} d={d} me={me} closers={closers} onStart={onStart} onRelease={onRelease} onAddSecond={onAddSecond} onRemoveSecond={onRemoveSecond} onDelete={onDelete} />)}
               </div>
             </div>
           ))}
@@ -295,7 +331,7 @@ function InternalAgenda({ list, onStart, onRelease, onAddManual, onDelete }) {
                 <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginLeft: 'auto' }}>{items.length}</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {items.map(d => <CallCard key={d.id} d={d} onStart={onStart} onRelease={onRelease} onDelete={onDelete} compact />)}
+                {items.map(d => <CallCard key={d.id} d={d} me={me} closers={closers} onStart={onStart} onRelease={onRelease} onAddSecond={onAddSecond} onRemoveSecond={onRemoveSecond} onDelete={onDelete} compact />)}
               </div>
             </div>
           ))}
@@ -306,7 +342,10 @@ function InternalAgenda({ list, onStart, onRelease, onAddManual, onDelete }) {
 }
 
 // Card de call reutilizado nos dois modos.
-function CallCard({ d, onStart, onRelease, onDelete, compact }) {
+function CallCard({ d, me, closers = [], onStart, onRelease, onAddSecond, onRemoveSecond, onDelete, compact }) {
+  const [pickSecond, setPickSecond] = useState(false);
+  const isOwner = d.closerName === me;
+  const others = closers.filter(n => n !== me && n !== d.secondCloser);
   return (
     <div style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 12, padding: compact ? '10px 12px' : '12px 14px' }}>
       <div style={{ display: 'flex', alignItems: compact ? 'flex-start' : 'center', gap: 12, flexDirection: compact ? 'column' : 'row' }}>
@@ -320,11 +359,22 @@ function CallCard({ d, onStart, onRelease, onDelete, compact }) {
           {compact && <p style={{ fontSize: 13, fontWeight: 800, color: ACCENT, fontFamily: 'var(--fm)' }}>{fmtTime(d.callAt)}{d.manual && <span style={{ fontSize: 8, color: 'var(--muted)', marginLeft: 6 }}>MANUAL</span>}</p>}
           <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{d.leadName}</p>
           {d.company && <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.company}</p>}
+          {d.secondCloser && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: ACCENT, background: `${ACCENT}1a`, padding: '2px 8px', borderRadius: 10, marginTop: 4, fontFamily: 'var(--fm)' }}>
+              <UserPlus size={10} /> + {d.secondCloser} (÷2)
+              {isOwner && <X size={10} style={{ cursor: 'pointer' }} onClick={() => onRemoveSecond(d.id)} />}
+            </span>
+          )}
         </div>
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: compact ? '100%' : 'auto', marginTop: compact ? 8 : 0 }}>
           <button onClick={() => onStart(d)} style={{ flex: compact ? 1 : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: `linear-gradient(135deg,${ACCENT},${ACCENT}cc)`, border: 'none', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
             <Video size={13} /> Iniciar
           </button>
+          {isOwner && !d.secondCloser && others.length > 0 && (
+            <button onClick={() => setPickSecond(v => !v)} title="Adicionar 2º closer" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: ACCENT, cursor: 'pointer', display: 'flex' }}>
+              <UserPlus size={13} />
+            </button>
+          )}
           <button onClick={() => onRelease(d)} title="Devolver para disponíveis" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', color: 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
             <Undo2 size={13} />
           </button>
@@ -335,19 +385,29 @@ function CallCard({ d, onStart, onRelease, onDelete, compact }) {
           )}
         </div>
       </div>
+      {pickSecond && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>Adicionar 2º closer (a comissão da venda será dividida por 2):</p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {others.map(n => (
+              <button key={n} onClick={() => { onAddSecond(d.id, n); setPickSecond(false); }} style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 14, cursor: 'pointer', background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)' }}>{n}</button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Recuperar (standby / lost / noshow) ────────────────────────
+// ── Recuperar (mq / noshow) ────────────────────────────────────
 function RecoverView({ list, onRecover }) {
-  const label = { standby: '⏸ Stand-by', lost: '❌ Perdido', noshow: '👻 No-show' };
-  const col = { standby: 'var(--amber)', lost: 'var(--neon)', noshow: 'var(--muted)' };
+  const label = { mq: 'MQ (mal qualif.)', noshow: 'No-show' };
+  const col = { mq: 'var(--neon)', noshow: 'var(--muted)' };
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 20 }}>
         <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Recuperar Calls</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Stand-by, perdidas e no-show — clique para retomar na sua agenda.</p>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>MQ e no-show — clique para retomar na sua agenda.</p>
       </div>
       {list.length === 0 ? <Empty msg="Nada para recuperar." /> : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 10 }}>
@@ -358,8 +418,7 @@ function RecoverView({ list, onRecover }) {
                 <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, fontFamily: 'var(--fm)', color: col[d.status], background: `${col[d.status]}1a`, whiteSpace: 'nowrap' }}>{label[d.status]}</span>
               </div>
               {d.company && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{d.company}</p>}
-              {d.lostReason && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontStyle: 'italic' }}>{d.lostReason}</p>}
-              {d.standbyAt && <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: 4, fontFamily: 'var(--fm)' }}>Retomar: {fmtDateTime(d.standbyAt)}</p>}
+              {d.mqReason && <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontStyle: 'italic' }}>{d.mqReason}</p>}
               <button onClick={() => onRecover(d.id)} style={{ ...BTN_BIG, marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <RotateCcw size={13} /> Recuperar
               </button>
@@ -460,18 +519,21 @@ function ConfirmModal({ icon, title, message, confirmLabel, confirmColor, onConf
   );
 }
 
-function GoalBar({ label, value, goal, color }) {
+function GoalBar({ label, value, goal, color, money = false }) {
   const hasGoal = goal > 0;
   const pct = hasGoal ? Math.min(100, Math.round((value / goal) * 100)) : 0;
+  const fmt = (n) => money
+    ? (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+    : n;
   return (
     <div style={{ background: 'rgba(12,12,24,.88)', border: `1px solid ${color}33`, borderRadius: 14, padding: 18, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color},transparent)` }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
         <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{label}</span>
-        <span style={{ fontSize: 24, fontWeight: 800, color }}>
-          {value}
+        <span style={{ fontSize: 22, fontWeight: 800, color }}>
+          {fmt(value)}
           {hasGoal
-            ? <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}> / {goal}</span>
+            ? <span style={{ fontSize: 13, color: 'var(--muted)', fontWeight: 500 }}> / {fmt(goal)}</span>
             : <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginLeft: 6 }}>sem meta</span>}
         </span>
       </div>
@@ -493,35 +555,54 @@ const CARD = { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border
 function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }) {
   const [elapsed, setElapsed] = useState(0);
   const [showClose, setShowClose] = useState(false);
+  // Mini-formulário obrigatório da call (persistido no deal.callForm).
+  const [form, setForm] = useState(deal.callForm || {
+    clientCompany: deal.company || '', responsibleName: '', whatSells: '', niche: '',
+    servicesOffered: '', investAmount: '', hasBrand: null, hasSite: null, siteLink: '',
+    hasDomainAccess: null, hasInstagram: null, hasInstagramAccess: null,
+    didPaidTraffic: null, awareOfInvestment: null,
+  });
   const notesRef = React.useRef(null);
   const savedRef = React.useRef(deal.callNotes || '');
+  const formSavedRef = React.useRef(JSON.stringify(deal.callForm || {}));
 
-  // Cronômetro.
   React.useEffect(() => {
     const id = setInterval(() => setElapsed(e => e + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
-  // Autosave das anotações a cada 5s (se mudou).
   React.useEffect(() => {
     const id = setInterval(() => {
       const html = notesRef.current?.innerHTML || '';
       if (html !== savedRef.current) { savedRef.current = html; onSaveNotes(deal.id, html); }
+      const fj = JSON.stringify(form);
+      if (fj !== formSavedRef.current) { formSavedRef.current = fj; actions.saveCallForm?.(deal.id, form); }
     }, 5000);
     return () => clearInterval(id);
-  }, [deal.id, onSaveNotes]);
+  }, [deal.id, onSaveNotes, form, actions]);
 
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
   const exec = (cmd) => { document.execCommand(cmd, false, null); notesRef.current?.focus(); };
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Validação do mini-formulário (todos obrigatórios).
+  const formComplete = (
+    form.clientCompany?.trim() && form.responsibleName?.trim() && form.whatSells?.trim() &&
+    form.niche?.trim() && form.servicesOffered?.trim() && form.investAmount?.trim() &&
+    form.hasBrand !== null && form.hasSite !== null && form.hasDomainAccess !== null &&
+    form.hasInstagram !== null && form.didPaidTraffic !== null && form.awareOfInvestment !== null &&
+    (form.hasSite !== true || form.siteLink?.trim()) &&
+    (form.hasInstagram !== true || form.hasInstagramAccess !== null)
+  );
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#07070e', zIndex: 1200, display: 'flex', flexDirection: 'column' }}>
-      {/* Sticky header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 24px', borderBottom: `1px solid ${COLOR}30`, background: 'rgba(12,12,24,.96)', flexShrink: 0 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <h2 style={{ fontSize: 17, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{deal.leadName}</h2>
           {deal.company && <p style={{ fontSize: 12, color: 'var(--muted)' }}>{deal.company}</p>}
         </div>
+        {deal.secondCloser && <span style={{ fontSize: 11, fontWeight: 700, color: ACCENT, background: `${ACCENT}1a`, padding: '4px 10px', borderRadius: 12, fontFamily: 'var(--fm)' }}>+ {deal.secondCloser}</span>}
         {deal.meetLink && (
           <a href={deal.meetLink} target="_blank" rel="noopener noreferrer" style={{ ...BTN_BIG, width: 'auto', padding: '9px 16px', fontSize: 13, background: 'linear-gradient(135deg,#22c55e,#16a34a)', textDecoration: 'none' }}>
             <Video size={15} /> Abrir Meet
@@ -533,25 +614,37 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
         </button>
       </div>
 
-      {/* Corpo: 3 colunas */}
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '300px 1fr 320px', overflow: 'hidden' }}>
-        {/* Esquerda: dados do SDR (read-only) */}
+      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '360px 1fr 320px', overflow: 'hidden' }}>
+        {/* Esquerda: dados do SDR + MINI-FORMULÁRIO OBRIGATÓRIO */}
         <div style={{ borderRight: '1px solid var(--border)', padding: 20, overflowY: 'auto' }}>
           <h3 style={ST_H}>Mapeado pelo SDR</h3>
           {deal.sdrName && <Info label="SDR" value={deal.sdrName} />}
           {deal.callAt && <Info label="Agendada para" value={new Date(deal.callAt).toLocaleString('pt-BR')} />}
-          <div style={{ marginTop: 14 }}>
+          <div style={{ marginTop: 8, marginBottom: 16 }}>
             <p style={ST_LBL}>DORES</p>
             <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginTop: 4, whiteSpace: 'pre-wrap' }}>{deal.pains || '—'}</p>
           </div>
-          {deal.sdrLogs?.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <p style={ST_LBL}>HISTÓRICO</p>
-              {deal.sdrLogs.slice(-6).map((l, i) => (
-                <p key={i} style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, fontFamily: 'var(--fm)' }}>· {logLabel(l)}</p>
-              ))}
-            </div>
-          )}
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: 14 }}>
+            <h3 style={{ ...ST_H, marginBottom: 4 }}>Formulário da Call *</h3>
+            <p style={{ fontSize: 11, color: formComplete ? '#22c55e' : 'var(--amber)', marginBottom: 12 }}>
+              {formComplete ? '✓ Completo' : 'Obrigatório para encerrar'}
+            </p>
+            <MiniField label="Nome do Cliente (Empresa)" value={form.clientCompany} onChange={v => setF('clientCompany', v)} />
+            <MiniField label="Nome do Responsável" value={form.responsibleName} onChange={v => setF('responsibleName', v)} />
+            <MiniField label="O que vende / faz" value={form.whatSells} onChange={v => setF('whatSells', v)} />
+            <MiniField label="Nicho" value={form.niche} onChange={v => setF('niche', v)} />
+            <MiniField label="Serviços ofertados" value={form.servicesOffered} onChange={v => setF('servicesOffered', v)} area />
+            <MiniField label="Valor disposto a investir" value={form.investAmount} onChange={v => setF('investAmount', v)} />
+            <MiniBool label="Já possui marca?" value={form.hasBrand} onChange={v => setF('hasBrand', v)} />
+            <MiniBool label="Já possui site?" value={form.hasSite} onChange={v => setF('hasSite', v)} />
+            {form.hasSite && <MiniField label="Link do site" value={form.siteLink} onChange={v => setF('siteLink', v)} />}
+            <MiniBool label="Tem acesso ao domínio?" value={form.hasDomainAccess} onChange={v => setF('hasDomainAccess', v)} />
+            <MiniBool label="Já possui Instagram?" value={form.hasInstagram} onChange={v => setF('hasInstagram', v)} />
+            {form.hasInstagram && <MiniBool label="Tem acesso ao Instagram?" value={form.hasInstagramAccess} onChange={v => setF('hasInstagramAccess', v)} />}
+            <MiniBool label="Já fez tráfego pago?" value={form.didPaidTraffic} onChange={v => setF('didPaidTraffic', v)} />
+            <MiniBool label="Ciente do investimento?" value={form.awareOfInvestment} onChange={v => setF('awareOfInvestment', v)} />
+          </div>
         </div>
 
         {/* Centro: rich text */}
@@ -573,7 +666,7 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
           />
         </div>
 
-        {/* Direita: Máquina de Objeções (accordion) */}
+        {/* Direita: Máquina de Objeções */}
         <div style={{ borderLeft: '1px solid var(--border)', padding: 20, overflowY: 'auto' }}>
           <h3 style={ST_H}>Máquina de Objeções</h3>
           {objections.length === 0
@@ -584,11 +677,35 @@ function Showtime({ deal, me, objections, onSaveNotes, onClose, actions, toast }
 
       {showClose && (
         <CloseModal
-          deal={deal} me={me} actions={actions} toast={toast}
+          deal={deal} me={me} actions={actions} toast={toast} callForm={form} formComplete={!!formComplete}
           onClose={() => setShowClose(false)}
           onDone={() => { setShowClose(false); onClose(); }}
         />
       )}
+    </div>
+  );
+}
+
+// Campo de texto do mini-formulário.
+function MiniField({ label, value, onChange, area = false }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label style={{ ...ST_LBL, display: 'block', marginBottom: 4 }}>{label}</label>
+      {area
+        ? <textarea value={value || ''} onChange={e => onChange(e.target.value)} rows={2} style={{ ...INP_M, resize: 'vertical', fontFamily: 'var(--f)' }} />
+        : <input value={value || ''} onChange={e => onChange(e.target.value)} style={INP_M} />}
+    </div>
+  );
+}
+// Campo booleano (Sim/Não) do mini-formulário.
+function MiniBool({ label, value, onChange }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <label style={{ ...ST_LBL, display: 'block', marginBottom: 4 }}>{label}</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button type="button" onClick={() => onChange(true)} style={{ flex: 1, padding: '6px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: value === true ? '#22c55e' : 'var(--surface)', color: value === true ? '#08110a' : 'var(--muted)', border: `1px solid ${value === true ? '#22c55e' : 'var(--border)'}` }}>Sim</button>
+        <button type="button" onClick={() => onChange(false)} style={{ flex: 1, padding: '6px', borderRadius: 7, cursor: 'pointer', fontSize: 12, fontWeight: 700, background: value === false ? 'var(--neon)' : 'var(--surface)', color: value === false ? '#fff' : 'var(--muted)', border: `1px solid ${value === false ? 'var(--neon)' : 'var(--border)'}` }}>Não</button>
+      </div>
     </div>
   );
 }
@@ -620,20 +737,16 @@ const RT_BTN = { background: 'var(--surface)', border: '1px solid var(--border)'
 // ════════════════════════════════════════════════════════════════
 // MODAL DE ENCERRAMENTO (forçado)
 // ════════════════════════════════════════════════════════════════
-function CloseModal({ deal, me, actions, toast, onClose, onDone }) {
-  const [outcome, setOutcome] = useState(null); // noshow | lost | standby | won
-  const [lostReason, setLostReason] = useState('');
-  const [standbyAt, setStandbyAt] = useState('');
+function CloseModal({ deal, me, actions, toast, callForm, formComplete, onClose, onDone }) {
+  const [outcome, setOutcome] = useState(null); // noshow | mq | venda_fechada
+  const [mqReason, setMqReason] = useState('');
 
   const confirm = async () => {
     let r;
     if (outcome === 'noshow') r = await actions.closeNoShow(deal.id, me);
-    else if (outcome === 'lost') {
-      if (!lostReason.trim()) { toast('Informe o motivo da perda.', 'e'); return; }
-      r = await actions.closeLost(deal.id, me, lostReason);
-    } else if (outcome === 'standby') {
-      if (!standbyAt) { toast('Defina data/hora do retorno.', 'e'); return; }
-      r = await actions.closeStandby(deal.id, me, new Date(standbyAt).toISOString());
+    else if (outcome === 'mq') {
+      if (!mqReason.trim()) { toast('Informe o motivo do MQ.', 'e'); return; }
+      r = await actions.closeLost(deal.id, me, mqReason);
     }
     if (r?.success) { toast('Call encerrada.'); onDone(); }
     else if (r) toast(r.error, 'e');
@@ -645,15 +758,34 @@ function CloseModal({ deal, me, actions, toast, onClose, onDone }) {
     else toast(r.error, 'e');
   };
 
-  // Briefing ocupa o modal inteiro quando outcome = won.
-  if (outcome === 'won') {
+  // Trava: o mini-formulário da call precisa estar completo para encerrar.
+  if (!formComplete) {
+    return (
+      <Overlay onClose={onClose}>
+        <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--amber)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+            <AlertTriangle size={20} color="var(--amber)" />
+            <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Formulário incompleto</h3>
+          </div>
+          <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18, lineHeight: 1.5 }}>
+            Antes de encerrar a call, preencha todos os campos do <strong>Formulário da Call</strong> (coluna esquerda). Isso é obrigatório para registrar o resultado.
+          </p>
+          <button onClick={onClose} style={{ ...BTN_BIG, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)` }}>Voltar e preencher</button>
+        </div>
+      </Overlay>
+    );
+  }
+
+  // Briefing (Venda Fechada) ocupa o modal inteiro.
+  if (outcome === 'venda_fechada') {
     return (
       <Overlay onClose={null}>
-        <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: `1px solid ${COLOR}40`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 720, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
-          <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Briefing — {deal.leadName}</h3>
+        <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: `1px solid ${COLOR}40`, borderRadius: 16, padding: 24, width: '100%', maxWidth: 760, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: '#fff', marginBottom: 4 }}>Venda Fechada — {deal.leadName}</h3>
           <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 20 }}>Preencha tudo para enviar ao CS. Campos obrigatórios travam o envio.</p>
           <BriefingForm
-            initial={{ companyName: deal.company || '', contactName: deal.leadName || '', contactPhone: deal.leadPhone || '', pains: deal.pains || '' }}
+            callForm={callForm}
+            initial={{ companyName: deal.company || callForm?.clientCompany || '', contactName: callForm?.responsibleName || deal.leadName || '', contactPhone: deal.leadPhone || '', pains: deal.pains || '' }}
             onSubmit={submitBriefing}
             onCancel={() => setOutcome(null)}
           />
@@ -672,26 +804,23 @@ function CloseModal({ deal, me, actions, toast, onClose, onDone }) {
         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 18 }}>Escolha um resultado para encerrar.</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 16 }}>
-          <OutcomeBtn active={outcome === 'won'} onClick={() => setOutcome('won')} color="#22c55e" label="✅ Ganho" />
-          <OutcomeBtn active={outcome === 'lost'} onClick={() => setOutcome('lost')} color="var(--neon)" label="❌ Perdido" />
-          <OutcomeBtn active={outcome === 'noshow'} onClick={() => setOutcome('noshow')} color="var(--muted)" label="👻 No-Show" />
-          <OutcomeBtn active={outcome === 'standby'} onClick={() => setOutcome('standby')} color="var(--amber)" label="⏸ Stand-by" />
+          <OutcomeBtn active={outcome === 'venda_fechada'} onClick={() => setOutcome('venda_fechada')} color="#22c55e" label="Venda Fechada" />
+          <OutcomeBtn active={outcome === 'mq'} onClick={() => setOutcome('mq')} color="var(--neon)" label="MQ (mal qualif.)" />
+          <OutcomeBtn active={outcome === 'noshow'} onClick={() => setOutcome('noshow')} color="var(--muted)" label="No-Show" />
         </div>
 
-        {outcome === 'lost' && (
+        {outcome === 'mq' && (
           <div style={{ marginBottom: 16 }}>
-            <label style={ST_LBL}>MOTIVO DA PERDA *</label>
-            <input value={lostReason} onChange={e => setLostReason(e.target.value)} placeholder="Ex: preço, timing, sem fit..." style={{ ...INP_M, marginTop: 6 }} />
+            <label style={ST_LBL}>MOTIVO DO MQ *</label>
+            <input value={mqReason} onChange={e => setMqReason(e.target.value)} placeholder="Por que o lead foi mal qualificado..." style={{ ...INP_M, marginTop: 6 }} />
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>Isso conta como métrica de MQ para o SDR que agendou.</p>
           </div>
         )}
-        {outcome === 'standby' && (
-          <div style={{ marginBottom: 16 }}>
-            <label style={ST_LBL}>RETOMAR EM *</label>
-            <input type="datetime-local" value={standbyAt} onChange={e => setStandbyAt(e.target.value)} style={{ ...INP_M, marginTop: 6 }} />
-          </div>
+        {outcome === 'noshow' && (
+          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>O lead volta para o painel do SDR com a marcação de No-Show, para reagendamento.</p>
         )}
 
-        {outcome && outcome !== 'won' && (
+        {outcome && outcome !== 'venda_fechada' && (
           <button onClick={confirm} style={{ ...BTN_BIG, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)` }}>Confirmar encerramento</button>
         )}
       </div>
@@ -701,6 +830,29 @@ function CloseModal({ deal, me, actions, toast, onClose, onDone }) {
 
 function Overlay({ children, onClose }) {
   return <div onClick={onClose || undefined} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 20 }}>{children}</div>;
+}
+
+// Passar a vez ao próximo closer da fila (motivo obrigatório).
+function PassTurnModal({ deal, onClose, onConfirm }) {
+  const [reason, setReason] = useState('');
+  return (
+    <Overlay onClose={onClose}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Passar a vez</h3>
+          <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
+        </div>
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
+          A call <strong>{deal.leadName}</strong> vai para o próximo closer da fila. Descreva o motivo.
+        </p>
+        <label style={ST_LBL}>MOTIVO *</label>
+        <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Ex: conflito de horário, conhço o lead, sem fit com meu perfil..." style={{ ...INP_M, marginTop: 6, resize: 'vertical', fontFamily: 'var(--f)' }} />
+        <button disabled={!reason.trim()} onClick={() => onConfirm(reason)} style={{ ...BTN_BIG, marginTop: 16, opacity: reason.trim() ? 1 : .5, background: `linear-gradient(135deg,${COLOR},${COLOR}cc)` }}>
+          <SkipForward size={15} /> Passar ao próximo closer
+        </button>
+      </div>
+    </Overlay>
+  );
 }
 function OutcomeBtn({ active, onClick, color, label }) {
   return (
