@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   Target, Snowflake, CalendarCheck, XCircle, MessageSquare,
   CheckSquare, Calendar, Phone, Clock, Send, X, Plus, Trash2, Edit2, Check, RotateCcw,
-  RefreshCw, Upload, Download, FileText, History, Eye,
+  RefreshCw, Upload, Download, History, Eye,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -15,9 +15,9 @@ import { useSDRScripts, fillScript, waLink } from '../../hooks/useSDRScripts';
 import { parseCSV, mapRowsToLeads, LEADS_CSV_TEMPLATE } from '../../lib/csv';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
-
+ 
 const COLOR = SECTORS.comercial.color; // #e879f9
-
+ 
 export default function SDRDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -28,19 +28,19 @@ export default function SDRDashboard() {
   } = useLeads();
   const { collaborators } = useCollaborators();
   const { scripts, addScript, updateScript, removeScript } = useSDRScripts(user?.authUid);
-
+ 
   const [page, setPage] = useState('queue');
   const [selectedId, setSelectedId] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [showImport, setShowImport] = useState(false);
-
+ 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60000);
     return () => clearInterval(id);
   }, []);
-
+ 
   const me = user?.name;
-
+ 
   // Closers ativos (para a fila rotativa ao agendar a call).
   const activeClosers = useMemo(
     () => collaborators.filter(c => c.sector === 'comercial' && c.active && c.commercialRole === 'closer').map(c => c.name),
@@ -49,7 +49,7 @@ export default function SDRDashboard() {
   const closersForQueue = activeClosers.length > 0
     ? activeClosers
     : collaborators.filter(c => c.sector === 'comercial' && c.active).map(c => c.name);
-
+ 
   // ── Particiona os leads por destino ─────────────────────────
   const buckets = useMemo(() => {
     const queue = [];
@@ -60,7 +60,7 @@ export default function SDRDashboard() {
     for (const l of leads) {
       const mine = !l.claimedBy || l.claimedBy === me;
       const followupDue = l.status === 'followup' && l.followupAt && new Date(l.followupAt).getTime() <= now;
-
+ 
       if ((l.status === 'queue' || followupDue) && mine) {
         queue.push({ ...l, _followupDue: followupDue });
       } else if (l.status === 'followup' && l.claimedBy === me) {
@@ -80,9 +80,9 @@ export default function SDRDashboard() {
     });
     return { queue, followupCold, scheduled, recoverable, cold };
   }, [leads, me, now]);
-
+ 
   const selected = leads.find(l => l.id === selectedId) || null;
-
+ 
   const NAV = [
     { key: 'queue',     label: 'Fila de Leads', icon: Target,        badge: buckets.queue.length },
     { key: 'followup',  label: 'Follow-up',     icon: Snowflake,     badge: buckets.followupCold.length },
@@ -93,7 +93,7 @@ export default function SDRDashboard() {
     { key: 'todo',      label: 'Meu Dia',       icon: CheckSquare },
     { key: 'agenda',    label: 'Agenda',        icon: Calendar },
   ];
-
+ 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar sectorId="comercial" navItems={NAV} activeKey={page} onNav={(k) => { setPage(k); }} />
@@ -146,7 +146,7 @@ export default function SDRDashboard() {
     </div>
   );
 }
-
+ 
 function Spinner() {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
@@ -154,7 +154,7 @@ function Spinner() {
     </div>
   );
 }
-
+ 
 function StubView({ page }) {
   const labels = { todo: 'Meu Dia', agenda: 'Agenda' };
   return (
@@ -167,7 +167,7 @@ function StubView({ page }) {
     </div>
   );
 }
-
+ 
 // ════════════════════════════════════════════════════════════════
 // SPLIT VIEW — fila à esquerda, detalhe do lead à direita
 // ════════════════════════════════════════════════════════════════
@@ -201,7 +201,7 @@ function SplitView({ title, subtitle, list, selected, onSelect, me, scripts, act
     </div>
   );
 }
-
+ 
 function Header({ title, subtitle, count }) {
   return (
     <div style={{ marginBottom: 20 }}>
@@ -215,7 +215,7 @@ function Header({ title, subtitle, count }) {
     </div>
   );
 }
-
+ 
 function LeadRow({ lead, active, onClick }) {
   return (
     <button onClick={onClick} style={{
@@ -237,7 +237,7 @@ function LeadRow({ lead, active, onClick }) {
     </button>
   );
 }
-
+ 
 // Sinalização forte das tentativas: verde → amarelo → vermelho.
 function AttemptsBadge({ left, total = 10, compact = false }) {
   const ratio = left / total;
@@ -269,7 +269,7 @@ function AttemptsBadge({ left, total = 10, compact = false }) {
     </div>
   );
 }
-
+ 
 // ── Detalhe do lead: WhatsApp + ações ──────────────────────────
 function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], readOnly = false }) {
   const [scriptId, setScriptId] = useState('');
@@ -278,26 +278,26 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
   const [showContact, setShowContact] = useState(false);
   const [showCold, setShowCold] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-
+ 
   const phone = lead.phone || '';
   const activeScript = scripts.find(s => s.id === scriptId);
   const message = activeScript ? fillScript(activeScript.text, { leadName: lead.name, sdrName: me }) : '';
   const attemptsLeft = lead.attemptsLeft ?? 0;
   // "Sem Interação" só libera depois de esgotar as tentativas 1x.
   const canSemInteracao = attemptsLeft === 0 || lead.attemptsExhausted;
-
+ 
   const openWhatsApp = async () => {
     if (!phone) { toast('Lead sem telefone cadastrado.', 'e'); return; }
     window.open(waLink(phone, message), '_blank', 'noopener');
     await actions.claimLead(lead.id, me);
   };
-
+ 
   const doSemInteracao = async () => {
     const r = await actions.markSemInteracao(lead.id, me);
     if (r.success) { toast('Lead movido para Recuperáveis.'); onDone(); }
     else toast(r.error, 'e');
   };
-
+ 
   return (
     <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 22 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
@@ -315,26 +315,26 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
         </div>
         <AttemptsBadge left={attemptsLeft} />
       </div>
-
+ 
       {lead.noShowFlag && (
         <div style={{ background: '#ef444415', border: '1px solid #ef444444', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: '#fca5a5', lineHeight: 1.5 }}>
           🔁 Este lead voltou por <strong>no-show</strong> (não compareceu à call). Reagende uma nova call.
         </div>
       )}
-
+ 
       {lead.notes && (
         <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '10px 12px', marginBottom: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
           📝 {lead.notes}
         </div>
       )}
-
+ 
       {/* Histórico de contatos */}
       {(lead.contactHistory?.length > 0) && (
         <button onClick={() => setShowHistory(true)} style={{ ...BTN, ...BTN_SOFT, width: '100%', marginBottom: 16, justifyContent: 'center' }}>
           <History size={14} /> Ver histórico de contatos ({lead.contactHistory.length})
         </button>
       )}
-
+ 
       {readOnly ? (
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px', textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>
           📅 Call agendada para {lead.dealId ? 'este lead' : ''}. Este lead está agendado — sem ações disponíveis.
@@ -359,7 +359,7 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
               <Phone size={15} /> Abrir WhatsApp
             </button>
           </div>
-
+ 
           <label style={LBL}>AÇÕES RÁPIDAS</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
             <button onClick={() => setShowContact(true)} style={{ ...BTN, ...BTN_SOFT }}><Send size={14} /> Registrar Contato</button>
@@ -369,7 +369,7 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
           </div>
         </>
       )}
-
+ 
       {showContact && ReactDOM.createPortal(
         <RegisterContactModal onClose={() => setShowContact(false)} onConfirm={async (data) => {
           const r = await actions.registerContact(lead.id, me, data);
@@ -378,7 +378,7 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
           if (r.exhausted) toast('Tentativas esgotadas — já pode marcar "Sem Interação".');
           else toast('Contato registrado (−1 tentativa).');
         }} />, document.body)}
-
+ 
       {showCold && ReactDOM.createPortal(
         <ColdReasonModal onClose={() => setShowCold(false)} onConfirm={async (reason) => {
           const r = await actions.markCold(lead.id, me, reason);
@@ -386,10 +386,10 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
           if (r.success) { toast('Lead marcado como frio.'); onDone(); }
           else toast(r.error, 'e');
         }} />, document.body)}
-
+ 
       {showHistory && ReactDOM.createPortal(
         <HistoryModal lead={lead} onClose={() => setShowHistory(false)} />, document.body)}
-
+ 
       {showFollowup && ReactDOM.createPortal(
         <FollowupModal onClose={() => setShowFollowup(false)} onConfirm={async (iso) => {
           const r = await actions.scheduleFollowup(lead.id, me, iso);
@@ -397,7 +397,7 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
           if (r.success) { toast('Follow-up agendado.'); onDone(); }
           else toast(r.error, 'e');
         }} />, document.body)}
-
+ 
       {showCall && ReactDOM.createPortal(
         <CallModal onClose={() => setShowCall(false)} onConfirm={async (data) => {
           const r = await actions.scheduleCall(lead.id, me, data, closers);
@@ -408,7 +408,7 @@ function LeadDetail({ lead, me, scripts, actions, toast, onDone, closers = [], r
     </div>
   );
 }
-
+ 
 // ════════════════════════════════════════════════════════════════
 // MODAIS
 // ════════════════════════════════════════════════════════════════
@@ -425,7 +425,7 @@ function ModalShell({ title, onClose, children }) {
     </div>
   );
 }
-
+ 
 function FollowupModal({ onClose, onConfirm }) {
   const [dt, setDt] = useState('');
   return (
@@ -441,7 +441,7 @@ function FollowupModal({ onClose, onConfirm }) {
     </ModalShell>
   );
 }
-
+ 
 function CallModal({ onClose, onConfirm }) {
   const [datetime, setDatetime] = useState('');
   const [meetLink, setMeetLink] = useState('');
@@ -462,7 +462,7 @@ function CallModal({ onClose, onConfirm }) {
     </ModalShell>
   );
 }
-
+ 
 // Registrar contato: tipo + se teve retorno + nota.
 function RegisterContactModal({ onClose, onConfirm }) {
   const [contactType, setContactType] = useState('');
@@ -489,7 +489,7 @@ function RegisterContactModal({ onClose, onConfirm }) {
     </ModalShell>
   );
 }
-
+ 
 // Lead frio: motivo obrigatório.
 function ColdReasonModal({ onClose, onConfirm }) {
   const [reason, setReason] = useState('');
@@ -506,7 +506,7 @@ function ColdReasonModal({ onClose, onConfirm }) {
     </ModalShell>
   );
 }
-
+ 
 // Histórico de contatos do lead.
 function HistoryModal({ lead, onClose }) {
   const hist = [...(lead.contactHistory || [])].reverse();
@@ -534,13 +534,13 @@ function HistoryModal({ lead, onClose }) {
     </ModalShell>
   );
 }
-
+ 
 // Importar leads via planilha (CSV).
 function ImportLeadsModal({ onClose, onImport }) {
   const [rows, setRows] = useState([]);
   const [fileName, setFileName] = useState('');
   const [error, setError] = useState('');
-
+ 
   const handleFile = (e) => {
     setError('');
     const file = e.target.files?.[0];
@@ -560,7 +560,7 @@ function ImportLeadsModal({ onClose, onImport }) {
     };
     reader.readAsText(file, 'utf-8');
   };
-
+ 
   const downloadTemplate = () => {
     const blob = new Blob([LEADS_CSV_TEMPLATE], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -568,7 +568,7 @@ function ImportLeadsModal({ onClose, onImport }) {
     a.href = url; a.download = 'modelo-leads.csv'; a.click();
     URL.revokeObjectURL(url);
   };
-
+ 
   return ReactDOM.createPortal(
     <ModalShell title="Importar leads por planilha" onClose={onClose}>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.5 }}>
@@ -603,7 +603,7 @@ function ImportLeadsModal({ onClose, onImport }) {
     document.body
   );
 }
-
+ 
 // ════════════════════════════════════════════════════════════════
 // VIEWS AUXILIARES
 // ════════════════════════════════════════════════════════════════
@@ -634,7 +634,7 @@ function ColdView({ list, onReopen, now }) {
     </div>
   );
 }
-
+ 
 function ScheduledView({ list, onSelect, selected, me, scripts }) {
   return (
     <div className="fade-up">
@@ -665,7 +665,7 @@ function ScheduledView({ list, onSelect, selected, me, scripts }) {
     </div>
   );
 }
-
+ 
 function LostView({ list, onReopen, title = 'Recuperáveis', subtitle = '', showReason = false }) {
   return (
     <div className="fade-up">
@@ -692,19 +692,19 @@ function LostView({ list, onReopen, title = 'Recuperáveis', subtitle = '', show
     </div>
   );
 }
-
+ 
 function ScriptsView({ scripts, addScript, updateScript, removeScript, toast }) {
   const [title, setTitle] = useState('');
   const [text, setText] = useState('');
   const [editId, setEditId] = useState(null);
-
+ 
   const submit = async () => {
     if (!title.trim() || !text.trim()) { toast('Preencha título e texto.', 'e'); return; }
     if (editId) { await updateScript(editId, { title, text }); setEditId(null); }
     else { await addScript(title, text); }
     setTitle(''); setText('');
   };
-
+ 
   return (
     <div className="fade-up">
       <Header title="Meus Scripts" subtitle="Modelos de mensagem com variáveis {nome_lead} e {nome_sdr}" />
@@ -718,7 +718,7 @@ function ScriptsView({ scripts, addScript, updateScript, removeScript, toast }) 
         </button>
         {editId && <button onClick={() => { setEditId(null); setTitle(''); setText(''); }} style={{ ...BTN, ...BTN_SOFT, marginTop: 8 }}>Cancelar edição</button>}
       </div>
-
+ 
       {scripts.length === 0 ? <Empty msg="Você ainda não criou scripts." /> : (
         <div style={{ display: 'grid', gap: 10 }}>
           {scripts.map(s => (
@@ -738,11 +738,11 @@ function ScriptsView({ scripts, addScript, updateScript, removeScript, toast }) 
     </div>
   );
 }
-
+ 
 function Empty({ msg }) {
   return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '40px 0' }}>{msg}</p>;
 }
-
+ 
 // ── Estilos compartilhados ─────────────────────────────────────
 const LBL = { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' };
 const INP = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' };
