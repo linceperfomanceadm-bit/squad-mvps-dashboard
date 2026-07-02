@@ -21,41 +21,70 @@ export default function AdminCommercialMetrics({ leads = [], deals = [], onDelet
     return startOfMonth(now).getTime();
   }, [period]);
 
-  // ── SDR: conta contatos e calls agendadas por pessoa ─────────
+  // ── SDR: contatos, calls agendadas e MQ (mal qualificados) ───
   const sdrStats = useMemo(() => {
     const map = {};
-    const bump = (name, key) => {
-      if (!name) return;
-      map[name] = map[name] || { name, contacts: 0, scheduled: 0 };
-      map[name][key]++;
+    const ensure = (name) => {
+      if (!name) return null;
+      map[name] = map[name] || { name, contacts: 0, scheduled: 0, mq: 0 };
+      return map[name];
     };
     leads.forEach(l => {
+      // Contatos: histórico novo (contactHistory) com fallback para logs antigos.
+      const history = l.contactHistory || [];
+      history.forEach(h => {
+        const t = h.at ? new Date(h.at).getTime() : 0;
+        if (t < since) return;
+        const s = ensure(h.by); if (s) s.contacts++;
+      });
       (l.logs || []).forEach(log => {
         const t = log.at ? new Date(log.at).getTime() : 0;
         if (t < since) return;
-        if (log.type === 'message_sent') bump(log.by, 'contacts');
-        if (log.type === 'call_scheduled') bump(log.by, 'scheduled');
+        if (log.type === 'message_sent') { const s = ensure(log.by); if (s) s.contacts++; }
+        if (log.type === 'call_scheduled') { const s = ensure(log.by); if (s) s.scheduled++; }
       });
+      // Call agendada: lead que virou deal (tem sdrName + callAt).
+      if (l.status === 'scheduled' && l.claimedBy) {
+        // contabilizado abaixo pelos deals para evitar duplicidade quando houver log
+      }
+    });
+    // Calls agendadas e MQ vêm dos deals (fonte da verdade do fechamento).
+    deals.forEach(d => {
+      if (!d.sdrName) return;
+      const t = d.callAt ? new Date(d.callAt).getTime() : (d.createdAt ? new Date(d.createdAt).getTime() : 0);
+      const s = ensure(d.sdrName); if (!s) return;
+      if (t >= since) s.scheduled++;
+      // MQ é KPI do SDR que agendou a call.
+      const ct = d.closedAt ? new Date(d.closedAt).getTime() : 0;
+      if (d.outcome === 'mq' && ct >= since) s.mq++;
     });
     return Object.values(map).sort((a, b) => (b.contacts + b.scheduled) - (a.contacts + a.scheduled));
-  }, [leads, since]);
+  }, [leads, deals, since]);
 
   // ── Closer: calls realizadas e vendas por pessoa ─────────────
   const closerStats = useMemo(() => {
     const map = {};
     const ensure = (name) => {
-      map[name] = map[name] || { name, calls: 0, won: 0, lost: 0, noshow: 0, revenue: 0 };
+      map[name] = map[name] || { name, calls: 0, won: 0, mq: 0, noshow: 0, revenue: 0 };
       return map[name];
     };
     deals.forEach(d => {
-      if (!d.closerName) return;
       const t = d.closedAt ? new Date(d.closedAt).getTime() : (d.wonAt ? new Date(d.wonAt).getTime() : 0);
       if (!t || t < since) return;
-      const s = ensure(d.closerName);
-      if (['won', 'lost', 'noshow'].includes(d.outcome)) s.calls++;
-      if (d.outcome === 'won') { s.won++; s.revenue += Number(d.saleTotal || 0); }
-      if (d.outcome === 'lost') s.lost++;
-      if (d.outcome === 'noshow') s.noshow++;
+      const isCounted = ['venda_fechada', 'mq', 'noshow'].includes(d.outcome);
+      // Considera closer principal e segundo closer (venda dividida).
+      const closers = [d.closerName, d.secondCloser].filter(Boolean);
+      closers.forEach(name => {
+        const s = ensure(name);
+        if (isCounted) s.calls++;
+        if (d.outcome === 'venda_fechada') {
+          s.won++;
+          // valor por closer respeita o split (saleValuePerCloser) quando houver.
+          s.revenue += Number(d.saleValuePerCloser != null ? d.saleValuePerCloser : (d.saleTotal || 0));
+        }
+        if (d.outcome === 'mq') s.mq++;
+        if (d.outcome === 'noshow') s.noshow++;
+      });
     });
     return Object.values(map).sort((a, b) => b.won - a.won || b.calls - a.calls);
   }, [deals, since]);
@@ -94,10 +123,10 @@ export default function AdminCommercialMetrics({ leads = [], deals = [], onDelet
       {/* Ranking SDR */}
       <Block title="Ranking SDR" subtitle="Contatos e calls agendadas no período">
         {sdrStats.length === 0 ? <Empty /> : (
-          <Table head={['SDR', 'Contatos', 'Calls agendadas', 'Conversão']}>
+          <Table head={['SDR', 'Contatos', 'Calls agendadas', 'MQ', 'Conversão']}>
             {sdrStats.map((s, i) => (
               <Row key={s.name} rank={i + 1} name={s.name} cells={[
-                s.contacts, s.scheduled,
+                s.contacts, s.scheduled, s.mq,
                 s.contacts > 0 ? `${Math.round((s.scheduled / s.contacts) * 100)}%` : '—',
               ]} />
             ))}
@@ -108,10 +137,10 @@ export default function AdminCommercialMetrics({ leads = [], deals = [], onDelet
       {/* Ranking Closer */}
       <Block title="Ranking Closer" subtitle="Calls realizadas, vendas e receita no período">
         {closerStats.length === 0 ? <Empty /> : (
-          <Table head={['Closer', 'Calls', 'Ganhas', 'Perdidas', 'No-show', 'Receita']}>
+          <Table head={['Closer', 'Calls', 'Vendas', 'MQ', 'No-show', 'Receita']}>
             {closerStats.map((s, i) => (
               <Row key={s.name} rank={i + 1} name={s.name} cells={[
-                s.calls, s.won, s.lost, s.noshow,
+                s.calls, s.won, s.mq, s.noshow,
                 `R$ ${s.revenue.toLocaleString('pt-BR')}`,
               ]} highlight={2} />
             ))}
@@ -141,7 +170,7 @@ function ManualCallsBlock({ deals, onDeleteCall, user }) {
               <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.leadName} {d.company && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>· {d.company}</span>}</p>
               <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
                 {d.closerName || '—'} · {d.callAt ? new Date(d.callAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem data'}
-                {d.outcome && ` · ${d.outcome}`}
+                {d.outcome && ` · ${({ venda_fechada: 'Venda fechada', mq: 'MQ', noshow: 'No-show' })[d.outcome] || d.outcome}`}
               </p>
             </div>
             <button onClick={() => onDeleteCall(d.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
