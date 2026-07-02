@@ -108,6 +108,19 @@ export const RECURRENCE_SERVICES = [
 
 export const SLA_DAYS = 3;
 
+// Serviços que o Closer pode vender (formulário de Venda Fechada).
+// Cada serviço marcado exige uma descrição >= 350 chars do que foi vendido.
+export const SALE_SERVICES = [
+  { id: 'gestao_trafego', label: 'Gestão de Tráfego' },
+  { id: 'social_media',   label: 'Social Media' },
+  { id: 'webdesign',      label: 'Site / WebDesign' },
+  { id: 'video',          label: 'Vídeo / Audiovisual' },
+  { id: 'design',         label: 'Design / Criativos' },
+  { id: 'seo',            label: 'SEO' },
+  { id: 'consultoria',    label: 'Consultoria' },
+  { id: 'outro',          label: 'Outro' },
+];
+
 // ─── Portal de Coleta de Produtos (clientes externos) ─────────
 // Plataformas de e-commerce que o cliente pode ter. "Outro" abre
 // campo de texto livre na criação do acesso.
