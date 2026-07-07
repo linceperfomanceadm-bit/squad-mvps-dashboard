@@ -40,7 +40,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
   const allChecked = total > 0 && checked === total;
   const isOnboarding = wd.status === 'onboarding';
   const isProduction = wd.status === 'production';
-  const startDate = isOnboarding ? wd.onboardingStartedAt : wd.productionStartedAt;
+  const startDate = isOnboarding ? wd.onboardingStartedAt : (isProduction ? wd.productionStartedAt : null);
   const totalDays = isOnboarding ? 7 : cfg.days || 30;
 
   const handleCheck = (itemId, val) => {
