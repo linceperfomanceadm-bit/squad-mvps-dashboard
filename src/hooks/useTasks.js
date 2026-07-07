@@ -1,22 +1,62 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, addDoc, updateDoc,
   deleteDoc, doc, serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-
+ 
+// ─── Auto-reparo de tasks presas em aprovação ──────────────────
+// Bug histórico: ao enviar para aprovação sem escolher aprovador, a
+// task gravava o próprio executor como aprovador (deliveredBy ===
+// responsibleName) e ficava presa. Esta função detecta essas tasks e
+// as devolve para "Em Produção" com o responsável original, uma única
+// vez. É idempotente: se não há nada corrompido, não faz nada.
+function isStuckApproval(t) {
+  if (t.status !== 'approval') return false;
+  const tl = Array.isArray(t.timeline) ? t.timeline : [];
+  const lastApproval = [...tl].reverse().find(e => e && e.action === 'sent_for_approval');
+  const selfDeliver = t.deliveredBy && t.deliveredBy === t.responsibleName;
+  const selfHandoff = lastApproval && lastApproval.by && lastApproval.to && lastApproval.by === lastApproval.to;
+  const noApprover  = !t.responsibleName;
+  return selfDeliver || selfHandoff || noApprover;
+}
+ 
 export function useTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  // Garante que o auto-reparo rode só uma vez por sessão do hook.
+  const repairedRef = useRef(false);
+ 
   useEffect(() => {
     const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, snap => {
-      setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setTasks(list);
       setLoading(false);
+ 
+      // Auto-reparo (uma vez). Corrige no Firestore; o snapshot propaga
+      // o resultado para todos os usuários automaticamente.
+      if (!repairedRef.current) {
+        repairedRef.current = true;
+        const stuck = list.filter(isStuckApproval);
+        stuck.forEach(t => {
+          const tl = Array.isArray(t.timeline) ? t.timeline : [];
+          const lastApproval = [...tl].reverse().find(e => e && e.action === 'sent_for_approval');
+          const restoreName   = t.deliveredBy || (lastApproval && lastApproval.by) || t.responsibleName || null;
+          const restoreSector = t.deliveredBySector || (lastApproval && lastApproval.sector) || t.responsibleSector || null;
+          updateDoc(doc(db, 'tasks', t.id), {
+            status: 'doing',
+            responsibleName: restoreName,
+            responsibleSector: restoreSector,
+            deliveredBy: null,
+            deliveredBySector: null,
+            approvalAt: null,
+          }).catch(() => {}); // silencioso: se falhar, tenta na próxima carga
+        });
+      }
     });
   }, []);
-
+ 
   // ── Create task ──────────────────────────────────────────────
   const createTask = async ({ name, clientId, clientName, deadline, priority, responsibleSector, responsibleName, responsibleNames, requestedBy, requestedBySector, comment, links }) => {
     try {
@@ -63,7 +103,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Move to Em Produção ──────────────────────────────────────
   const moveToProduction = async (taskId, updatedLinks) => {
     try {
@@ -85,13 +125,18 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Move to Em Aprovação ─────────────────────────────────────
   // deliveredBy = who actually did the work (current responsible before handoff)
   const moveToApproval = async (taskId, approverName, approverSector, updatedLinks) => {
     try {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
+      // Guarda: sem aprovador explícito, não envia (evita gravar o
+      // próprio executor como aprovador — origem do bug).
+      if (!approverName || !approverSector) {
+        return { success: false, error: 'Selecione quem vai aprovar antes de enviar.' };
+      }
       const now = new Date().toISOString();
       const timeline = [...(task.timeline || []), {
         action: 'sent_for_approval',
@@ -114,7 +159,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Approve (complete) task ──────────────────────────────────
   const approveTask = async (taskId) => {
     try {
@@ -136,7 +181,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Reject (send back for rework) ───────────────────────────
   const rejectTask = async (taskId, reworkNote, newResponsibleName, newResponsibleSector) => {
     try {
@@ -174,7 +219,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Add comment ──────────────────────────────────────────────
   const addComment = async (taskId, author, sector, text) => {
     try {
@@ -192,7 +237,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Update links ─────────────────────────────────────────────
   const updateLinks = async (taskId, links) => {
     try {
@@ -200,7 +245,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Alterar data de entrega (com justificativa) ─────────────
   // Registra na timeline E como comentário no chat da task.
   const changeDeadline = async (taskId, newDeadline, reason, byName, bySector) => {
@@ -231,7 +276,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Delete task ──────────────────────────────────────────────
   const deleteTask = async (taskId) => {
     try {
@@ -239,7 +284,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
-
+ 
   // ── Helper: tasks visible to a user ─────────────────────────
   const getMyTasks = (userName) => {
     return tasks.filter(t =>
@@ -249,7 +294,7 @@ export function useTasks() {
       t.deliveredBy === userName
     );
   };
-
+ 
   return {
     tasks, loading,
     createTask, moveToProduction, moveToApproval,
