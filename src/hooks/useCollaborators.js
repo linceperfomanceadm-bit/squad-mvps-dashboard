@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy } from 'firebase/firestore';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth';
-import { db, loginIdToEmail } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions, loginIdToEmail } from '../lib/firebase';
 
 /*
  * Criar um usuário com createUserWithEmailAndPassword loga
@@ -79,6 +80,26 @@ export function useCollaborators(sectorFilter = null) {
     catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Reset de senha via Cloud Function (Admin SDK) ────────────
+  // Alterar a senha de OUTRO usuário exige privilégio de servidor.
+  // A função no backend valida que o chamador é admin, redefine a
+  // senha no Firebase Auth e marca firstAccess:true no doc.
+  const resetPassword = async (collaboratorId, newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, error: 'A senha provisória deve ter pelo menos 6 caracteres.' };
+    }
+    try {
+      const fn = httpsCallable(functions, 'resetCollaboratorPassword');
+      const res = await fn({ collaboratorId, newPassword });
+      if (res?.data?.success) return { success: true };
+      return { success: false, error: 'Falha ao redefinir a senha.' };
+    } catch (err) {
+      // HttpsError chega com .message legível vindo do backend.
+      const msg = err?.message || 'Falha ao redefinir a senha.';
+      return { success: false, error: msg };
+    }
+  };
+
   const deleteCollaborator = async (id) => {
     // NOTA: isto remove apenas o doc de perfil. A conta no Firebase Auth
     // não pode ser apagada pelo cliente (exige Admin SDK). O acesso fica
@@ -88,5 +109,5 @@ export function useCollaborators(sectorFilter = null) {
     catch (err) { return { success: false, error: err.message }; }
   };
 
-  return { collaborators, loading, addCollaborator, updateCollaborator, deleteCollaborator };
+  return { collaborators, loading, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator };
 }
