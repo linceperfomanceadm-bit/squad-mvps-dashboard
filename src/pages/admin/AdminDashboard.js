@@ -50,7 +50,7 @@ export default function AdminDashboard() {
     addBrandMaterial,
     removeBrandMaterial,
   } = useClients();
-  const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, deleteCollaborator } = useCollaborators();
+  const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
   const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
   const { deals, deleteManualCall } = useDeals();
   const { goals, saveGoals } = useCommercialGoals();
@@ -86,6 +86,12 @@ export default function AdminDashboard() {
   const handleDeleteCollab = async (id) => {
     const res = await deleteCollaborator(id);
     if (res.success) toast('Colaborador removido.', 'e');
+    else toast(res.error, 'e');
+    return res;
+  };
+  const handleResetCollabPassword = async (id, newPw) => {
+    const res = await resetPassword(id, newPw);
+    if (res.success) toast('Senha redefinida! O colaborador troca no próximo acesso.');
     else toast(res.error, 'e');
     return res;
   };
@@ -243,6 +249,7 @@ export default function AdminDashboard() {
             collaborators={collaborators}
             onAdd={handleAddCollab}
             onUpdate={handleUpdateCollab}
+            onResetPassword={handleResetCollabPassword}
             onDelete={handleDeleteCollab}
           />
         )}
