@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
 import { SECTORS } from '../../lib/firebase';
 
-export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onDelete }) {
+export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, commercialRole: '' });
   const [showPw, setShowPw] = useState(false);
@@ -35,8 +35,9 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onD
   };
 
   const handleResetPassword = async (id, newPw) => {
-    if (!newPw || newPw.length < 4) return;
-    await onUpdate(id, { password: newPw, firstAccess: true });
+    if (!newPw || newPw.length < 6) { setError('A senha provisória deve ter pelo menos 6 caracteres.'); return; }
+    const res = await onResetPassword(id, newPw);
+    if (!res?.success) { setError(res?.error || 'Falha ao redefinir a senha.'); }
   };
 
   return (
