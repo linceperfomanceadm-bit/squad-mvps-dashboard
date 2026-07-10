@@ -31,6 +31,7 @@ export default function TaskKanban({
       })
     : tasks.filter(t =>
         t.responsibleName === currentUser ||
+        (Array.isArray(t.responsibleNames) && t.responsibleNames.includes(currentUser)) ||
         t.requestedBy === currentUser ||
         t.deliveredBy === currentUser
       );
@@ -65,7 +66,8 @@ export default function TaskKanban({
 
     if (!task || task.status === targetColId) return;
 
-    const isResponsible = task.responsibleName === currentUser;
+    const isResponsible = task.responsibleName === currentUser ||
+      (Array.isArray(task.responsibleNames) && task.responsibleNames.includes(currentUser));
     const isRequester   = task.requestedBy === currentUser;
 
     if (!isAdmin && !isResponsible && !isRequester) return;
