@@ -4,7 +4,7 @@ import {
   deleteDoc, doc, serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
- 
+
 // ─── Auto-reparo de tasks presas em aprovação ──────────────────
 // Bug histórico: ao enviar para aprovação sem escolher aprovador, a
 // task gravava o próprio executor como aprovador (deliveredBy ===
@@ -20,24 +20,36 @@ function isStuckApproval(t) {
   const noApprover  = !t.responsibleName;
   return selfDeliver || selfHandoff || noApprover;
 }
- 
+
+// Detecta o desalinhamento singular/plural: responsibleName foi
+// atualizado (ex.: aprovador), mas responsibleNames ficou com o valor
+// antigo. Isso faz a task sumir do kanban de quem deveria vê-la.
+function hasNameMismatch(t) {
+  if (!t.responsibleName) return false;
+  const names = Array.isArray(t.responsibleNames) ? t.responsibleNames : [];
+  // Se o array não contém o responsável singular, está dessincronizado.
+  return !names.includes(t.responsibleName);
+}
+
 export function useTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   // Garante que o auto-reparo rode só uma vez por sessão do hook.
   const repairedRef = useRef(false);
- 
+
   useEffect(() => {
     const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, snap => {
       const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setTasks(list);
       setLoading(false);
- 
+
       // Auto-reparo (uma vez). Corrige no Firestore; o snapshot propaga
       // o resultado para todos os usuários automaticamente.
       if (!repairedRef.current) {
         repairedRef.current = true;
+
+        // (a) Tasks presas em aprovação com executor = aprovador.
         const stuck = list.filter(isStuckApproval);
         stuck.forEach(t => {
           const tl = Array.isArray(t.timeline) ? t.timeline : [];
@@ -48,15 +60,26 @@ export function useTasks() {
             status: 'doing',
             responsibleName: restoreName,
             responsibleSector: restoreSector,
+            responsibleNames: restoreName ? [restoreName] : [],
             deliveredBy: null,
             deliveredBySector: null,
             approvalAt: null,
-          }).catch(() => {}); // silencioso: se falhar, tenta na próxima carga
+          }).catch(() => {});
+        });
+
+        // (b) Tasks com responsibleNames dessincronizado do singular
+        //     (causa da task sumir do kanban do responsável correto).
+        //     Só corrige o que NÃO caiu no reparo (a) acima.
+        const stuckIds = new Set(stuck.map(t => t.id));
+        list.filter(t => !stuckIds.has(t.id) && hasNameMismatch(t)).forEach(t => {
+          updateDoc(doc(db, 'tasks', t.id), {
+            responsibleNames: [t.responsibleName],
+          }).catch(() => {});
         });
       }
     });
   }, []);
- 
+
   // ── Create task ──────────────────────────────────────────────
   const createTask = async ({ name, clientId, clientName, deadline, priority, responsibleSector, responsibleName, responsibleNames, requestedBy, requestedBySector, comment, links }) => {
     try {
@@ -103,7 +126,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Move to Em Produção ──────────────────────────────────────
   const moveToProduction = async (taskId, updatedLinks) => {
     try {
@@ -125,7 +148,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Move to Em Aprovação ─────────────────────────────────────
   // deliveredBy = who actually did the work (current responsible before handoff)
   const moveToApproval = async (taskId, approverName, approverSector, updatedLinks) => {
@@ -153,13 +176,17 @@ export function useTasks() {
         deliveredBySector: task.responsibleSector,
         responsibleName: approverName,
         responsibleSector: approverSector,
+        // Sincroniza o array plural — a UI (card, filtros do kanban,
+        // isResponsible) lê responsibleNames; sem isto a task some do
+        // kanban do aprovador e continua no de quem entregou.
+        responsibleNames: [approverName],
         links: updatedLinks || task.links,
         timeline,
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Approve (complete) task ──────────────────────────────────
   const approveTask = async (taskId) => {
     try {
@@ -181,7 +208,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Reject (send back for rework) ───────────────────────────
   const rejectTask = async (taskId, reworkNote, newResponsibleName, newResponsibleSector) => {
     try {
@@ -210,6 +237,8 @@ export function useTasks() {
         reworkCount,
         responsibleName: newResponsibleName,
         responsibleSector: newResponsibleSector,
+        // Mantém o array plural em sincronia com o singular.
+        responsibleNames: [newResponsibleName],
         // Reset deliveredBy so next approval cycle tracks correctly
         deliveredBy: null,
         deliveredBySector: null,
@@ -219,7 +248,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Add comment ──────────────────────────────────────────────
   const addComment = async (taskId, author, sector, text) => {
     try {
@@ -237,7 +266,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Update links ─────────────────────────────────────────────
   const updateLinks = async (taskId, links) => {
     try {
@@ -245,7 +274,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Alterar data de entrega (com justificativa) ─────────────
   // Registra na timeline E como comentário no chat da task.
   const changeDeadline = async (taskId, newDeadline, reason, byName, bySector) => {
@@ -276,7 +305,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Delete task ──────────────────────────────────────────────
   const deleteTask = async (taskId) => {
     try {
@@ -284,7 +313,7 @@ export function useTasks() {
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
- 
+
   // ── Helper: tasks visible to a user ─────────────────────────
   const getMyTasks = (userName) => {
     return tasks.filter(t =>
@@ -294,7 +323,7 @@ export function useTasks() {
       t.deliveredBy === userName
     );
   };
- 
+
   return {
     tasks, loading,
     createTask, moveToProduction, moveToApproval,
