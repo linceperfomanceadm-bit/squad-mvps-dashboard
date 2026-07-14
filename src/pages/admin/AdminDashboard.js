@@ -173,7 +173,8 @@ export default function AdminDashboard() {
             </div>
             <TaskKanban
               tasks={tasks}
-              clients={clients.filter(c => c.active)}
+              clients={clients.filter(c => c.active !== false)}
+              allClients={clients.filter(c => c.active !== false)}
               collaborators={collaborators}
               currentUser={user?.name}
               currentUserSector={user?.sector || 'webdesign'}
