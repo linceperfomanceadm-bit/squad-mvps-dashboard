@@ -7,6 +7,7 @@ import CreateTaskModal from './CreateTaskModal';
 
 export default function TaskKanban({
   tasks, clients, collaborators,
+  allClients,
   currentUser, currentUserSector,
   isAdmin = false,
   adminFilters = null,
@@ -205,7 +206,7 @@ export default function TaskKanban({
       {/* Create task modal */}
       {showCreate && (
         <CreateTaskModal
-          clients={clients}
+          clients={allClients || clients}
           collaborators={collaborators}
           currentUser={currentUser}
           currentUserSector={currentUserSector}

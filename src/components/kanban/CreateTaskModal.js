@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
- 
+
 export default function CreateTaskModal({ clients, collaborators, currentUser, currentUserSector, onClose, onSave }) {
   const [form, setForm] = useState({
     name: '',
@@ -16,24 +16,24 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
   const [links, setLinks] = useState([{ name: '', url: '' }]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
- 
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active);
- 
+
   const addLink = () => setLinks(l => [...l, { name: '', url: '' }]);
   const updateLink = (i, field, val) => setLinks(l => l.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
   const removeLink = (i) => setLinks(l => l.filter((_, idx) => idx !== i));
- 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name.trim())           { setError('Preencha o nome da task.'); return; }
     if (!form.clientId)              { setError('Selecione o cliente.'); return; }
     if (!form.responsibleSector)     { setError('Selecione o setor responsável.'); return; }
     if (!form.responsibleNames.length) { setError('Selecione ao menos um responsável.'); return; }
- 
+
     setLoading(true);
     const client = clients.find(c => c.id === form.clientId);
- 
+
     // Only include links that have both name and url filled
     const validLinks = links
       .filter(l => l.name.trim() && l.url.trim())
@@ -43,7 +43,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
         addedBy: currentUser,
         addedAt: new Date().toISOString(),
       }));
- 
+
     const res = await onSave({
       ...form,
       responsibleName:   form.responsibleNames[0] || '',
@@ -56,7 +56,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     if (res.success) onClose();
     else setError(res.error || 'Erro ao criar task.');
   };
- 
+
   const content = (
     <div
       style={{
@@ -90,16 +90,16 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             <X size={16} color="#aaa" />
           </button>
         </div>
- 
+
         {/* Body */}
         <form onSubmit={handleSubmit} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
- 
+
           {/* Name */}
           <div style={S.field}>
             <label style={S.label}>NOME DA TASK *</label>
             <input style={S.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Criar banner para campanha de Black Friday" autoFocus />
           </div>
- 
+
           {/* Client + Deadline */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div style={S.field}>
@@ -117,7 +117,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <input style={S.input} type="date" value={form.deadline} onChange={e => set('deadline', e.target.value)} />
             </div>
           </div>
- 
+
           {/* Priority */}
           <div style={S.field}>
             <label style={S.label}>PRIORIDADE *</label>
@@ -140,7 +140,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               ))}
             </div>
           </div>
- 
+
           {/* Sector + Responsible */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <div style={S.field}>
@@ -175,7 +175,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                 )}
             </div>
           </div>
- 
+
           {/* Links with name */}
           <div style={S.field}>
             <label style={S.label}>LINKS DO MATERIAL (OPCIONAL)</label>
@@ -213,7 +213,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <Plus size={13} /> Adicionar link
             </button>
           </div>
- 
+
           {/* Comment */}
           <div style={S.field}>
             <label style={S.label}>COMENTÁRIO INICIAL (OPCIONAL)</label>
@@ -224,9 +224,9 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               placeholder="Descreva detalhes, referências ou instruções para o responsável..."
             />
           </div>
- 
+
           {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
- 
+
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
             <button type="button"
               style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 18px', color: '#888', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
@@ -247,10 +247,10 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
       </div>
     </div>
   );
- 
+
   return ReactDOM.createPortal(content, document.body);
 }
- 
+
 const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { fontSize: 10, letterSpacing: '.14em', color: '#666', fontWeight: 600, fontFamily: 'var(--fm)' },
