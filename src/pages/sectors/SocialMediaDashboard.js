@@ -87,6 +87,7 @@ export default function SocialMediaDashboard() {
           <TaskKanban
             tasks={tasks}
             clients={myClients}
+            allClients={clients.filter(c => c.active !== false)}
             collaborators={collaborators}
             currentUser={user?.name}
             currentUserSector="socialmedia"
