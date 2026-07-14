@@ -106,7 +106,10 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <label style={S.label}>CLIENTE *</label>
               <select style={S.select} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
                 <option value="">Selecionar cliente</option>
-                {clients.filter(c => c.active).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {clients
+                  .filter(c => c.active !== false)
+                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                  .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div style={S.field}>
