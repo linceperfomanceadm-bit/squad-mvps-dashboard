@@ -31,6 +31,89 @@ function hasNameMismatch(t) {
   return !names.includes(t.responsibleName);
 }
 
+// ─── Responsáveis adicionais (depois da task já criada) ────────
+// Só o CRIADOR da task (requestedBy) e o admin chamam esta função —
+// a permissão é validada na UI (TaskModal).
+//
+// REGRA IMPORTANTE: o responsável PRINCIPAL (responsibleName) é sempre
+// preservado como primeiro item do array. Ele é quem entrega, quem vira
+// deliveredBy e quem conta nas métricas (Hall da Fama, Extrato,
+// Relatórios). Aqui só se somam/removem responsáveis EXTRAS. Isso
+// mantém intactos o fluxo de aprovação/refação e o auto-reparo de
+// dessincronização (hasNameMismatch) definido acima.
+//
+// É uma função solta (não faz parte do hook) para que o TaskModal possa
+// usá-la direto, sem precisar passar prop nova por TaskKanban, pelos 5
+// dashboards e pelo AdminFeed.
+export async function updateTaskResponsibles(task, extraPeople, byName, bySector) {
+  try {
+    if (!task || !task.id) return { success: false, error: 'Task não encontrada.' };
+
+    const principal = task.responsibleName
+      || (Array.isArray(task.responsibleNames) ? task.responsibleNames[0] : null);
+    if (!principal) return { success: false, error: 'Task sem responsável principal.' };
+
+    // Normaliza a lista de extras: sem vazios, sem duplicados e sem
+    // repetir o principal.
+    const seen = new Set([principal]);
+    const extras = [];
+    (extraPeople || []).forEach(p => {
+      const name = String(p?.name || '').trim();
+      if (!name || seen.has(name)) return;
+      seen.add(name);
+      extras.push({ name, sector: p?.sector || null });
+    });
+
+    const names = [principal, ...extras.map(p => p.name)];
+    const sectors = [task.responsibleSector, ...extras.map(p => p.sector)].filter(Boolean);
+    const uniqueSectors = Array.from(new Set(sectors));
+
+    const before = (Array.isArray(task.responsibleNames) && task.responsibleNames.length)
+      ? task.responsibleNames
+      : [principal];
+
+    // Nada mudou — não escreve nem polui o chat com comentário repetido.
+    const unchanged = before.length === names.length && before.every((n, i) => n === names[i]);
+    if (unchanged) return { success: true, unchanged: true };
+
+    const now = new Date().toISOString();
+    const added   = names.filter(n => !before.includes(n));
+    const removed = before.filter(n => !names.includes(n));
+
+    const parts = [];
+    if (added.length)   parts.push(`entrou: ${added.join(', ')}`);
+    if (removed.length) parts.push(`saiu: ${removed.join(', ')}`);
+
+    const timeline = [...(task.timeline || []), {
+      action: 'responsibles_changed',
+      by: byName,
+      sector: bySector,
+      at: now,
+      added,
+      removed,
+      to: names,
+    }];
+
+    const comments = [...(task.comments || []), {
+      id: `c_${Date.now()}`,
+      author: byName,
+      sector: bySector,
+      text: `👥 Responsáveis atualizados (${parts.join(' · ')}). Agora: ${names.join(', ')}.`,
+      createdAt: now,
+      isSystem: true,
+    }];
+
+    await updateDoc(doc(db, 'tasks', task.id), {
+      responsibleName: principal,        // principal nunca muda por aqui
+      responsibleNames: names,
+      responsibleSectors: uniqueSectors, // novo: todos os setores envolvidos
+      timeline,
+      comments,
+    });
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
+}
+
 export function useTasks() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -180,6 +263,7 @@ export function useTasks() {
         // isResponsible) lê responsibleNames; sem isto a task some do
         // kanban do aprovador e continua no de quem entregou.
         responsibleNames: [approverName],
+        responsibleSectors: [approverSector],
         links: updatedLinks || task.links,
         timeline,
       });
@@ -239,6 +323,7 @@ export function useTasks() {
         responsibleSector: newResponsibleSector,
         // Mantém o array plural em sincronia com o singular.
         responsibleNames: [newResponsibleName],
+        responsibleSectors: [newResponsibleSector],
         // Reset deliveredBy so next approval cycle tracks correctly
         deliveredBy: null,
         deliveredBySector: null,

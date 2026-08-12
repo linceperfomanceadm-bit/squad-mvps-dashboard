@@ -15,18 +15,23 @@ export function useClients() {
     });
   }, []);
 
-  // Add client — admin creates, goes to WD onboarding automatically
+  // Add client — admin cria, ou o CS Comercial cria ao fechar o
+  // onboarding. Campos extras (dados do contrato, kickoff, etc.) são
+  // preservados: só `name`, `responsibles` e os blocos de setor têm
+  // tratamento especial.
   const addClient = async (data) => {
     try {
+      const { name, responsibles, wdService, ...extra } = data || {};
       const newClient = {
-        name: data.name,
+        ...extra,
+        name,
         // Responsible per sector (optional)
-        responsibles: data.responsibles || {},
+        responsibles: responsibles || {},
         // WebDesign data
         wd: {
-          service: data.wdService || null,
-          status: data.wdService ? 'onboarding' : null,
-          onboardingStartedAt: data.wdService ? new Date().toISOString() : null,
+          service: wdService || null,
+          status: wdService ? 'onboarding' : null,
+          onboardingStartedAt: wdService ? new Date().toISOString() : null,
           productionStartedAt: null,
           checklist: [],
           notes: '',
@@ -43,8 +48,8 @@ export function useClients() {
         createdAt: serverTimestamp(),
         active: true,
       };
-      await addDoc(collection(db, 'clients'), newClient);
-      return { success: true };
+      const ref = await addDoc(collection(db, 'clients'), newClient);
+      return { success: true, id: ref.id };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
@@ -244,8 +249,36 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── CS Operacional: Kickoff ─────────────────────────────────
+  // O cliente entra em `kickoff.pending` quando o CS Comercial conclui
+  // o onboarding. Ao confirmar o kickoff, ele sai da aba de pendentes.
+  const confirmKickoff = async (clientId, byName) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'kickoff.pending': false,
+        'kickoff.confirmedAt': new Date().toISOString(),
+        'kickoff.confirmedBy': byName || null,
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── CS Operacional: Saúde do Cliente (farol manual) ─────────
+  // level: 'green' | 'yellow' | 'orange' | 'red' | null (limpar)
+  const setClientHealth = async (clientId, level, note, byName) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        clientHealth: level
+          ? { level, note: note || '', by: byName || null, at: new Date().toISOString() }
+          : null,
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   return {
     clients, loading, addClient, updateClient, deleteClient,
+    confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     smAddPost, smAddBulkPosts, smUpdatePostStatus,
     addDelivery, updateBrandbook,

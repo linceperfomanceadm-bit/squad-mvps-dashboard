@@ -5,21 +5,25 @@ import { db } from '../lib/firebase';
 /*
  * Metas comerciais (definidas pelo admin).
  * Documento: commercial_config/goals = {
- *   teamGoal: number,
- *   individual: { [closerName]: number }
+ *   teamGoal:   number,                  // meta de VALOR (R$) da equipe/mês
+ *   individual: { [closerName]: number },// meta de VALOR (R$) por closer
+ *   sdrTeamGoal: number,                 // meta de calls agendadas da equipe
+ *   sdrIndividual: { [sdrName]: number },// meta de calls agendadas por SDR
  * }
- * Mensais, sem valores em R$ — apenas contagem de vendas.
+ * Mensais — resetam naturalmente na virada do mês.
  */
+const EMPTY_GOALS = { teamGoal: 0, individual: {}, sdrTeamGoal: 0, sdrIndividual: {} };
+
 export function useCommercialGoals() {
-  const [goals, setGoals] = useState({ teamGoal: 0, individual: {} });
+  const [goals, setGoals] = useState(EMPTY_GOALS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const ref = doc(db, 'commercial_config', 'goals');
     return onSnapshot(ref, snap => {
-      if (snap.exists()) setGoals({ teamGoal: 0, individual: {}, ...snap.data() });
+      if (snap.exists()) setGoals({ ...EMPTY_GOALS, ...snap.data() });
       setLoading(false);
-    });
+    }, () => setLoading(false));
   }, []);
 
   const saveGoals = async (next) => {
@@ -46,7 +50,7 @@ export function useObjections(authUid) {
     return onSnapshot(ref, snap => {
       setItems(snap.exists() ? (snap.data().items || []) : []);
       setLoading(false);
-    });
+    }, () => setLoading(false));
   }, [authUid]);
 
   const save = async (next) => {
@@ -66,56 +70,100 @@ export function useObjections(authUid) {
   return { items, loading, addItem, updateItem, removeItem };
 }
 
-// Soma o VALOR das vendas fechadas no mês corrente.
-// Para um closer específico, considera o split: se ele foi 2º closer
-// ou dividiu com outro, conta apenas a parte dele (saleValuePerCloser).
-export function sumSalesThisMonth(deals, closerName = null) {
+// ─── Helpers de período ────────────────────────────────────────
+const isThisMonth = (iso) => {
+  if (!iso) return false;
+  const d = new Date(iso);
   const now = new Date();
-  const m = now.getMonth(), y = now.getFullYear();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+};
+
+// Aceita o formato novo ('venda_ganha') e o antigo ('venda_fechada').
+const won = (d) => d?.outcome === 'venda_ganha' || d?.outcome === 'venda_fechada';
+
+// ─── Métricas do Closer ────────────────────────────────────────
+
+// Soma o VALOR das vendas ganhas no mês corrente.
+// Na visão individual considera o split (saleValuePerCloser).
+export function sumSalesThisMonth(deals, closerName = null) {
   let total = 0;
   for (const d of deals) {
-    if (d.outcome !== 'venda_fechada') continue;
-    const ts = d.wonAt || d.closedAt;
-    if (!ts) continue;
-    const dt = new Date(ts);
-    if (dt.getMonth() !== m || dt.getFullYear() !== y) continue;
+    if (!won(d)) continue;
+    if (!isThisMonth(d.wonAt || d.closedAt)) continue;
 
     const full = d.saleTotal != null ? Number(d.saleTotal) : 0;
-    const per = d.saleValuePerCloser != null ? Number(d.saleValuePerCloser) : full;
+    const per  = d.saleValuePerCloser != null ? Number(d.saleValuePerCloser) : full;
 
-    if (!closerName) {
-      total += full; // visão de equipe: valor cheio da venda
-    } else if (d.closerName === closerName || d.secondCloser === closerName) {
-      total += per;  // visão individual: parte do closer (split se houver)
-    }
+    if (!closerName) total += full;
+    else if (d.closerName === closerName || d.secondCloser === closerName) total += per;
   }
   return total;
 }
 
-// Conta o NÚMERO de vendas fechadas no mês (para exibição auxiliar).
+// Nº de vendas ganhas no mês.
 export function countWonThisMonth(deals, closerName = null) {
-  const now = new Date();
-  const m = now.getMonth(), y = now.getFullYear();
   return deals.filter(d => {
-    if (d.outcome !== 'venda_fechada') return false;
+    if (!won(d)) return false;
     if (closerName && d.closerName !== closerName && d.secondCloser !== closerName) return false;
-    const ts = d.wonAt || d.closedAt;
-    if (!ts) return false;
-    const dt = new Date(ts);
-    return dt.getMonth() === m && dt.getFullYear() === y;
+    return isThisMonth(d.wonAt || d.closedAt);
   }).length;
 }
 
-// Conta MQ (mal qualificado) de um SDR no mês — métrica de KPI do SDR.
+// Calls REALIZADAS no mês (o closer confirmou que aconteceu).
+export function countCallsDoneThisMonth(deals, closerName = null) {
+  return deals.filter(d => {
+    if (!d.callDoneAt) return false;
+    if (closerName && d.closerName !== closerName && d.secondCloser !== closerName) return false;
+    return isThisMonth(d.callDoneAt);
+  }).length;
+}
+
+// Follow Ups em aberto (aguardando desfecho do closer).
+export function countOpenFollowups(deals, closerName = null) {
+  return deals.filter(d => {
+    if (d.status !== 'followup') return false;
+    if (closerName && d.closerName !== closerName && d.secondCloser !== closerName) return false;
+    return true;
+  }).length;
+}
+
+// ─── Métricas do SDR ───────────────────────────────────────────
+
+// Calls AGENDADAS no mês por um SDR (data da call dentro do mês).
+export function countScheduledThisMonth(deals, sdrName = null) {
+  return deals.filter(d => {
+    if (!d.sdrName) return false;
+    if (sdrName && d.sdrName !== sdrName) return false;
+    return isThisMonth(d.callAt);
+  }).length;
+}
+
+// Calls BEM QUALIFICADAS: agendadas no mês que aconteceram e NÃO
+// foram marcadas como MQ nem deram no-show.
+export function countQualifiedThisMonth(deals, sdrName = null) {
+  return deals.filter(d => {
+    if (!d.sdrName) return false;
+    if (sdrName && d.sdrName !== sdrName) return false;
+    if (!isThisMonth(d.callAt)) return false;
+    if (!d.callDoneAt) return false;
+    return d.outcome !== 'mq' && d.outcome !== 'noshow';
+  }).length;
+}
+
+// MQ no mês — KPI de qualidade do SDR que agendou.
 export function countMQThisMonth(deals, sdrName = null) {
-  const now = new Date();
-  const m = now.getMonth(), y = now.getFullYear();
   return deals.filter(d => {
     if (d.outcome !== 'mq') return false;
     if (sdrName && d.sdrName !== sdrName) return false;
-    const ts = d.closedAt;
-    if (!ts) return false;
-    const dt = new Date(ts);
-    return dt.getMonth() === m && dt.getFullYear() === y;
+    return isThisMonth(d.closedAt);
+  }).length;
+}
+
+// No-shows no mês — também é KPI do SDR.
+export function countNoShowThisMonth(deals, sdrName = null) {
+  return deals.filter(d => {
+    if (!d.noShowAt) return false;
+    if (sdrName && d.sdrName !== sdrName) return false;
+    return isThisMonth(d.noShowAt);
   }).length;
 }
