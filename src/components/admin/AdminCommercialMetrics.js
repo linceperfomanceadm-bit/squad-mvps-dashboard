@@ -1,18 +1,25 @@
 import React, { useState, useMemo } from 'react';
 import { startOfDay, startOfWeek, startOfMonth } from 'date-fns';
-import { Phone, CalendarCheck, Trophy, TrendingUp, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
+import { CARD, LBL, Tag, Empty, money, fmtDateTime } from '../commercial/ui';
 
 /*
- * Métricas comerciais (admin): produtividade de SDR e Closer.
- * Período: dia / semana / mês (igual ao espírito das métricas do Kanban).
- * Mostra ranking individual + total do time.
+ * Métricas comerciais (admin) — reconstruídas sobre o funil novo.
  *
- * Fontes:
- *   - leads[].logs: { type: 'message_sent' | 'call_scheduled', by, at }
- *   - deals: { closerName, outcome, wonAt, closedAt, saleTotal, callAt }
+ * SDR:    calls agendadas · bem qualificadas · MQ · no-show
+ * Closer: calls realizadas · vendas ganhas · valor · MQ · follow ups
+ *
+ * Fonte única: coleção `deals`.
+ *   callAt      → quando a call foi agendada para acontecer
+ *   callDoneAt  → o closer confirmou que a call aconteceu
+ *   wonAt       → venda ganha
+ *   closedAt    → desfecho (MQ)
+ *   noShowAt    → cliente não compareceu
  */
-export default function AdminCommercialMetrics({ leads = [], deals = [], onDeleteCall, user }) {
-  const [period, setPeriod] = useState('day');
+const isWon = (d) => d?.outcome === 'venda_ganha' || d?.outcome === 'venda_fechada';
+
+export default function AdminCommercialMetrics({ deals = [], onDeleteCall, user }) {
+  const [period, setPeriod] = useState('month');
 
   const since = useMemo(() => {
     const now = new Date();
@@ -21,209 +28,207 @@ export default function AdminCommercialMetrics({ leads = [], deals = [], onDelet
     return startOfMonth(now).getTime();
   }, [period]);
 
-  // ── SDR: contatos, calls agendadas e MQ (mal qualificados) ───
+  const inPeriod = (iso) => iso && new Date(iso).getTime() >= since;
+
+  // ── SDR ──────────────────────────────────────────────────────
   const sdrStats = useMemo(() => {
     const map = {};
     const ensure = (name) => {
       if (!name) return null;
-      map[name] = map[name] || { name, contacts: 0, scheduled: 0, mq: 0 };
+      map[name] = map[name] || { name, scheduled: 0, qualified: 0, mq: 0, noshow: 0, won: 0 };
       return map[name];
     };
-    leads.forEach(l => {
-      // Contatos: histórico novo (contactHistory) com fallback para logs antigos.
-      const history = l.contactHistory || [];
-      history.forEach(h => {
-        const t = h.at ? new Date(h.at).getTime() : 0;
-        if (t < since) return;
-        const s = ensure(h.by); if (s) s.contacts++;
-      });
-      (l.logs || []).forEach(log => {
-        const t = log.at ? new Date(log.at).getTime() : 0;
-        if (t < since) return;
-        if (log.type === 'message_sent') { const s = ensure(log.by); if (s) s.contacts++; }
-        if (log.type === 'call_scheduled') { const s = ensure(log.by); if (s) s.scheduled++; }
-      });
-      // Call agendada: lead que virou deal (tem sdrName + callAt).
-      if (l.status === 'scheduled' && l.claimedBy) {
-        // contabilizado abaixo pelos deals para evitar duplicidade quando houver log
-      }
-    });
-    // Calls agendadas e MQ vêm dos deals (fonte da verdade do fechamento).
     deals.forEach(d => {
       if (!d.sdrName) return;
-      const t = d.callAt ? new Date(d.callAt).getTime() : (d.createdAt ? new Date(d.createdAt).getTime() : 0);
-      const s = ensure(d.sdrName); if (!s) return;
-      if (t >= since) s.scheduled++;
-      // MQ é KPI do SDR que agendou a call.
-      const ct = d.closedAt ? new Date(d.closedAt).getTime() : 0;
-      if (d.outcome === 'mq' && ct >= since) s.mq++;
+      const s = ensure(d.sdrName);
+      if (!s) return;
+      if (inPeriod(d.callAt)) {
+        s.scheduled++;
+        if (d.callDoneAt && d.outcome !== 'mq' && d.outcome !== 'noshow') s.qualified++;
+      }
+      if (d.outcome === 'mq' && inPeriod(d.closedAt)) s.mq++;
+      if (inPeriod(d.noShowAt)) s.noshow++;
+      if (isWon(d) && inPeriod(d.wonAt)) s.won++;
     });
-    return Object.values(map).sort((a, b) => (b.contacts + b.scheduled) - (a.contacts + a.scheduled));
-  }, [leads, deals, since]);
+    return Object.values(map).sort((a, b) => b.scheduled - a.scheduled);
+  }, [deals, since]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Closer: calls realizadas e vendas por pessoa ─────────────
+  // ── Closer ───────────────────────────────────────────────────
   const closerStats = useMemo(() => {
     const map = {};
     const ensure = (name) => {
-      map[name] = map[name] || { name, calls: 0, won: 0, mq: 0, noshow: 0, revenue: 0 };
+      if (!name) return null;
+      map[name] = map[name] || { name, calls: 0, won: 0, mq: 0, revenue: 0, followups: 0 };
       return map[name];
     };
     deals.forEach(d => {
-      const t = d.closedAt ? new Date(d.closedAt).getTime() : (d.wonAt ? new Date(d.wonAt).getTime() : 0);
-      if (!t || t < since) return;
-      const isCounted = ['venda_fechada', 'mq', 'noshow'].includes(d.outcome);
-      // Considera closer principal e segundo closer (venda dividida).
-      const closers = [d.closerName, d.secondCloser].filter(Boolean);
-      closers.forEach(name => {
-        const s = ensure(name);
-        if (isCounted) s.calls++;
-        if (d.outcome === 'venda_fechada') {
-          s.won++;
-          // valor por closer respeita o split (saleValuePerCloser) quando houver.
-          s.revenue += Number(d.saleValuePerCloser != null ? d.saleValuePerCloser : (d.saleTotal || 0));
+      const names = [d.closerName, d.secondCloser].filter(Boolean);
+      names.forEach(n => {
+        const c = ensure(n);
+        if (!c) return;
+        if (inPeriod(d.callDoneAt)) c.calls++;
+        if (d.status === 'followup') c.followups++;
+        if (d.outcome === 'mq' && inPeriod(d.closedAt)) c.mq++;
+        if (isWon(d) && inPeriod(d.wonAt)) {
+          c.won++;
+          const full = Number(d.saleTotal) || 0;
+          c.revenue += d.saleValuePerCloser != null ? Number(d.saleValuePerCloser) : full;
         }
-        if (d.outcome === 'mq') s.mq++;
-        if (d.outcome === 'noshow') s.noshow++;
       });
     });
-    return Object.values(map).sort((a, b) => b.won - a.won || b.calls - a.calls);
-  }, [deals, since]);
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  }, [deals, since]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sdrTotals = useMemo(() => sdrStats.reduce((a, s) => ({ contacts: a.contacts + s.contacts, scheduled: a.scheduled + s.scheduled }), { contacts: 0, scheduled: 0 }), [sdrStats]);
-  const closerTotals = useMemo(() => closerStats.reduce((a, s) => ({ calls: a.calls + s.calls, won: a.won + s.won, revenue: a.revenue + s.revenue }), { calls: 0, won: 0, revenue: 0 }), [closerStats]);
+  const totals = useMemo(() => {
+    const wonDeals = deals.filter(d => isWon(d) && inPeriod(d.wonAt));
+    return {
+      scheduled: deals.filter(d => inPeriod(d.callAt)).length,
+      calls: deals.filter(d => inPeriod(d.callDoneAt)).length,
+      won: wonDeals.length,
+      revenue: wonDeals.reduce((s, d) => s + (Number(d.saleTotal) || 0), 0),
+      mq: deals.filter(d => d.outcome === 'mq' && inPeriod(d.closedAt)).length,
+      noshow: deals.filter(d => inPeriod(d.noShowAt)).length,
+    };
+  }, [deals, since]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const convRate = totals.calls > 0 ? Math.round((totals.won / totals.calls) * 100) : 0;
+  const showRate = totals.scheduled > 0 ? Math.round((totals.calls / totals.scheduled) * 100) : 0;
+
+  // Calls agendadas do período (para o admin conferir/excluir)
+  const upcoming = useMemo(() => deals
+    .filter(d => d.status === 'scheduled')
+    .sort((a, b) => new Date(a.callAt) - new Date(b.callAt)),
+    [deals]);
 
   return (
     <div className="fade-up">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Métricas Comerciais</h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Produtividade de SDRs e Closers · ranking individual e total do time.</p>
+          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Métricas Comercial</h1>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Produtividade de SDRs e Closers no período</p>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {[['day', 'Dia'], ['week', 'Semana'], ['month', 'Mês']].map(([k, label]) => (
-            <button key={k} onClick={() => setPeriod(k)} style={{
-              fontSize: 12, fontWeight: 700, padding: '7px 14px', borderRadius: 9, cursor: 'pointer', fontFamily: 'var(--fm)',
-              background: period === k ? 'var(--neon-dim)' : 'var(--surface)',
-              color: period === k ? 'var(--neon)' : 'var(--muted)',
-              border: `1px solid ${period === k ? 'var(--neon-border)' : 'var(--border)'}`,
-            }}>{label}</button>
+          {[{ id: 'day', label: 'Hoje' }, { id: 'week', label: 'Semana' }, { id: 'month', label: 'Mês' }].map(p => (
+            <button
+              key={p.id}
+              onClick={() => setPeriod(p.id)}
+              style={{ padding: '8px 16px', borderRadius: 9, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: period === p.id ? 'var(--neon-dim)' : 'var(--surface)', color: period === p.id ? 'var(--neon)' : 'var(--muted)', border: `1px solid ${period === p.id ? 'var(--neon-border)' : 'var(--border)'}` }}
+            >
+              {p.label}
+            </button>
           ))}
         </div>
       </div>
 
-      {/* Totais do time */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12, marginBottom: 26 }}>
-        <TotalCard icon={<Phone size={16} />} label="Contatos (SDR)" value={sdrTotals.contacts} color="#38bdf8" />
-        <TotalCard icon={<CalendarCheck size={16} />} label="Calls agendadas" value={sdrTotals.scheduled} color="#a78bfa" />
-        <TotalCard icon={<TrendingUp size={16} />} label="Calls realizadas" value={closerTotals.calls} color="#f59e0b" />
-        <TotalCard icon={<Trophy size={16} />} label="Vendas ganhas" value={closerTotals.won} color="#22c55e" />
-        <TotalCard label="Receita fechada" value={`R$ ${closerTotals.revenue.toLocaleString('pt-BR')}`} color="#22c55e" small />
+      {/* Totais */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 12, marginBottom: 22 }}>
+        <Box label="Calls agendadas" value={totals.scheduled} color="var(--blue)" />
+        <Box label="Calls realizadas" value={totals.calls} color="var(--blue)" sub={`${showRate}% de comparecimento`} />
+        <Box label="Vendas ganhas" value={totals.won} color="var(--green)" sub={`${convRate}% de conversão`} />
+        <Box label="Faturamento" value={money(totals.revenue)} color="var(--green)" small />
+        <Box label="MQ" value={totals.mq} color="var(--neon)" />
+        <Box label="No-shows" value={totals.noshow} color="var(--amber)" />
       </div>
 
-      {/* Ranking SDR */}
-      <Block title="Ranking SDR" subtitle="Contatos e calls agendadas no período">
-        {sdrStats.length === 0 ? <Empty /> : (
-          <Table head={['SDR', 'Contatos', 'Calls agendadas', 'MQ', 'Conversão']}>
-            {sdrStats.map((s, i) => (
-              <Row key={s.name} rank={i + 1} name={s.name} cells={[
-                s.contacts, s.scheduled, s.mq,
-                s.contacts > 0 ? `${Math.round((s.scheduled / s.contacts) * 100)}%` : '—',
-              ]} />
-            ))}
-          </Table>
-        )}
-      </Block>
+      {/* SDRs */}
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>🎯 SDRs</h2>
+      {sdrStats.length === 0 ? <Empty msg="Nenhuma atividade de SDR no período." /> : (
+        <Table
+          head={['SDR', 'Agendadas', 'Bem qualif.', 'MQ', 'No-show', 'Viraram venda']}
+          rows={sdrStats.map(s => [
+            s.name,
+            s.scheduled,
+            <span style={{ color: 'var(--green)' }}>{s.qualified}</span>,
+            <span style={{ color: s.mq > 0 ? 'var(--neon)' : 'var(--muted)' }}>{s.mq}</span>,
+            <span style={{ color: s.noshow > 0 ? 'var(--amber)' : 'var(--muted)' }}>{s.noshow}</span>,
+            <span style={{ color: 'var(--green)', fontWeight: 700 }}>{s.won}</span>,
+          ])}
+        />
+      )}
 
-      {/* Ranking Closer */}
-      <Block title="Ranking Closer" subtitle="Calls realizadas, vendas e receita no período">
-        {closerStats.length === 0 ? <Empty /> : (
-          <Table head={['Closer', 'Calls', 'Vendas', 'MQ', 'No-show', 'Receita']}>
-            {closerStats.map((s, i) => (
-              <Row key={s.name} rank={i + 1} name={s.name} cells={[
-                s.calls, s.won, s.mq, s.noshow,
-                `R$ ${s.revenue.toLocaleString('pt-BR')}`,
-              ]} highlight={2} />
-            ))}
-          </Table>
-        )}
-      </Block>
+      {/* Closers */}
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: '26px 0 10px' }}>💼 Closers</h2>
+      {closerStats.length === 0 ? <Empty msg="Nenhuma atividade de closer no período." /> : (
+        <Table
+          head={['Closer', 'Calls', 'Vendas', 'Valor', 'MQ', 'Follow ups']}
+          rows={closerStats.map(c => [
+            c.name,
+            c.calls,
+            <span style={{ color: 'var(--green)', fontWeight: 700 }}>{c.won}</span>,
+            <span style={{ color: 'var(--green)', fontFamily: 'var(--fm)' }}>{money(c.revenue)}</span>,
+            <span style={{ color: c.mq > 0 ? 'var(--neon)' : 'var(--muted)' }}>{c.mq}</span>,
+            <span style={{ color: c.followups > 0 ? 'var(--amber)' : 'var(--muted)' }}>{c.followups}</span>,
+          ])}
+        />
+      )}
 
-      {/* Calls manuais — exclusão (admin) */}
-      <ManualCallsBlock deals={deals} onDeleteCall={onDeleteCall} user={user} />
-    </div>
-  );
-}
-
-function ManualCallsBlock({ deals, onDeleteCall, user }) {
-  const manuals = useMemo(() => deals.filter(d => d.manual), [deals]);
-  if (!onDeleteCall) return null;
-  return (
-    <div style={{ marginBottom: 26 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>Calls Manuais</h2>
-      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Calls cadastradas manualmente pelos closers. Exclua para limpar métricas de teste.</p>
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
-        {manuals.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma call manual cadastrada.</p>
-        ) : manuals.map(d => (
-          <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.leadName} {d.company && <span style={{ color: 'var(--muted)', fontWeight: 400 }}>· {d.company}</span>}</p>
-              <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
-                {d.closerName || '—'} · {d.callAt ? new Date(d.callAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'sem data'}
-                {d.outcome && ` · ${({ venda_fechada: 'Venda fechada', mq: 'MQ', noshow: 'No-show' })[d.outcome] || d.outcome}`}
-              </p>
+      {/* Agenda geral */}
+      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', margin: '26px 0 10px' }}>
+        📅 Calls agendadas ({upcoming.length})
+      </h2>
+      {upcoming.length === 0 ? <Empty msg="Nenhuma call agendada no momento." /> : (
+        <div style={{ ...CARD, padding: 0, overflow: 'hidden' }}>
+          {upcoming.map(d => (
+            <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{d.leadName}</p>
+                <p style={{ fontSize: 11, color: 'var(--muted)' }}>{d.company || '—'}</p>
+              </div>
+              {d.sdrName && <Tag text={d.sdrName} color="var(--blue)" />}
+              <span style={{ fontSize: 12, color: 'var(--neon)', fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{fmtDateTime(d.callAt)}</span>
+              {onDeleteCall && (
+                <button
+                  onClick={() => onDeleteCall(d.id)}
+                  style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 7px', display: 'flex', cursor: 'pointer' }}
+                  title="Excluir call"
+                >
+                  <Trash2 size={13} color="rgba(238,51,99,.7)" />
+                </button>
+              )}
             </div>
-            <button onClick={() => onDeleteCall(d.id)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: '#ef4444', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              <Trash2 size={13} /> Excluir
-            </button>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function TotalCard({ icon, label, value, color, small }) {
+function Box({ label, value, color, sub, small }) {
   return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '16px 18px', position: 'relative', overflow: 'hidden' }}>
+    <div style={{ ...CARD, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color},transparent)` }} />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, color, marginBottom: 8 }}>{icon}<span style={{ fontSize: 11, color: 'var(--muted)' }}>{label}</span></div>
+      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
       <p style={{ fontSize: small ? 20 : 30, fontWeight: 800, color }}>{value}</p>
+      {sub && <p style={{ fontSize: 10, color: '#666', marginTop: 6, fontFamily: 'var(--fm)' }}>{sub}</p>}
     </div>
   );
 }
-function Block({ title, subtitle, children }) {
+
+function Table({ head, rows }) {
   return (
-    <div style={{ marginBottom: 26 }}>
-      <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 2 }}>{title}</h2>
-      <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>{subtitle}</p>
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>{children}</div>
+    <div style={{ ...CARD, padding: 0, overflowX: 'auto' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            {head.map(h => (
+              <th key={h} style={{ ...LBL, textAlign: 'left', padding: '12px 16px', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                {h.toUpperCase()}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i}>
+              {r.map((cell, j) => (
+                <td key={j} style={{ padding: '11px 16px', fontSize: 13, color: j === 0 ? '#fff' : '#ddd', fontWeight: j === 0 ? 600 : 500, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
-function Table({ head, children }) {
-  return (
-    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-      <thead>
-        <tr>{head.map((h, i) => <th key={i} style={{ textAlign: i === 0 ? 'left' : 'center', fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em', padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>{h.toUpperCase()}</th>)}</tr>
-      </thead>
-      <tbody>{children}</tbody>
-    </table>
-  );
-}
-function Row({ rank, name, cells, highlight }) {
-  return (
-    <tr>
-      <td style={{ padding: '11px 14px', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, fontFamily: 'var(--fm)', color: rank === 1 ? '#fbbf24' : 'var(--muted)', width: 18 }}>{rank}º</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{name}</span>
-        </span>
-      </td>
-      {cells.map((c, i) => (
-        <td key={i} style={{ textAlign: 'center', padding: '11px 14px', borderBottom: '1px solid var(--border)', fontSize: 13, fontWeight: highlight === i + 1 ? 800 : 500, color: highlight === i + 1 ? '#22c55e' : 'var(--text)', fontFamily: 'var(--fm)' }}>{c}</td>
-      ))}
-    </tr>
-  );
-}
-function Empty() { return <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '28px 0' }}>Sem dados no período.</p>; }
