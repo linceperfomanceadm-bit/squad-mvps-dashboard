@@ -1,98 +1,94 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { ClipboardList } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
-import { useAuth } from '../../contexts/AuthContext';
-import { useToast } from '../../components/shared/Toast';
 import { SECTORS } from '../../lib/firebase';
-import { Check, ClipboardList } from 'lucide-react';
+import { CARD, GRID, Tag, fmtDate } from './ui';
 
 /*
- * Board de Onboarding por setor.
- * Mostra os clientes cujo onboarding está em andamento e que incluem o
- * setor atual. Cada colaborador só marca/desmarca o "ok" do SEU setor.
- * Quando todos os setores dão ok, o cliente sai daqui (status 'ready')
- * e aparece na aba Onboarding do CS.
+ * "Novos Clientes" do setor — apenas informativo.
+ *
+ * No fluxo novo o setor NÃO marca mais "setup pronto": quando o CS
+ * Comercial conclui a call de onboarding, o cliente já nasce ativo e
+ * segue para o Kickoff do CS Operacional. Este painel existe só para
+ * o setor ver quem entrou na carteira dele recentemente, com o
+ * briefing e os serviços vendidos como contexto.
  */
-export default function OnboardingBoard({ sectorId }) {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const { clients, markOnboardingSector } = useClients();
-  const [busy, setBusy] = useState(null);
+const RECENT_DAYS = 30;
 
+export default function OnboardingBoard({ sectorId }) {
+  const { clients } = useClients();
   const color = SECTORS[sectorId]?.color || 'var(--neon)';
 
-  // Clientes em onboarding que envolvem este setor e ainda não concluíram.
-  const mine = useMemo(() => clients.filter(c =>
-    c.onboarding && c.onboarding.status === 'running' && (c.onboarding.sectors || []).includes(sectorId)
-  ), [clients, sectorId]);
-
-  const toggle = async (client) => {
-    const current = client.onboarding?.checklist?.[sectorId]?.ok;
-    setBusy(client.id);
-    const r = await markOnboardingSector(client.id, sectorId, user?.name, !current);
-    setBusy(null);
-    if (!r.success) { toast(r.error, 'e'); return; }
-    if (r.allOk) toast('Todos os setores concluíram! Cliente pronto para o CS. 🎉');
-    else toast(current ? 'Marcação removida.' : 'Setor marcado como pronto.');
-  };
+  const mine = useMemo(() => {
+    const cutoff = Date.now() - RECENT_DAYS * 86400000;
+    return clients
+      .filter(c => {
+        if (c.active === false) return false;
+        const r = c.responsibles?.[sectorId];
+        const hasMe = Array.isArray(r) ? r.length > 0 : !!r;
+        if (!hasMe) return false;
+        // Pendente de kickoff OU ativado nos últimos 30 dias.
+        if (c.kickoff?.pending) return true;
+        const at = c.kickoff?.confirmedAt || c.onboardingCallAt;
+        return at ? new Date(at).getTime() >= cutoff : false;
+      })
+      .sort((a, b) => (a.kickoff?.pending === b.kickoff?.pending ? 0 : a.kickoff?.pending ? -1 : 1));
+  }, [clients, sectorId]);
 
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Onboarding</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Novos clientes que precisam do seu setor. Marque quando o seu setup estiver pronto.</p>
+        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Novos Clientes</h1>
+        <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          Clientes que entraram na carteira do seu setor nos últimos {RECENT_DAYS} dias. Leia o briefing antes de começar.
+        </p>
       </div>
 
       {mine.length === 0 ? (
         <div style={{ background: 'rgba(12,12,24,.6)', border: '1px dashed var(--border)', borderRadius: 14, padding: '48px 24px', textAlign: 'center' }}>
           <ClipboardList size={26} color="var(--muted)" style={{ marginBottom: 10 }} />
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum cliente em onboarding para o seu setor agora.</p>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum cliente novo para o seu setor agora.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 14 }}>
+        <div style={GRID}>
           {mine.map(c => {
-            const cl = c.onboarding?.checklist || {};
-            const sectors = c.onboarding?.sectors || [];
-            const myOk = cl[sectorId]?.ok;
-            const services = (c.services || c.onboarding?.services || []);
+            const people = c.responsibles?.[sectorId];
+            const names = Array.isArray(people) ? people.join(', ') : people;
+            const services = c.services || [];
             return (
-              <div key={c.id} style={{ background: 'rgba(12,12,24,.9)', border: `1px solid ${myOk ? 'var(--green-b)' : 'var(--border)'}`, borderRadius: 14, padding: 18 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{c.name}</span>
-                  {myOk && <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--fm)', background: 'var(--green-dim)', padding: '2px 8px', borderRadius: 8 }}>SEU OK ✓</span>}
+              <div key={c.id} style={{ ...CARD, border: `1px solid ${c.kickoff?.pending ? 'var(--amber-b)' : `${color}30`}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                  <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{c.name}</p>
+                  {c.kickoff?.pending
+                    ? <Tag text="AGUARDA KICKOFF" color="var(--amber)" />
+                    : <Tag text="ATIVO" color="var(--green)" />}
                 </div>
 
-                {/* Serviços vendidos (contexto) */}
+                {names && <p style={{ fontSize: 12, color, marginTop: 6 }}>👤 {names}</p>}
+                {c.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Contato: {c.contactName}</p>}
+
                 {services.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
                     {services.map((s, i) => (
-                      <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{s.label || s}</span>
+                      <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 8, background: 'var(--surface)', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
+                        {s.label || s}
+                      </span>
                     ))}
                   </div>
                 )}
 
-                {/* Progresso dos setores */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                  {sectors.map(s => {
-                    const ok = cl[s]?.ok;
-                    const isMine = s === sectorId;
-                    return (
-                      <div key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                        <span style={{ fontSize: 12, color: isMine ? (SECTORS[s]?.color || 'var(--text)') : 'var(--muted)', fontWeight: isMine ? 700 : 500 }}>
-                          {SECTORS[s]?.emoji} {SECTORS[s]?.label || s}{isMine ? ' (você)' : ''}
-                        </span>
-                        <span style={{ fontSize: 10, fontWeight: 700, fontFamily: 'var(--fm)', color: ok ? 'var(--green)' : 'var(--muted)' }}>{ok ? `✓ ${cl[s]?.by || ''}` : 'pendente'}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                {c.briefing && (
+                  <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                    <p style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', marginBottom: 5 }}>BRIEFING</p>
+                    <p style={{ fontSize: 12, color: '#ccc', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{c.briefing}</p>
+                  </div>
+                )}
 
-                <button
-                  disabled={busy === c.id}
-                  onClick={() => toggle(c)}
-                  style={{ width: '100%', marginTop: 14, padding: '11px', borderRadius: 10, border: myOk ? '1px solid var(--border)' : 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: myOk ? 'var(--surface)' : `linear-gradient(135deg,${color},${color}cc)`, color: myOk ? 'var(--muted)' : '#fff' }}
-                >
-                  <Check size={15} /> {myOk ? 'Desmarcar meu setor' : 'Marcar meu setor como pronto'}
-                </button>
+                {(c.kickoff?.confirmedAt || c.onboardingCallAt) && (
+                  <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 10 }}>
+                    {c.kickoff?.confirmedAt ? `Kickoff em ${fmtDate(c.kickoff.confirmedAt)}` : `Onboarding em ${fmtDate(c.onboardingCallAt)}`}
+                  </p>
+                )}
               </div>
             );
           })}
