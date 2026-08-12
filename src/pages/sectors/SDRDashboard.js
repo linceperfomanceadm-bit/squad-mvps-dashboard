@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  LayoutDashboard, CalendarCheck, AlertTriangle, Plus, X, Check, Video,
+  LayoutDashboard, CalendarCheck, AlertTriangle, Plus, Video,
   CheckSquare, Calendar, Trash2, Edit2, MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
