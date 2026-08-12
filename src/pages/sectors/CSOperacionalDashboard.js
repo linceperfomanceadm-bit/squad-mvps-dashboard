@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  LayoutDashboard, Rocket, Activity, HeartPulse, CheckSquare, Calendar, Check, X,
+  LayoutDashboard, Rocket, Activity, HeartPulse, CheckSquare, Calendar, X,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
