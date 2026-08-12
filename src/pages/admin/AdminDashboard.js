@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Target, TrendingUp, CheckSquare, Calendar, Package } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, XCircle, TrendingUp, CheckSquare, Calendar, Package } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
-import { useLeads } from '../../hooks/useLeads';
 import { useDeals } from '../../hooks/useDeals';
 import { useCommercialGoals } from '../../hooks/useCloserData';
 import { useToast } from '../../components/shared/Toast';
@@ -13,7 +12,7 @@ import AdminFeed from '../../components/admin/AdminFeed';
 import AdminCharts from '../../components/admin/AdminCharts';
 import AdminClients from '../../components/admin/AdminClients';
 import AdminCollaborators from '../../components/admin/AdminCollaborators';
-import AdminLeads from '../../components/admin/AdminLeads';
+import AdminMQBase from '../../components/admin/AdminMQBase';
 import AdminGoals from '../../components/admin/AdminGoals';
 import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminCommercialMetrics from '../../components/admin/AdminCommercialMetrics';
@@ -27,7 +26,7 @@ const NAV = [
   { key: 'overview',      label: 'Visão Geral',    icon: LayoutDashboard },
   { key: 'kanban',        label: 'Tasks',           icon: Kanban },
   { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
-  { key: 'leads',         label: 'Leads',           icon: Target },
+  { key: 'mq',            label: 'Base MQ',         icon: XCircle },
   { key: 'goals',         label: 'Metas',           icon: TrendingUp },
   { key: 'commercial',    label: 'Métricas Comercial', icon: BarChart2 },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
@@ -51,8 +50,7 @@ export default function AdminDashboard() {
     removeBrandMaterial,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
-  const { leads, loading: loadingLeads, addLead, addLeadsBulk, deleteLead } = useLeads();
-  const { deals, deleteManualCall } = useDeals();
+  const { deals, loading: loadingDeals, deleteCall } = useDeals();
   const { goals, saveGoals } = useCommercialGoals();
   const {
     tasks, loading: loadingTasks,
@@ -64,7 +62,7 @@ export default function AdminDashboard() {
   const [taskSectorFilter, setTaskSectorFilter] = useState('');
   const [taskCollabFilter, setTaskCollabFilter] = useState('');
 
-  const loading = loadingClients || loadingCollabs || loadingTasks || loadingLeads;
+  const loading = loadingClients || loadingCollabs || loadingTasks || loadingDeals;
 
   const handleAddClient = async (data) => {
     const res = await addClient(data);
@@ -207,18 +205,12 @@ export default function AdminDashboard() {
           />
         ) : page === 'charts' ? (
           <AdminCharts clients={clients} tasks={tasks} />
-        ) : page === 'leads' ? (
-          <AdminLeads
-            leads={leads}
-            onAdd={addLead}
-            onAddBulk={addLeadsBulk}
-            onDelete={deleteLead}
-            toast={toast}
-          />
+        ) : page === 'mq' ? (
+          <AdminMQBase deals={deals} collaborators={collaborators} />
         ) : page === 'goals' ? (
           <AdminGoals goals={goals} collaborators={collaborators} onSave={saveGoals} toast={toast} />
         ) : page === 'commercial' ? (
-          <AdminCommercialMetrics leads={leads} deals={deals} user={user} onDeleteCall={async (id) => { const r = await deleteManualCall(id, { ...user, isAdmin: true }); if (r.success) toast('Call excluída.'); else toast(r.error, 'e'); }} />
+          <AdminCommercialMetrics deals={deals} user={user} onDeleteCall={async (id) => { const r = await deleteCall(id, { ...user, isAdmin: true }); if (r.success) toast('Call excluída.'); else toast(r.error, 'e'); }} />
         ) : page === 'portal' ? (
           <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
         ) : page === 'vault' ? (
