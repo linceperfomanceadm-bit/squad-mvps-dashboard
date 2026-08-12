@@ -4,6 +4,7 @@ import { X, Send, Plus, Trash2, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
+import { updateTaskResponsibles } from '../../hooks/useTasks';
 
 // Interpreta "YYYY-MM-DD" no fuso local (corrige o bug de 1 dia antes).
 function parseLocalDate(str) {
@@ -113,6 +114,10 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const [showDeadlineForm, setShowDeadlineForm] = useState(false);
   const [newDeadline, setNewDeadline] = useState(task.deadline || '');
   const [deadlineReason, setDeadlineReason] = useState('');
+  const [showRespForm, setShowRespForm] = useState(false);
+  const [respPick, setRespPick] = useState({ sector: '', name: '' });
+  const [respBusy, setRespBusy] = useState(false);
+  const [respError, setRespError] = useState('');
   const chatEndRef = useRef(null);
 
   const respNames = (Array.isArray(task.responsibleNames) && task.responsibleNames.length) ? task.responsibleNames : (task.responsibleName ? [task.responsibleName] : []);
@@ -120,6 +125,13 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const isRequester   = task.requestedBy === currentUser;
   const priority      = TASK_PRIORITIES.find(p => p.id === task.priority);
   const responsibleSector = SECTORS[task.responsibleSector];
+
+  // ── Responsáveis: principal + extras ─────────────────────────
+  // Só o criador da task e o admin podem mexer. O principal (quem
+  // entrega e conta nas métricas) não sai por aqui — só os extras.
+  const principalName = task.responsibleName || respNames[0] || '';
+  const extraNames    = respNames.filter(n => n !== principalName);
+  const canEditResponsibles = (isAdmin || isRequester) && task.status !== 'done';
 
   // Realtime: scroll chat to bottom when comments change
   useEffect(() => {
@@ -172,6 +184,34 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const allCollabs  = collaborators.filter(c => c.active);
   const sectorCollabs = (sectorId) => allCollabs.filter(c => c.sector === sectorId);
 
+  // Setor de um colaborador pelo nome (para colorir o chip e gravar
+  // responsibleSectors). Cai em null se a pessoa foi desativada.
+  const sectorOfName = (name) => {
+    if (name === principalName) return task.responsibleSector || null;
+    return collaborators.find(c => c.name === name)?.sector || null;
+  };
+
+  const saveResponsibles = async (nextExtras) => {
+    setRespBusy(true);
+    setRespError('');
+    const people = nextExtras.map(n => ({ name: n, sector: sectorOfName(n) }));
+    const r = await updateTaskResponsibles(task, people, currentUser, currentUserSector);
+    setRespBusy(false);
+    if (!r?.success) { setRespError(r?.error || 'Falha ao atualizar responsáveis.'); return false; }
+    return true;
+  };
+
+  const handleAddResponsible = async () => {
+    if (!respPick.name) return;
+    if (respNames.includes(respPick.name)) { setRespError('Essa pessoa já é responsável nesta task.'); return; }
+    const ok = await saveResponsibles([...extraNames, respPick.name]);
+    if (ok) { setRespPick({ sector: '', name: '' }); setShowRespForm(false); }
+  };
+
+  const handleRemoveResponsible = async (name) => {
+    await saveResponsibles(extraNames.filter(n => n !== name));
+  };
+
   const content = (
     <div
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99998, padding: 20, overflowY: 'auto' }}
@@ -223,7 +263,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
               {[
-                { label: respNames.length > 1 ? 'RESPONSÁVEIS' : 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${respNames.join(', ')}`, color: responsibleSector?.color },
+                { label: 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${principalName || '—'}`, color: responsibleSector?.color },
                 { label: 'SETOR',       value: responsibleSector?.label, color: responsibleSector?.color },
                 task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: '#ddd', deadline: true } : null,
                 { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : '#888' },
@@ -236,6 +276,97 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   )}
                 </div>
               ))}
+            </div>
+
+            {/* Responsáveis (principal + extras) */}
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
+                  RESPONSÁVEIS ({respNames.length})
+                </p>
+                {canEditResponsibles && !showRespForm && (
+                  <button
+                    onClick={() => { setRespError(''); setRespPick({ sector: '', name: '' }); setShowRespForm(true); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 7, padding: '4px 9px', color: 'var(--neon)', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    <Plus size={12} /> Adicionar
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {respNames.map(name => {
+                  const isPrincipal = name === principalName;
+                  const sec = SECTORS[sectorOfName(name)];
+                  const color = sec?.color || '#8F97A0';
+                  return (
+                    <span
+                      key={name}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 16, padding: '5px 10px', fontSize: 12, fontWeight: 600, color }}
+                    >
+                      {sec?.emoji} {name}
+                      {isPrincipal && (
+                        <span style={{ fontSize: 9, fontFamily: 'var(--fm)', color: '#888', fontWeight: 700, letterSpacing: '.06em' }}>PRINCIPAL</span>
+                      )}
+                      {!isPrincipal && canEditResponsibles && (
+                        <button
+                          onClick={() => handleRemoveResponsible(name)}
+                          disabled={respBusy}
+                          title="Remover responsável"
+                          style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--neon)', cursor: respBusy ? 'not-allowed' : 'pointer', opacity: respBusy ? .4 : .8 }}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+
+              {showRespForm && (
+                <div style={{ background: 'rgba(238,51,99,.05)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginTop: 10 }}>
+                  <p style={{ fontSize: 12, color: 'var(--neon)', fontWeight: 600, marginBottom: 10 }}>Adicionar responsável</p>
+                  <select
+                    style={{ ...S.select, marginBottom: 8 }}
+                    value={respPick.sector}
+                    onChange={e => setRespPick({ sector: e.target.value, name: '' })}
+                  >
+                    <option value="">Selecionar setor</option>
+                    {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                  </select>
+                  {respPick.sector && (
+                    <select
+                      style={{ ...S.select, marginBottom: 10 }}
+                      value={respPick.name}
+                      onChange={e => setRespPick(p => ({ ...p, name: e.target.value }))}
+                    >
+                      <option value="">Selecionar colaborador</option>
+                      {sectorCollabs(respPick.sector)
+                        .filter(c => !respNames.includes(c.name))
+                        .map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                    </select>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...S.actionBtn('#EE3363'), flex: 1, opacity: (!respPick.name || respBusy) ? .5 : 1 }}
+                      onClick={handleAddResponsible}
+                      disabled={!respPick.name || respBusy}
+                    >
+                      {respBusy ? 'Salvando...' : 'Adicionar'}
+                    </button>
+                    <button style={S.cancelBtn} onClick={() => { setShowRespForm(false); setRespError(''); }}>Cancelar</button>
+                  </div>
+                </div>
+              )}
+
+              {respError && (
+                <p style={{ fontSize: 11, color: 'var(--neon)', marginTop: 8 }}>⚠ {respError}</p>
+              )}
+              {canEditResponsibles && respNames.length > 1 && !showRespForm && (
+                <p style={{ fontSize: 10, color: '#555', marginTop: 8, lineHeight: 1.5 }}>
+                  O responsável principal é quem entrega a task e conta nas métricas. Os demais enxergam a task no kanban e participam do chat.
+                </p>
+              )}
             </div>
 
             {/* Form de alteração de data */}
