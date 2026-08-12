@@ -46,6 +46,55 @@ export const SECTORS = {
 // Entrada do Admin (não é um "setor" comum, mas a tela de login usa).
 export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' };
 
+// ─── Subpapéis (funções dentro do setor) ──────────────────────
+// O login é o mesmo do setor; o que decide para qual painel a pessoa
+// vai é a FUNÇÃO cadastrada no colaborador.
+export const COMMERCIAL_ROLES = [
+  { id: 'sdr',    label: 'SDR',    desc: 'Cadastro de calls agendadas' },
+  { id: 'closer', label: 'Closer', desc: 'Calls, follow up e fechamento' },
+];
+
+export const CS_ROLES = [
+  { id: 'comercial',   label: 'CS Comercial',   desc: 'Contratos, assinatura, pagamento e onboarding' },
+  { id: 'operacional', label: 'CS Operacional', desc: 'Kickoff, saúde operacional e saúde do cliente' },
+];
+
+// ─── Funil comercial (coleção `deals`) ────────────────────────
+// scheduled → call agendada pelo SDR, visível a todos os closers
+// followup  → call realizada, aguardando desfecho do closer
+// won       → Venda Ganha (segue para o CS Comercial)
+// mq        → Mal Qualificado (base de análise do Líder Comercial)
+// noshow    → cliente não compareceu; volta ao painel do SDR
+// active    → CS concluiu o onboarding e o cliente foi criado
+export const DEAL_STATUS = {
+  scheduled: { id: 'scheduled', label: 'Agendada',    color: '#38bdf8' },
+  followup:  { id: 'followup',  label: 'Follow Up',   color: '#f59e0b' },
+  won:       { id: 'won',       label: 'Venda Ganha', color: '#22c55e' },
+  mq:        { id: 'mq',        label: 'MQ',          color: '#EE3363' },
+  noshow:    { id: 'noshow',    label: 'No-Show',     color: '#8F97A0' },
+  active:    { id: 'active',    label: 'Ativo',       color: '#3EFFFF' },
+};
+
+// Etapas do CS Comercial dentro de um deal ganho.
+export const CS_STAGES = {
+  contract:   { id: 'contract',   label: 'Novos Contratos' },
+  onboarding: { id: 'onboarding', label: 'Onboarding' },
+  done:       { id: 'done',       label: 'Concluído' },
+};
+
+// BANT — qualificação registrada pelo SDR no cadastro da call.
+export const BANT_FIELDS = [
+  { id: 'budget',    label: 'B — Budget (orçamento)',      placeholder: 'Quanto pode investir? Já investe hoje?' },
+  { id: 'authority', label: 'A — Authority (decisor)',     placeholder: 'Quem decide a compra? Está na call?' },
+  { id: 'need',      label: 'N — Need (necessidade)',      placeholder: 'Qual a dor principal? O que quer resolver?' },
+  { id: 'timing',    label: 'T — Timing (urgência)',       placeholder: 'Para quando? O que faz ser agora?' },
+];
+
+// Formas de pagamento do pré-formulário (Venda Ganha).
+export const PAYMENT_METHODS = [
+  'PIX', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Transferência', 'Outro',
+];
+
 // ─── WebDesign service config ─────────────────────────────────
 export const WD_SERVICE_CONFIG = {
   ecommerce: {
