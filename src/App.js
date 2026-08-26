@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from './components/shared/Toast';
@@ -18,6 +18,10 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import { PortalAuthProvider, usePortalAuth } from './contexts/PortalAuthContext';
 import PortalLoginPage from './pages/PortalLoginPage';
 import PortalDashboard from './pages/PortalDashboard';
+
+// Painel de parede: carregado sob demanda para não pesar o bundle de
+// quem só usa o dashboard normal.
+const TVPanel = lazy(() => import('./pages/TVPanel'));
 
 // Destino do usuário comercial conforme o subpapel.
 function commercialHome(user) {
@@ -153,6 +157,14 @@ function AppRoutes() {
       {/* Admin */}
       <Route path="/admin" element={
         <ProtectedRoute requireAdmin><AdminDashboard /></ProtectedRoute>
+      } />
+
+      {/* Painel de parede da agência — rota pública, sem login.
+          Autentica sozinho como anônimo e só mostra dado operacional. */}
+      <Route path="/tv" element={
+        <Suspense fallback={<div style={{ minHeight: '100vh', background: '#050508' }} />}>
+          <TVPanel />
+        </Suspense>
       } />
 
       {/* Portal de Coleta (clientes externos — auth próprio) */}
