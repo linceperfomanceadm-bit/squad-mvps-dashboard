@@ -81,10 +81,13 @@ export function useTVData() {
 
   const seenDoneRef = useRef(null);     // null = primeira carga
   const reloadTokenRef = useRef(null);  // null = primeira leitura da config
-  const [tick, setTick] = useState(0);  // recalcula métricas a cada minuto
+  // Relógio interno: o memo recalcula quando o minuto vira (task passa
+  // a contar como atrasada, o dia muda). É usado dentro do cálculo,
+  // então é uma dependência real e não um truque de invalidação.
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 60000);
+    const id = setInterval(() => setNowTs(Date.now()), 60000);
     return () => clearInterval(id);
   }, []);
 
@@ -183,7 +186,7 @@ export function useTVData() {
 
   // ── Métricas ─────────────────────────────────────────────────
   const data = useMemo(() => {
-    const now = new Date();
+    const now = new Date(nowTs);
     const tasks = openTasks;
 
     // Mesma regra de atraso do useClientHealth — mantém a TV coerente
@@ -382,7 +385,7 @@ export function useTVData() {
       criticalClients,
       totalClients: ativos.length,
     };
-  }, [openTasks, doneTasks, clients, tick]);
+  }, [openTasks, doneTasks, clients, nowTs]);
 
   return {
     ...data,
