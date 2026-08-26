@@ -4,16 +4,25 @@ import { db } from '../lib/firebase';
 
 /*
  * Config global do app. Documento app_config/general.
- * Por enquanto guarda a URL pública da agenda (Google Calendar embed).
+ * Guarda a URL pública da agenda (Google Calendar embed) e os
+ * controles do painel de TV da parede (/tv), que reage em tempo real.
  */
+const DEFAULTS = {
+  agendaEmbedUrl: '',
+  tvPaused: false,        // true = TV mostra tela de espera
+  tvPauseMessage: '',     // texto exibido na tela de espera
+  tvLockScene: '',        // '' = rotação normal; id da cena = travado
+  tvCelebrations: true,   // confete ao concluir entrega
+  tvReloadToken: 0,       // muda de valor = todas as TVs recarregam
+};
 export function useAppConfig() {
-  const [config, setConfig] = useState({ agendaEmbedUrl: '' });
+  const [config, setConfig] = useState(DEFAULTS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const ref = doc(db, 'app_config', 'general');
     return onSnapshot(ref, snap => {
-      if (snap.exists()) setConfig({ agendaEmbedUrl: '', ...snap.data() });
+      if (snap.exists()) setConfig({ ...DEFAULTS, ...snap.data() });
       setLoading(false);
     }, () => setLoading(false));
   }, []);
