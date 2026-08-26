@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, XCircle, TrendingUp, CheckSquare, Calendar, Package } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, XCircle, TrendingUp, CheckSquare, Calendar, Package, Monitor } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -17,6 +17,7 @@ import AdminGoals from '../../components/admin/AdminGoals';
 import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminCommercialMetrics from '../../components/admin/AdminCommercialMetrics';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
+import AdminTVControl from '../../components/admin/AdminTVControl';
 import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
@@ -36,6 +37,7 @@ const NAV = [
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
   { key: 'todo',          label: 'Meu Dia',         icon: CheckSquare },
   { key: 'agenda',        label: 'Agenda',          icon: Calendar },
+  { key: 'tv',            label: 'Painel de TV',    icon: Monitor },
 ];
 
 export default function AdminDashboard() {
@@ -237,6 +239,8 @@ export default function AdminDashboard() {
           <TodoView accent="var(--neon)" />
         ) : page === 'agenda' ? (
           <AdminAgenda toast={toast} />
+        ) : page === 'tv' ? (
+          <AdminTVControl toast={toast} />
         ) : (
           <AdminCollaborators
             collaborators={collaborators}
