@@ -1,9 +1,27 @@
-import React, { useState, useRef } from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState, useRef, useMemo } from 'react';
+import { Plus, X } from 'lucide-react';
 import { TASK_COLUMNS } from '../../lib/firebase';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import CreateTaskModal from './CreateTaskModal';
+
+// deadline é string 'YYYY-MM-DD'. Comparar como texto evita a armadilha
+// do new Date('2026-08-25'), que é interpretado como UTC e "volta" um dia
+// no nosso fuso. Datas ISO ordenam alfabeticamente na mesma ordem que
+// cronologicamente, então < e > funcionam direto.
+const ymd = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+
+const DATE_FILTERS = [
+  { id: '',         label: 'Todos os prazos' },
+  { id: 'overdue',  label: 'Atrasadas' },
+  { id: 'today',    label: 'Vencem hoje' },
+  { id: 'tomorrow', label: 'Até amanhã' },
+  { id: 'week',     label: 'Esta semana' },
+  { id: 'none',     label: 'Sem prazo' },
+];
 
 export default function TaskKanban({
   tasks, clients, collaborators,
@@ -18,13 +36,15 @@ export default function TaskKanban({
   const [showCreate, setShowCreate] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
+  const [clientFilter, setClientFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState('');
   const dragTask = useRef(null);
 
   // Always derive selectedTask from live tasks array — this makes chat realtime
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
 
-  // Filter tasks visible to this user
-  const visibleTasks = isAdmin
+  // Tasks que este usuário tem permissão de ver (antes dos filtros da tela).
+  const baseTasks = isAdmin
     ? tasks.filter(t => {
         if (adminFilters?.sector && t.responsibleSector !== adminFilters.sector && t.requestedBySector !== adminFilters.sector) return false;
         if (adminFilters?.collaborator && t.responsibleName !== adminFilters.collaborator && t.requestedBy !== adminFilters.collaborator) return false;
@@ -36,6 +56,66 @@ export default function TaskKanban({
         t.requestedBy === currentUser ||
         t.deliveredBy === currentUser
       );
+
+  // ── Filtros de tela ───────────────────────────────────────────
+  const hoje = ymd(new Date());
+  const amanha = ymd(addDays(new Date(), 1));
+  // Fim da semana = domingo. getDay(): 0=domingo, então (dia+6)%7 dá
+  // 0 para segunda-feira e 6 para domingo.
+  const fimSemana = ymd(addDays(new Date(), 6 - ((new Date().getDay() + 6) % 7)));
+
+  const matchDate = (t) => {
+    if (!dateFilter) return true;
+    if (dateFilter === 'none') return !t.deadline;
+    if (!t.deadline) return false;
+    if (dateFilter === 'overdue')  return t.deadline < hoje && t.status !== 'done';
+    if (dateFilter === 'today')    return t.deadline === hoje;
+    if (dateFilter === 'tomorrow') return t.deadline <= amanha;
+    if (dateFilter === 'week')     return t.deadline <= fimSemana;
+    return true;
+  };
+
+  const matchClient = (t) => {
+    if (!clientFilter) return true;
+    if (clientFilter === '__none__') return !t.clientId;
+    return t.clientId === clientFilter;
+  };
+
+  const visibleTasks = baseTasks.filter(t => matchClient(t) && matchDate(t));
+
+  // Lista de clientes montada a partir das tasks que o usuário já vê —
+  // mostrar a carteira inteira da agência aqui só criaria um dropdown
+  // gigante cheio de nome que essa pessoa não atende.
+  const clientOptions = useMemo(() => {
+    const mapa = new Map();
+    let semCliente = 0;
+    baseTasks.forEach(t => {
+      if (!t.clientId) { semCliente += 1; return; }
+      const atual = mapa.get(t.clientId);
+      if (atual) atual.count += 1;
+      else mapa.set(t.clientId, { id: t.clientId, name: t.clientName || 'Sem nome', count: 1 });
+    });
+    const lista = Array.from(mapa.values()).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    if (semCliente) lista.push({ id: '__none__', name: 'Sem cliente', count: semCliente });
+    return lista;
+  }, [baseTasks]);
+
+  const dateCounts = useMemo(() => {
+    const c = {};
+    DATE_FILTERS.forEach(f => { c[f.id] = 0; });
+    baseTasks.forEach(t => {
+      c[''] += 1;
+      if (!t.deadline) { c.none += 1; return; }
+      if (t.deadline < hoje && t.status !== 'done') c.overdue += 1;
+      if (t.deadline === hoje) c.today += 1;
+      if (t.deadline <= amanha) c.tomorrow += 1;
+      if (t.deadline <= fimSemana) c.week += 1;
+    });
+    return c;
+  }, [baseTasks, hoje, amanha, fimSemana]);
+
+  const filtroAtivo = Boolean(clientFilter || dateFilter);
+  const limparFiltros = () => { setClientFilter(''); setDateFilter(''); };
 
   const tasksByColumn = (colId) => visibleTasks.filter(t => t.status === colId);
 
@@ -98,13 +178,15 @@ export default function TaskKanban({
   return (
     <div className="fade-up">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
             Kanban de Tasks
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''} visíveis
+            {filtroAtivo
+              ? `${visibleTasks.length} de ${baseTasks.length} task${baseTasks.length !== 1 ? 's' : ''}`
+              : `${visibleTasks.length} task${visibleTasks.length !== 1 ? 's' : ''} visíveis`}
             {visibleTasks.filter(t => t.status !== 'done' && t.isRework).length > 0 && (
               <span style={{ color: 'var(--amber)' }}>
                 {' '}· {visibleTasks.filter(t => t.status !== 'done' && t.isRework).length} em ajuste
@@ -118,6 +200,38 @@ export default function TaskKanban({
         >
           <Plus size={15} /> Nova Task
         </button>
+      </div>
+
+      {/* Filtros */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <select
+          value={clientFilter}
+          onChange={e => setClientFilter(e.target.value)}
+          style={{ ...S.filter, ...(clientFilter ? S.filterActive : null) }}
+        >
+          <option value="">Todos os clientes</option>
+          {clientOptions.map(c => (
+            <option key={c.id} value={c.id}>{c.name} ({c.count})</option>
+          ))}
+        </select>
+
+        <select
+          value={dateFilter}
+          onChange={e => setDateFilter(e.target.value)}
+          style={{ ...S.filter, ...(dateFilter ? S.filterActive : null) }}
+        >
+          {DATE_FILTERS.map(f => (
+            <option key={f.id} value={f.id}>
+              {f.label}{dateCounts[f.id] ? ` (${dateCounts[f.id]})` : ''}
+            </option>
+          ))}
+        </select>
+
+        {filtroAtivo && (
+          <button onClick={limparFiltros} style={S.clearBtn}>
+            <X size={13} /> Limpar filtros
+          </button>
+        )}
       </div>
 
       {/* Kanban columns */}
@@ -164,7 +278,9 @@ export default function TaskKanban({
 
               {/* Tasks */}
               {colTasks.length === 0 && !isDragTarget ? (
-                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>Vazio</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>
+                  {filtroAtivo ? 'Nada com esse filtro' : 'Vazio'}
+                </p>
               ) : (
                 colTasks.map(task => (
                   <div
@@ -221,3 +337,20 @@ export default function TaskKanban({
     </div>
   );
 }
+
+const S = {
+  filter: {
+    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none',
+    cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 180,
+  },
+  filterActive: {
+    borderColor: 'var(--neon-border)', background: 'rgba(238,51,99,.08)', color: 'var(--neon)',
+  },
+  clearBtn: {
+    display: 'flex', alignItems: 'center', gap: 6, background: 'transparent',
+    border: '1px solid var(--border)', borderRadius: 9, padding: '9px 13px',
+    color: 'var(--muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
+    fontFamily: 'var(--f)',
+  },
+};
