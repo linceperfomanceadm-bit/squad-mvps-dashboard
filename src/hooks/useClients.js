@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, WD_SERVICE_CONFIG } from '../lib/firebase';
+import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG } from '../lib/firebase';
 
 export function useClients() {
   const [clients, setClients] = useState([]);
@@ -21,12 +21,22 @@ export function useClients() {
   // tratamento especial.
   const addClient = async (data) => {
     try {
-      const { name, responsibles, wdService, ...extra } = data || {};
+      const { name, responsibles, wdService, idVisualResponsible, ...extra } = data || {};
       const newClient = {
         ...extra,
         name,
         // Responsible per sector (optional)
         responsibles: responsibles || {},
+        // ID Visual — bloco próprio, dono próprio. Só o designer
+        // responsável enxerga; o time de web não vê nada disso.
+        idv: idVisualResponsible ? {
+          responsible: idVisualResponsible,
+          status: 'onboarding',
+          onboardingStartedAt: new Date().toISOString(),
+          productionStartedAt: null,
+          checklist: [],
+          notes: '',
+        } : null,
         // WebDesign data
         wd: {
           service: wdService || null,
@@ -68,50 +78,81 @@ export function useClients() {
   //   addedBySector, addedAt }. Registro de autoria para rastreio.
   const ALLOWED_FILE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/x-icon', 'image/vnd.microsoft.icon', 'application/pdf'];
 
-  const addBrandMaterial = async (clientId, { type, name, file, videoUrl }, addedBy, addedBySector) => {
+  // Toda ação no Brand Hub vira uma linha de histórico. É o que permite
+  // saber depois quem subiu ou apagou cada arquivo — o Brand Hub é
+  // compartilhado entre Design, Vídeo, Social Media e admin.
+  const logBrand = (clientId, entry) => updateDoc(doc(db, 'clients', clientId), {
+    'brandbook.log': arrayUnion({
+      id: `log_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+      at: new Date().toISOString(),
+      ...entry,
+    }),
+  });
+
+  // Aceita um arquivo (`file`) ou vários (`files`) de uma vez. Cada
+  // arquivo vira um material com o próprio nome de origem.
+  const addBrandMaterial = async (clientId, { type, name, file, files, videoUrl }, addedBy, addedBySector) => {
     try {
-      const id = `mat_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
-      let material = {
-        id, type, name: name?.trim() || 'Sem nome',
-        addedBy: addedBy || 'Desconhecido',
-        addedBySector: addedBySector || '',
-        addedAt: new Date().toISOString(),
-      };
+      const by = addedBy || 'Desconhecido';
+      const sector = addedBySector || '';
+      const stamp = () => `mat_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
 
       if (type === 'video') {
         if (!videoUrl?.trim()) return { success: false, error: 'Informe o link do vídeo.' };
-        material.url = videoUrl.trim();
-        material.path = null;
-        material.fileType = 'video';
-      } else {
-        if (!file) return { success: false, error: 'Selecione um arquivo.' };
-        if (!ALLOWED_FILE_TYPES.includes(file.type)) {
-          return { success: false, error: 'Formato não suportado. Use JPG, PNG, WEBP, ICO ou PDF.' };
-        }
-        if (file.size > 25 * 1024 * 1024) return { success: false, error: 'Arquivo muito grande (máx. 25MB).' };
-        const clean = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-        const path = `brand-hub/${clientId}/${id}_${clean}`;
-        const storageRef = ref(storage, path);
-        await uploadBytes(storageRef, file);
-        material.url = await getDownloadURL(storageRef);
-        material.path = path;
-        material.fileType = file.type;
+        const material = {
+          id: stamp(), type: 'video',
+          name: name?.trim() || 'Vídeo',
+          url: videoUrl.trim(), path: null, fileType: 'video',
+          addedBy: by, addedBySector: sector, addedAt: new Date().toISOString(),
+        };
+        await updateDoc(doc(db, 'clients', clientId), { 'brandbook.materials': arrayUnion(material) });
+        await logBrand(clientId, { action: 'add', name: material.name, by, sector });
+        return { success: true };
       }
 
-      await updateDoc(doc(db, 'clients', clientId), {
-        'brandbook.materials': arrayUnion(material),
-      });
-      return { success: true };
+      const lista = (files && files.length) ? Array.from(files) : (file ? [file] : []);
+      if (lista.length === 0) return { success: false, error: 'Selecione ao menos um arquivo.' };
+
+      const invalido = lista.find(f => !ALLOWED_FILE_TYPES.includes(f.type));
+      if (invalido) {
+        return { success: false, error: `"${invalido.name}": formato não suportado. Use JPG, PNG, WEBP, ICO ou PDF.` };
+      }
+      const grande = lista.find(f => f.size > 25 * 1024 * 1024);
+      if (grande) return { success: false, error: `"${grande.name}" passa de 25MB.` };
+
+      for (const f of lista) {
+        const id = stamp();
+        const clean = f.name.replace(/[^a-zA-Z0-9.]/g, '_');
+        const path = `brand-hub/${clientId}/${id}_${clean}`;
+        const storageRef = ref(storage, path);
+        await uploadBytes(storageRef, f);
+        const material = {
+          id, type: 'file',
+          name: f.name,
+          url: await getDownloadURL(storageRef),
+          path, fileType: f.type,
+          addedBy: by, addedBySector: sector, addedAt: new Date().toISOString(),
+        };
+        await updateDoc(doc(db, 'clients', clientId), { 'brandbook.materials': arrayUnion(material) });
+        await logBrand(clientId, { action: 'add', name: material.name, by, sector });
+      }
+      return { success: true, count: lista.length };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
   // Remove material. Permissão (criador/admin) é checada na UI; aqui
   // só executa. Apaga o arquivo do Storage se houver.
-  const removeBrandMaterial = async (clientId, material) => {
+  const removeBrandMaterial = async (clientId, material, byName, bySector) => {
     try {
       if (material.path) { try { await deleteObject(ref(storage, material.path)); } catch {} }
       await updateDoc(doc(db, 'clients', clientId), {
         'brandbook.materials': arrayRemove(material),
+      });
+      await logBrand(clientId, {
+        action: 'remove',
+        name: material.name || 'material',
+        by: byName || 'Desconhecido',
+        sector: bySector || '',
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
@@ -165,6 +206,57 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── ID Visual actions ──────────────────────────────────────
+  // Espelham o fluxo do WebDesign (onboarding → produção →
+  // finalizado), mas gravam no bloco `idv`, que pertence ao designer.
+  const idvMoveToProduction = async (clientId) => {
+    try {
+      const checklist = ID_VISUAL_CONFIG.checklist.map((label, i) => ({
+        id: `idv_${i}`, label, checked: false, checkedAt: null,
+      }));
+      await updateDoc(doc(db, 'clients', clientId), {
+        'idv.status': 'production',
+        'idv.onboardingCompletedAt': new Date().toISOString(),
+        'idv.productionStartedAt': new Date().toISOString(),
+        'idv.checklist': checklist,
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const idvMoveBackToOnboarding = async (clientId) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'idv.status': 'onboarding',
+        'idv.onboardingStartedAt': new Date().toISOString(),
+        'idv.productionStartedAt': null,
+        'idv.checklist': [],
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const idvUpdateChecklist = async (clientId, updatedChecklist) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), { 'idv.checklist': updatedChecklist });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const idvUpdateNotes = async (clientId, notes) => {
+    try { await updateDoc(doc(db, 'clients', clientId), { 'idv.notes': notes }); return { success: true }; }
+    catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const idvMoveStatus = async (clientId, newStatus) => {
+    try {
+      const patch = { 'idv.status': newStatus };
+      if (newStatus === 'finished') patch['idv.finishedAt'] = new Date().toISOString();
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Social Media actions ──────────────────────────────────
   const smAddPost = async (clientId, post) => {
     try {
@@ -213,7 +305,7 @@ export function useClients() {
   };
 
   // ── Brandbook ────────────────────────────────────────────
-  const updateBrandbook = async (clientId, brandbook) => {
+  const updateBrandbook = async (clientId, brandbook, byName, bySector) => {
     try {
       // Atualiza apenas colors/typography por campo, para NÃO apagar
       // os materials já existentes (que vivem em brandbook.materials).
@@ -222,6 +314,12 @@ export function useClients() {
       if ('typography' in brandbook) patch['brandbook.typography'] = brandbook.typography;
       if ('driveLink' in brandbook) patch['brandbook.driveLink'] = brandbook.driveLink;
       await updateDoc(doc(db, 'clients', clientId), patch);
+      await logBrand(clientId, {
+        action: 'brandbook',
+        name: 'paleta / tipografia',
+        by: byName || 'Desconhecido',
+        sector: bySector || '',
+      });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
@@ -280,6 +378,7 @@ export function useClients() {
     clients, loading, addClient, updateClient, deleteClient,
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
+    idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
     smAddPost, smAddBulkPosts, smUpdatePostStatus,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
