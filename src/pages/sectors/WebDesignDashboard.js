@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar, Package, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar, Package, ClipboardList, MessageSquare } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useRequests } from '../../hooks/useRequests';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
@@ -13,6 +14,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
+import RequestsInbox from '../../components/shared/RequestsInbox';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 
 const NAV = [
@@ -23,6 +25,7 @@ const NAV = [
   { key: 'recurrence', label: 'Recorrência',   icon: RefreshCw },
   { key: 'finished',   label: 'Finalizados',   icon: CheckCircle },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
+  { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
   { key: 'client_onboarding', label: 'Onboarding Clientes', icon: ClipboardList },
   { key: 'portal',     label: 'Portal de Produtos', icon: Package },
   { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
@@ -35,6 +38,7 @@ export default function WebDesignDashboard() {
   const { clients, loading, addClient, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, deleteClient } = useClients();
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
+  const { requests, markSeen, addReply } = useRequests();
 
   const [page, setPage] = useState('overview');
   const [prodSubTab, setProdSubTab] = useState('ecommerce');
@@ -58,10 +62,17 @@ export default function WebDesignDashboard() {
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;
 
+  // Solicitação da CS ainda não respondida por esta pessoa.
+  const openRequests = requests.filter(r => r.toName === user?.name && r.status === 'open').length;
+
   const navItems = NAV.map(n => ({
     ...n,
-    badge: n.key === 'kanban' ? pendingApproval : (counts[n.key] || 0),
-    badgeDanger: (n.key === 'onboarding' && overdueOnboarding > 0) || (n.key === 'kanban' && pendingApproval > 0),
+    badge: n.key === 'kanban' ? pendingApproval
+      : n.key === 'requests' ? openRequests
+      : (counts[n.key] || 0),
+    badgeDanger: (n.key === 'onboarding' && overdueOnboarding > 0)
+      || (n.key === 'kanban' && pendingApproval > 0)
+      || (n.key === 'requests' && openRequests > 0),
   }));
 
   const handleAdd = async (data) => {
@@ -111,6 +122,16 @@ export default function WebDesignDashboard() {
             onUpdateLinks={updateLinks}
             onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
+          />
+        ) : page === 'requests' ? (
+          <RequestsInbox
+            requests={requests}
+            currentUser={user?.name}
+            currentUserSector="webdesign"
+            accent="#FD2534"
+            onMarkSeen={markSeen}
+            onReply={addReply}
+            toast={toast}
           />
         ) : page === 'todo' ? (
           <TodoView accent="var(--neon)" />
