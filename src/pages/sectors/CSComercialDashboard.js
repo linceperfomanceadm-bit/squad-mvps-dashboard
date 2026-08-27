@@ -2,16 +2,20 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, FileText, PenTool, CreditCard, Activity,
-  CheckSquare, Calendar, Check, Video, Clock,
+  CheckSquare, Calendar, Check, Video, Clock, Kanban, MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useDeals, canMoveToOnboarding } from '../../hooks/useDeals';
+import { useTasks } from '../../hooks/useTasks';
+import { useRequests } from '../../hooks/useRequests';
 import Sidebar from '../../components/shared/Sidebar';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
+import TaskKanban from '../../components/kanban/TaskKanban';
+import CSRequests from '../../components/commercial/CSRequests';
 import CSResponsiblesModal from '../../components/commercial/CSResponsiblesModal';
 import { SECTORS } from '../../lib/firebase';
 import {
@@ -41,12 +45,19 @@ const COLOR = SECTORS.cs.color;
 export default function CSComercialDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { addClient } = useClients();
+  const { clients, addClient } = useClients();
   const { collaborators } = useCollaborators();
   const {
     deals, loading, toggleCsChecklist, confirmSignature, confirmPayment,
     moveToOnboarding, rescheduleOnboardingCall, finishOnboarding,
   } = useDeals();
+  const {
+    tasks, moveToProduction, moveToApproval, approveTask, rejectTask,
+    addComment, updateLinks, deleteTask, changeDeadline,
+  } = useTasks();
+  const {
+    requests, createRequest, addReply, closeRequest, deleteRequest,
+  } = useRequests();
 
   const [page, setPage] = useState('contracts');
   const [openDeal, setOpenDeal] = useState(null);
@@ -69,11 +80,23 @@ export default function CSComercialDashboard() {
 
   const liveDeal = openDeal ? deals.find(d => d.id === openDeal) || null : null;
 
+  // Clientes ativos e carteira desta pessoa (responsável salvo como
+  // string em docs antigos e como array nos novos).
+  const activeClients = useMemo(() => clients.filter(c => c.active !== false), [clients]);
+  const myClientIds = useMemo(() => activeClients.filter(c => {
+    const r = c.responsibles?.cs;
+    return Array.isArray(r) ? r.includes(me) : r === me;
+  }).map(c => c.id), [activeClients, me]);
+
+  const requestsToClose = requests.filter(r => r.status === 'answered').length;
+
   const NAV = [
     { key: 'contracts',  label: 'Novos Contratos', icon: FileText,   badge: buckets.contracts.length, badgeDanger: buckets.contracts.length > 0 },
     { key: 'signature',  label: 'Assinatura',      icon: PenTool,    badge: buckets.signature.length },
     { key: 'payment',    label: 'Pagamento',       icon: CreditCard, badge: buckets.payment.length },
     { key: 'onboarding', label: 'Onboarding',      icon: Activity,   badge: buckets.onboarding.length },
+    { key: 'kanban',     label: 'Produção',        icon: Kanban },
+    { key: 'requests',   label: 'Solicitações',    icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
     { key: 'overview',   label: 'Visão Geral',     icon: LayoutDashboard },
     { key: 'todo',       label: 'Meu Dia',         icon: CheckSquare },
     { key: 'agenda',     label: 'Agenda',          icon: Calendar },
@@ -84,6 +107,8 @@ export default function CSComercialDashboard() {
     signature:  ['Painel de Assinatura', 'Contratos pendentes de assinatura'],
     payment:    ['Painel de Pagamento', 'Contratos pendentes de pagamento'],
     onboarding: ['Onboarding', 'Calls de onboarding agendadas'],
+    kanban:     ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
+    requests:   ['Reporte da CS', 'Solicitações abertas para os times de produção'],
     overview:   ['Visão Geral', 'Seu funil de contratos no mês'],
     todo:       ['Meu Dia', ''],
     agenda:     ['Agenda', ''],
@@ -202,6 +227,45 @@ export default function CSComercialDashboard() {
                     ))}
                   </div>
                 )
+            )}
+
+            {page === 'kanban' && (
+              <TaskKanban
+                tasks={tasks}
+                clients={activeClients}
+                allClients={activeClients}
+                collaborators={collaborators}
+                currentUser={me}
+                currentUserSector="cs"
+                readOnly
+                myClientIds={myClientIds}
+                title="Produção dos Clientes"
+                subtitle="Somente leitura"
+                onCreateTask={async () => ({ success: false })}
+                onMoveToProduction={moveToProduction}
+                onMoveToApproval={moveToApproval}
+                onApprove={approveTask}
+                onReject={rejectTask}
+                onAddComment={addComment}
+                onUpdateLinks={updateLinks}
+                onChangeDeadline={changeDeadline}
+                onDelete={deleteTask}
+              />
+            )}
+
+            {page === 'requests' && (
+              <CSRequests
+                requests={requests}
+                clients={clients}
+                collaborators={collaborators}
+                currentUser={me}
+                currentUserSector="cs"
+                onCreate={(data) => createRequest(data, me, 'cs')}
+                onReply={addReply}
+                onCloseRequest={closeRequest}
+                onDelete={deleteRequest}
+                toast={toast}
+              />
             )}
 
             {page === 'todo' && <TodoView accent={COLOR} />}
