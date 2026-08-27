@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check, Upload, Trash2, FileText, Image as ImageIcon, Video, Download, Plus, X } from 'lucide-react';
+import ReactDOM from 'react-dom';
+import { Copy, ExternalLink, ChevronDown, ChevronUp, Edit2, Check, Upload, Trash2, FileText, Image as ImageIcon, Video, Download, Plus, X, History } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
+
+// Responsável pode estar salvo como string (legado) ou array (multi).
+const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
 
 function ColorSwatch({ hex }) {
   const [copied, setCopied] = useState(false);
@@ -23,6 +27,11 @@ function ColorSwatch({ hex }) {
 function fmtDate(iso) {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 }
 
 // Cartão de um material da biblioteca.
@@ -65,52 +74,93 @@ function MaterialItem({ material, canDelete, onDelete }) {
   );
 }
 
-// Modal para adicionar material (arquivo OU link de vídeo).
+// Modal para adicionar material (arquivos OU link de vídeo).
+//
+// Vive num portal no document.body de propósito: o Brand Hub roda dentro
+// de containers com `animation: ... both`, e um ancestral com transform
+// aplicado vira o bloco de contenção de qualquer position:fixed filho.
+// Era isso que jogava o modal para longe da viewport e obrigava a
+// rolar a página inteira para achá-lo.
 function AddMaterialModal({ onClose, onAdd }) {
   const [tab, setTab] = useState('file');
   const [name, setName] = useState('');
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [videoUrl, setVideoUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async () => {
     setError('');
-    if (tab === 'file' && !file) { setError('Selecione um arquivo.'); return; }
+    if (tab === 'file' && files.length === 0) { setError('Selecione ao menos um arquivo.'); return; }
     if (tab === 'video' && !videoUrl.trim()) { setError('Cole o link do vídeo.'); return; }
     setBusy(true);
-    const finalName = name.trim() || (tab === 'file' ? file?.name : 'Vídeo');
-    const r = await onAdd({ type: tab, name: finalName, file, videoUrl });
+    const r = await onAdd(
+      tab === 'video'
+        ? { type: 'video', name: name.trim() || 'Vídeo', videoUrl }
+        : { type: 'file', files }
+    );
     setBusy(false);
     if (r.success) onClose();
     else setError(r.error || 'Erro ao adicionar.');
   };
 
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+  const content = (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 24px 64px rgba(0,0,0,.7)', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Adicionar material</h3>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <button onClick={() => setTab('file')} style={{ flex: 1, padding: '9px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: tab === 'file' ? 'var(--neon-dim)' : 'var(--surface)', color: tab === 'file' ? 'var(--neon)' : 'var(--muted)', border: `1px solid ${tab === 'file' ? 'var(--neon-border)' : 'var(--border)'}` }}>Arquivo</button>
+          <button onClick={() => setTab('file')} style={{ flex: 1, padding: '9px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: tab === 'file' ? 'var(--neon-dim)' : 'var(--surface)', color: tab === 'file' ? 'var(--neon)' : 'var(--muted)', border: `1px solid ${tab === 'file' ? 'var(--neon-border)' : 'var(--border)'}` }}>Arquivos</button>
           <button onClick={() => setTab('video')} style={{ flex: 1, padding: '9px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: tab === 'video' ? 'var(--neon-dim)' : 'var(--surface)', color: tab === 'video' ? 'var(--neon)' : 'var(--muted)', border: `1px solid ${tab === 'video' ? 'var(--neon-border)' : 'var(--border)'}` }}>Vídeo (link)</button>
         </div>
 
-        <label style={S.label}>NOME (opcional)</label>
-        <input style={{ ...S.input, marginTop: 6, marginBottom: 14 }} value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Logo principal" />
-
         {tab === 'file' ? (
-          <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '24px', border: '1px dashed var(--border)', borderRadius: 12, cursor: 'pointer' }}>
-            <Upload size={24} color="var(--neon)" />
-            <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{file ? file.name : 'Clique para escolher'}</span>
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>JPG, PNG, WEBP, ICO ou PDF (máx. 25MB)</span>
-            <input type="file" accept="image/jpeg,image/png,image/webp,image/x-icon,.ico,application/pdf" onChange={e => setFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-          </label>
+          <>
+            <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '24px', border: '1px dashed var(--border)', borderRadius: 12, cursor: 'pointer' }}>
+              <Upload size={24} color="var(--neon)" />
+              <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600, textAlign: 'center' }}>
+                {files.length === 0
+                  ? 'Clique para escolher (pode selecionar vários)'
+                  : `${files.length} arquivo${files.length > 1 ? 's' : ''} selecionado${files.length > 1 ? 's' : ''}`}
+              </span>
+              <span style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}>JPG, PNG, WEBP, ICO ou PDF (máx. 25MB cada)</span>
+              <input
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/webp,image/x-icon,.ico,application/pdf"
+                onChange={e => setFiles(Array.from(e.target.files || []))}
+                style={{ display: 'none' }}
+              />
+            </label>
+
+            {files.length > 0 && (
+              <div style={{ marginTop: 10, maxHeight: 140, overflowY: 'auto' }}>
+                {files.map((f, i) => (
+                  <div key={`${f.name}_${i}`} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, marginBottom: 5 }}>
+                    <FileText size={12} color="var(--muted)" style={{ flexShrink: 0 }} />
+                    <span style={{ fontSize: 12, color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                    <button
+                      onClick={() => setFiles(list => list.filter((_, idx) => idx !== i))}
+                      style={{ background: 'none', border: 'none', color: 'var(--neon)', cursor: 'pointer', padding: 0, display: 'flex', flexShrink: 0 }}
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
+              Cada arquivo entra com o próprio nome de origem.
+            </p>
+          </>
         ) : (
           <>
+            <label style={S.label}>NOME (opcional)</label>
+            <input style={{ ...S.input, marginTop: 6, marginBottom: 14 }} value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Vídeo institucional" />
             <label style={S.label}>LINK DO VÍDEO</label>
             <input style={{ ...S.input, marginTop: 6 }} value={videoUrl} onChange={e => setVideoUrl(e.target.value)} placeholder="https://youtube.com/... ou Drive" />
           </>
@@ -118,34 +168,47 @@ function AddMaterialModal({ onClose, onAdd }) {
 
         {error && <p style={{ fontSize: 12, color: 'var(--neon)', marginTop: 12 }}>{error}</p>}
         <button onClick={submit} disabled={busy} style={{ ...S.saveBtn, width: '100%', marginTop: 18, opacity: busy ? 0.7 : 1 }}>
-          {busy ? 'Enviando...' : 'Adicionar material'}
+          {busy ? 'Enviando...' : 'Adicionar'}
         </button>
       </div>
     </div>
   );
+
+  return ReactDOM.createPortal(content, document.body);
 }
 
-function ClientVaultCard({ client, canEditBrandbook, canAddMaterial, currentUser, isAdmin, onUpdate, onAddMaterial, onRemoveMaterial }) {
-  const [open,    setOpen]    = useState(false);
+const LOG_LABEL = { add: 'ADICIONOU', remove: 'EXCLUIU', brandbook: 'EDITOU' };
+const LOG_TAG = {
+  add:       { background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green-b)' },
+  remove:    { background: 'rgba(239,68,68,.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)' },
+  brandbook: { background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)' },
+};
+
+// ─── Card de um cliente ────────────────────────────────────────
+function ClientVaultCard({ client, canEditBrandbook, canAddMaterial, currentUser, currentSector, isAdmin, onUpdate, onAddMaterial, onRemoveMaterial }) {
+  const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [form,    setForm]    = useState({
-    colors:    client.brandbook?.colors?.join(', ') || '',
-    typography: client.brandbook?.typography || '',
-  });
-
-  const handleSave = () => {
-    const colors = form.colors.split(',').map(c => c.trim()).filter(c => c.length > 0);
-    onUpdate(client.id, { colors, typography: form.typography });
-    setEditing(false);
-  };
+  const [showLog, setShowLog] = useState(false);
 
   const bb = client.brandbook || {};
   const materials = bb.materials || [];
-  const hasData = bb.colors?.length || bb.typography || materials.length;
+  const log = [...(bb.log || [])].sort((a, b) => new Date(b.at) - new Date(a.at));
+  const hasData = (bb.colors?.length > 0) || bb.typography;
+
+  const [form, setForm] = useState({
+    colors: (bb.colors || []).join(', '),
+    typography: bb.typography || '',
+  });
+
+  const handleSave = () => {
+    const colors = form.colors.split(',').map(c => c.trim()).filter(Boolean);
+    onUpdate(client.id, { colors, typography: form.typography.trim() }, currentUser, currentSector);
+    setEditing(false);
+  };
 
   return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', marginBottom: 10 }}>
+    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' }} onClick={() => setOpen(!open)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'var(--neon)' }}>
@@ -218,12 +281,41 @@ function ClientVaultCard({ client, canEditBrandbook, canAddMaterial, currentUser
                         key={m.id}
                         material={m}
                         canDelete={isAdmin || m.addedBy === currentUser}
-                        onDelete={(mat) => onRemoveMaterial(client.id, mat)}
+                        onDelete={(mat) => onRemoveMaterial(client.id, mat, currentUser, currentSector)}
                       />
                     ))}
                   </div>
                 )}
               </div>
+
+              {/* Histórico — quem mexeu no quê */}
+              {log.length > 0 && (
+                <div>
+                  <button
+                    onClick={() => setShowLog(v => !v)}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', padding: 0, color: 'var(--muted)', fontSize: 10, fontFamily: 'var(--fm)', letterSpacing: '.14em', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    <History size={12} />
+                    HISTÓRICO ({log.length})
+                    {showLog ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  </button>
+                  {showLog && (
+                    <div style={{ marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '4px 12px', maxHeight: 220, overflowY: 'auto' }}>
+                      {log.slice(0, 40).map(l => (
+                        <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+                          <span style={{ fontSize: 9, fontWeight: 700, fontFamily: 'var(--fm)', padding: '2px 7px', borderRadius: 10, flexShrink: 0, ...(LOG_TAG[l.action] || {}) }}>
+                            {LOG_LABEL[l.action] || l.action}
+                          </span>
+                          <span style={{ fontSize: 12, color: 'var(--text)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+                          <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', flexShrink: 0, textAlign: 'right' }}>
+                            {l.by} · {fmtDateTime(l.at)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -244,15 +336,16 @@ export default function VaultPage({ clients, sectorId, onUpdateBrandbook, onAddM
   const [search, setSearch] = useState('');
 
   const isAdmin = isAdminView || user?.isAdmin;
-  const canEditBrandbook = isAdmin || (sectorId && clients.some(c => {
-    const r = c.responsibles?.[sectorId];
-    return Array.isArray(r) ? r.includes(user?.name) : r === user?.name;
-  }));
-  // Adicionar material: quem tem a ferramenta no painel já chega aqui.
-  const canAddMaterial = true;
+  const logSector = isAdminView ? 'admin' : (sectorId || '');
 
+  // Permissão de editar paleta/tipografia é POR CLIENTE: ser responsável
+  // por um cliente não dá direito de mexer no brand de todos os outros.
+  const canEditOf = (c) => isAdmin || (!!sectorId && asArray(c.responsibles?.[sectorId]).includes(user?.name));
+
+  // `c.active !== false` em vez de `c.active`: cliente antigo, cadastrado
+  // antes do campo existir, continua aparecendo.
   const activeClients = clients.filter(
-    c => c.active && c.name.toLowerCase().includes(search.toLowerCase())
+    c => c.active !== false && c.name.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -283,9 +376,10 @@ export default function VaultPage({ clients, sectorId, onUpdateBrandbook, onAddM
           <ClientVaultCard
             key={c.id}
             client={c}
-            canEditBrandbook={canEditBrandbook}
-            canAddMaterial={canAddMaterial}
+            canEditBrandbook={canEditOf(c)}
+            canAddMaterial={true}
             currentUser={user?.name}
+            currentSector={logSector}
             isAdmin={isAdmin}
             onUpdate={onUpdateBrandbook}
             onAddMaterial={onAddMaterial}
