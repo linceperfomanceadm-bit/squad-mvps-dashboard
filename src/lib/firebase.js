@@ -119,6 +119,42 @@ export const WD_SERVICE_CONFIG = {
   },
 };
 
+// Serviços de SITE oferecidos no cadastro novo. ID Visual saiu daqui:
+// virou um bloco próprio (`idv`) que vive no painel do Design, não no
+// do WebDesign. WD_SERVICE_CONFIG continua completo por causa dos
+// clientes antigos, que seguem funcionando como sempre.
+export const WD_WEB_SERVICES = ['ecommerce', 'landing_page', 'lp_catalogo'];
+
+// ─── ID Visual (bloco `idv` do cliente) ───────────────────────
+// Mesmas fases do WebDesign (onboarding → produção → finalizado),
+// mas com dono próprio: só o designer responsável enxerga.
+export const ID_VISUAL_CONFIG = {
+  label: 'ID Visual',
+  days: 20,
+  onboardingDays: 7,
+  checklist: [
+    'Envio de Namings',
+    'Aprovação Paleta de Cor e Tipografia',
+    'Apresentação da ID Visual',
+    'Entrega do Manual de Marca',
+  ],
+};
+
+// ─── Reporte da CS (coleção `requests`) ───────────────────────
+// Solicitação pontual que a CS abre para um colaborador específico.
+// Não é task de produção e por isso não encosta no Kanban.
+//   open     → aberta, aguardando o colaborador
+//   answered → colaborador respondeu (com ou sem \"resolvido\")
+//   closed   → CS encerrou; some da lista do colaborador
+export const REQUEST_STATUS = {
+  open:     { id: 'open',     label: 'Aguardando',  color: '#f59e0b' },
+  answered: { id: 'answered', label: 'Respondida',  color: '#38bdf8' },
+  closed:   { id: 'closed',   label: 'Encerrada',   color: '#22c55e' },
+};
+
+// Setores de produção que recebem Reporte da CS.
+export const REQUEST_SECTORS = ['socialmedia', 'webdesign', 'design', 'videomaker', 'trafego'];
+
 // ─── Social Media Kanban columns ─────────────────────────────
 export const SM_COLUMNS = [
   { id: 'production', label: 'Em Produção',      color: '#EE3363' },
