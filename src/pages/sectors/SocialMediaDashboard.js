@@ -1,38 +1,55 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList } from 'lucide-react';
+import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
+import RequestsInbox from '../../components/shared/RequestsInbox';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useRequests } from '../../hooks/useRequests';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import SMOverview from '../../components/sectors/socialMedia/SMOverview';
 import SMKanban from '../../components/sectors/socialMedia/SMKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import SMBulkInput from '../../components/sectors/socialMedia/SMBulkInput';
+import VaultPage from '../../components/sectors/creative/VaultPage';
 import TaskKanban from '../../components/kanban/TaskKanban';
 
+// Responsável pode estar salvo como string (legado) ou array (multi).
+const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
+
 const NAV = [
-  { key: 'overview',  label: 'Visão Geral',  icon: LayoutDashboard },
-  { key: 'smkanban',  label: 'Posts',         icon: Columns },
-  { key: 'planning',  label: 'Planejamento',  icon: Plus },
-  { key: 'kanban',    label: 'Tasks',          icon: Kanban },
-  { key: 'onboarding', label: 'Onboarding',    icon: ClipboardList },
-  { key: 'todo',      label: 'Meu Dia',        icon: CheckSquare },
-  { key: 'agenda',    label: 'Agenda',         icon: Calendar },
+  { key: 'overview',   label: 'Visão Geral',   icon: LayoutDashboard },
+  { key: 'smkanban',   label: 'Posts',          icon: Columns },
+  { key: 'planning',   label: 'Planejamento',   icon: Plus },
+  { key: 'kanban',     label: 'Tasks',           icon: Kanban },
+  { key: 'requests',   label: 'Reporte da CS',   icon: MessageSquare },
+  { key: 'onboarding', label: 'Onboarding',      icon: ClipboardList },
+  { key: 'vault',      label: 'Brand Hub',       icon: BookOpen },
+  { key: 'todo',       label: 'Meu Dia',         icon: CheckSquare },
+  { key: 'agenda',     label: 'Agenda',          icon: Calendar },
 ];
 
 export default function SocialMediaDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, smAddBulkPosts, smUpdatePostStatus } = useClients();
+  const {
+    clients, loading, smAddBulkPosts, smUpdatePostStatus,
+    updateBrandbook, addBrandMaterial, removeBrandMaterial,
+  } = useClients();
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
+  const { requests, markSeen, addReply } = useRequests();
   const [page, setPage] = useState('overview');
 
-  const myClients = clients.filter(c => c.active && c.responsibles?.socialmedia === user?.name);
+  // `c.active !== false` e responsável em array: cliente antigo ou
+  // cadastrado pelo admin (que salva array) continua aparecendo.
+  const myClients = clients.filter(
+    c => c.active !== false && asArray(c.responsibles?.socialmedia).includes(user?.name)
+  );
+
   const myPosts = [];
   myClients.forEach(c => {
     (c.sm?.posts || []).forEach(p => {
@@ -42,6 +59,9 @@ export default function SocialMediaDashboard() {
 
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;
+
+  // Solicitação da CS que ainda não foi respondida por esta pessoa.
+  const openRequests = requests.filter(r => r.toName === user?.name && r.status === 'open').length;
 
   const handleBulkSave = async (rows) => {
     const res = await smAddBulkPosts(rows);
@@ -57,10 +77,23 @@ export default function SocialMediaDashboard() {
     return res;
   };
 
+  const handleUpdateBrandbook = async (clientId, brandbook, byName, bySector) => {
+    const res = await updateBrandbook(clientId, brandbook, byName, bySector);
+    if (res.success) toast('Brandbook atualizado!');
+    else toast(res.error, 'e');
+    return res;
+  };
+
   const navItems = NAV.map(n => ({
     ...n,
-    badge: n.key === 'smkanban' ? myPosts.filter(p => p.status === 'client').length : n.key === 'kanban' ? pendingApproval : 0,
-    badgeDanger: (n.key === 'smkanban') || (n.key === 'kanban' && pendingApproval > 0),
+    badge: n.key === 'smkanban'
+      ? myPosts.filter(p => p.status === 'client').length
+      : n.key === 'kanban' ? pendingApproval
+      : n.key === 'requests' ? openRequests
+      : 0,
+    badgeDanger: (n.key === 'smkanban')
+      || (n.key === 'kanban' && pendingApproval > 0)
+      || (n.key === 'requests' && openRequests > 0),
   }));
 
   return (
@@ -79,6 +112,24 @@ export default function SocialMediaDashboard() {
           <SMBulkInput clients={myClients} responsible={user?.name} onSave={handleBulkSave} />
         ) : page === 'onboarding' ? (
           <OnboardingBoard sectorId="socialmedia" />
+        ) : page === 'requests' ? (
+          <RequestsInbox
+            requests={requests}
+            currentUser={user?.name}
+            currentUserSector="socialmedia"
+            accent="#E91E63"
+            onMarkSeen={markSeen}
+            onReply={addReply}
+            toast={toast}
+          />
+        ) : page === 'vault' ? (
+          <VaultPage
+            clients={clients}
+            sectorId="socialmedia"
+            onUpdateBrandbook={handleUpdateBrandbook}
+            onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, 'socialmedia')}
+            onRemoveMaterial={removeBrandMaterial}
+          />
         ) : page === 'todo' ? (
           <TodoView accent="#38bdf8" />
         ) : page === 'agenda' ? (
