@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock } from 'lucide-react';
+import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock, Radio, Volume2, Save } from 'lucide-react';
 import { useAppConfig } from '../../hooks/useAppConfig';
 
 /*
@@ -21,12 +21,20 @@ export default function AdminTVControl({ toast }) {
   const { config, loading, saveConfig } = useAppConfig();
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState('');
+  const [radioUrl, setRadioUrl] = useState('');
+  const [volume, setVolume] = useState(50);
 
   useEffect(() => { setMsg(config.tvPauseMessage || ''); }, [config.tvPauseMessage]);
+  useEffect(() => { setRadioUrl(config.tvRadioUrl || ''); }, [config.tvRadioUrl]);
+  useEffect(() => {
+    setVolume(typeof config.tvRadioVolume === 'number' ? config.tvRadioVolume : 50);
+  }, [config.tvRadioVolume]);
 
   const pausado = config.tvPaused === true;
   const comemora = config.tvCelebrations !== false;
   const cena = config.tvLockScene || '';
+  const tocando = config.tvRadioPlaying === true;
+  const urlMudou = radioUrl.trim() !== (config.tvRadioUrl || '');
   const tvUrl = `${window.location.origin}/tv`;
 
   const aplicar = async (patch, ok, chave) => {
@@ -60,6 +68,23 @@ export default function AdminTVControl({ toast }) {
     'Comando enviado. As TVs vão recarregar em instantes.',
     'reload'
   );
+
+  const salvarRadio = () => aplicar(
+    { tvRadioUrl: radioUrl.trim() },
+    radioUrl.trim() ? 'Rádio salva. A TV já está com o novo endereço.' : 'Rádio removida da TV.',
+    'radiourl'
+  );
+
+  const toggleRadio = () => aplicar(
+    { tvRadioPlaying: !tocando, tvRadioUrl: radioUrl.trim() },
+    tocando ? 'Rádio pausada.' : 'Rádio no ar. Se for a primeira vez do dia, toque em "Ligar som" na TV.',
+    'radio'
+  );
+
+  const salvarVolume = () => {
+    if (volume === config.tvRadioVolume) return;
+    saveConfig({ tvRadioVolume: volume });
+  };
 
   if (loading) return null;
 
@@ -172,6 +197,68 @@ export default function AdminTVControl({ toast }) {
             <PartyPopper size={15} />
             {comemora ? 'Desligar comemorações' : 'Ligar comemorações'}
           </button>
+        </div>
+
+        {/* Rádio */}
+        <div style={{ ...S.box, gridColumn: '1 / -1' }}>
+          <p style={{ ...S.boxTitle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Radio size={16} color={tocando ? 'var(--green)' : 'var(--muted)'} />
+            Rádio da TV
+          </p>
+          <p style={S.boxText}>
+            Cole o endereço do stream — o link direto do áudio (.mp3, .aac ou .m3u8), não a página
+            do player. Trocar a rádio aqui já muda o som na parede.
+          </p>
+
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12, flexWrap: 'wrap' }}>
+            <input
+              value={radioUrl}
+              onChange={e => setRadioUrl(e.target.value)}
+              placeholder="https://exemplo.com/stream.mp3"
+              style={{ ...S.input, flex: '1 1 320px', marginBottom: 0, fontFamily: 'var(--fm)', fontSize: 12.5 }}
+            />
+            <button
+              onClick={salvarRadio}
+              disabled={saving === 'radiourl' || !urlMudou}
+              style={{ ...S.btn, ...S.btnGhost, width: 'auto', opacity: urlMudou ? 1 : .45 }}
+            >
+              <Save size={15} /> Salvar endereço
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button
+              onClick={toggleRadio}
+              disabled={saving === 'radio' || !radioUrl.trim()}
+              style={{ ...S.btn, ...(tocando ? S.btnAmber : S.btnGreen), width: 'auto', opacity: radioUrl.trim() ? 1 : .45 }}
+            >
+              {tocando ? <Pause size={15} /> : <Play size={15} />}
+              {tocando ? 'Pausar música' : 'Tocar música'}
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 240px' }}>
+              <Volume2 size={16} color="var(--muted)" style={{ flexShrink: 0 }} />
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={volume}
+                onChange={e => setVolume(Number(e.target.value))}
+                onPointerUp={salvarVolume}
+                onKeyUp={salvarVolume}
+                style={{ flex: 1, accentColor: '#EE3363', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--fm)', width: 34, textAlign: 'right', flexShrink: 0 }}>
+                {volume}%
+              </span>
+            </div>
+          </div>
+
+          <p style={{ ...S.boxText, marginTop: 12, marginBottom: 0 }}>
+            O navegador não deixa nenhum site tocar som sozinho. Na primeira vez que a rádio entra
+            no ar, a TV mostra um botão <strong style={{ color: 'var(--text)' }}>Ligar som</strong> no
+            canto — um clique e o áudio segue sozinho até o reload das 4h.
+          </p>
         </div>
       </div>
 
