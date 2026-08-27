@@ -2,14 +2,20 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, Rocket, Activity, HeartPulse, CheckSquare, Calendar, X,
+  UserPlus, Kanban, MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import { useClients } from '../../hooks/useClients';
+import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useRequests } from '../../hooks/useRequests';
 import Sidebar from '../../components/shared/Sidebar';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
+import TaskKanban from '../../components/kanban/TaskKanban';
+import CSRequests from '../../components/commercial/CSRequests';
+import CSAddClientModal from '../../components/commercial/CSAddClientModal';
 import { SECTORS } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
@@ -37,14 +43,22 @@ const COLOR = SECTORS.cs.color;
 export default function CSOperacionalDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, confirmKickoff, setClientHealth } = useClients();
-  const { tasks } = useTasks();
+  const { clients, loading, confirmKickoff, setClientHealth, addClient } = useClients();
+  const { collaborators } = useCollaborators();
+  const {
+    tasks, moveToProduction, moveToApproval, approveTask, rejectTask,
+    addComment, updateLinks, deleteTask, changeDeadline,
+  } = useTasks();
+  const {
+    requests, createRequest, addReply, closeRequest, deleteRequest,
+  } = useRequests();
 
   const [page, setPage] = useState('kickoff');
   const [onlyMine, setOnlyMine] = useState(false);
   const [opsFilter, setOpsFilter] = useState('all');
   const [openId, setOpenId] = useState(null);
   const [healthTarget, setHealthTarget] = useState(null);
+  const [showAddClient, setShowAddClient] = useState(false);
 
   const me = user?.name;
 
@@ -53,11 +67,18 @@ export default function CSOperacionalDashboard() {
     [clients]
   );
 
-  const mineFilter = (c) => {
-    if (!onlyMine) return true;
+  // Responsável pode estar salvo como string (legado) ou array (multi).
+  const isMine = (c) => {
     const r = c.responsibles?.cs;
     return Array.isArray(r) ? r.includes(me) : r === me;
   };
+  const mineFilter = (c) => (onlyMine ? isMine(c) : true);
+
+  // Carteira da pessoa — alimenta o filtro "Meus clientes" do Kanban.
+  const myClientIds = useMemo(
+    () => activeClients.filter(isMine).map(c => c.id),
+    [activeClients, me] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const kickoffPending = useMemo(
     () => activeClients.filter(c => c.kickoff?.pending),
@@ -98,10 +119,16 @@ export default function CSOperacionalDashboard() {
 
   const openClient = openId ? liveClients.find(c => c.id === openId) || null : null;
 
+  // Solicitações que o colaborador já respondeu e esperam a CS encerrar.
+  const requestsToClose = requests.filter(r => r.status === 'answered').length;
+
   const NAV = [
     { key: 'kickoff',  label: 'Kickoff',           icon: Rocket,     badge: kickoffPending.length, badgeDanger: kickoffPending.length > 0 },
     { key: 'ops',      label: 'Saúde Operacional', icon: Activity,   badge: opsCounts.red, badgeDanger: opsCounts.red > 0 },
     { key: 'client',   label: 'Saúde do Cliente',  icon: HeartPulse },
+    { key: 'kanban',   label: 'Produção',          icon: Kanban },
+    { key: 'requests', label: 'Solicitações',      icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
+    { key: 'register', label: 'Cadastrar Cliente', icon: UserPlus },
     { key: 'overview', label: 'Visão Geral',       icon: LayoutDashboard },
     { key: 'todo',     label: 'Meu Dia',           icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',            icon: Calendar },
@@ -111,6 +138,9 @@ export default function CSOperacionalDashboard() {
     kickoff:  ['Clientes pendentes de Kickoff', 'Confirme quando a reunião de kickoff for realizada'],
     ops:      ['Saúde Operacional', 'Farol automático pelas tasks em atraso de cada cliente'],
     client:   ['Saúde do Cliente', 'Farol manual — relacionamento e pendências por parte do cliente'],
+    kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
+    requests: ['Reporte da CS', 'Solicitações abertas para os times de produção'],
+    register: ['Cadastrar Cliente', 'Para clientes que não vieram pelo funil comercial'],
     overview: ['Visão Geral', 'Sua carteira em números'],
     todo:     ['Meu Dia', ''],
     agenda:   ['Agenda', ''],
@@ -210,6 +240,59 @@ export default function CSOperacionalDashboard() {
                 )
             )}
 
+            {page === 'kanban' && (
+              <TaskKanban
+                tasks={tasks}
+                clients={activeClients}
+                allClients={activeClients}
+                collaborators={collaborators}
+                currentUser={me}
+                currentUserSector="cs"
+                readOnly
+                myClientIds={myClientIds}
+                title="Produção dos Clientes"
+                subtitle="Somente leitura"
+                onCreateTask={async () => ({ success: false })}
+                onMoveToProduction={moveToProduction}
+                onMoveToApproval={moveToApproval}
+                onApprove={approveTask}
+                onReject={rejectTask}
+                onAddComment={addComment}
+                onUpdateLinks={updateLinks}
+                onChangeDeadline={changeDeadline}
+                onDelete={deleteTask}
+              />
+            )}
+
+            {page === 'requests' && (
+              <CSRequests
+                requests={requests}
+                clients={clients}
+                collaborators={collaborators}
+                currentUser={me}
+                currentUserSector="cs"
+                onCreate={(data) => createRequest(data, me, 'cs')}
+                onReply={addReply}
+                onCloseRequest={closeRequest}
+                onDelete={deleteRequest}
+                toast={toast}
+              />
+            )}
+
+            {page === 'register' && (
+              <div className="fade-up" style={{ ...CARD, maxWidth: 520 }}>
+                <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Cadastro manual</p>
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 16 }}>
+                  Cadastre um cliente sem depender do fluxo comercial. Ele entra direto como ativo,
+                  já com os responsáveis de cada setor. Se marcar ID Visual, a demanda vai para o
+                  painel do designer escolhido.
+                </p>
+                <button style={{ ...BTN_PRIMARY, width: '100%' }} onClick={() => setShowAddClient(true)}>
+                  + Cadastrar novo cliente
+                </button>
+              </div>
+            )}
+
             {page === 'todo' && <TodoView accent={COLOR} />}
             {page === 'agenda' && <AgendaView />}
           </>
@@ -224,6 +307,19 @@ export default function CSOperacionalDashboard() {
           onClose={() => setOpenId(null)}
           onSetHealth={() => { setHealthTarget(openClient); setOpenId(null); }}
         />, document.body)}
+
+      {showAddClient && (
+        <CSAddClientModal
+          collaborators={collaborators}
+          onClose={() => setShowAddClient(false)}
+          onAdd={async (data) => {
+            const r = await addClient(data);
+            if (r.success) toast(`${data.name} cadastrado e ativo! 🎉`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+        />
+      )}
 
       {healthTarget && ReactDOM.createPortal(
         <ClientHealthModal
