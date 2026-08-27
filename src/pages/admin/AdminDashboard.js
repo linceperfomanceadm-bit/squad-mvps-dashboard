@@ -101,8 +101,8 @@ export default function AdminDashboard() {
     else toast(res.error, 'e');
     return res;
   };
-  const handleUpdateBrandbook = async (clientId, brandbook) => {
-    const res = await updateBrandbook(clientId, brandbook);
+  const handleUpdateBrandbook = async (clientId, brandbook, byName, bySector) => {
+    const res = await updateBrandbook(clientId, brandbook, byName || user?.name, bySector || 'admin');
     if (res.success) toast('Brandbook atualizado!');
     else toast(res.error, 'e');
   };
