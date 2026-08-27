@@ -29,6 +29,12 @@ export default function TaskKanban({
   currentUser, currentUserSector,
   isAdmin = false,
   adminFilters = null,
+  // Modo acompanhamento (CS): vê tudo, comenta, mas não arrasta card
+  // nem cria task. `myClientIds` alimenta o filtro "Meus clientes".
+  readOnly = false,
+  myClientIds = null,
+  title = 'Kanban de Tasks',
+  subtitle = null,
   onCreateTask, onMoveToProduction, onMoveToApproval,
   onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete,
 }) {
@@ -38,13 +44,21 @@ export default function TaskKanban({
   const [dragOverCol, setDragOverCol] = useState(null);
   const [clientFilter, setClientFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
+  const [scope, setScope] = useState('mine');
   const dragTask = useRef(null);
+
+  const temEscopo = readOnly && Array.isArray(myClientIds);
 
   // Always derive selectedTask from live tasks array — this makes chat realtime
   const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null;
 
   // Tasks que este usuário tem permissão de ver (antes dos filtros da tela).
-  const baseTasks = isAdmin
+  const baseTasks = readOnly
+    ? tasks.filter(t => {
+        if (!temEscopo || scope === 'all') return true;
+        return t.clientId && myClientIds.includes(t.clientId);
+      })
+    : isAdmin
     ? tasks.filter(t => {
         if (adminFilters?.sector && t.responsibleSector !== adminFilters.sector && t.requestedBySector !== adminFilters.sector) return false;
         if (adminFilters?.collaborator && t.responsibleName !== adminFilters.collaborator && t.requestedBy !== adminFilters.collaborator) return false;
@@ -145,6 +159,7 @@ export default function TaskKanban({
     setDragOverCol(null);
     dragTask.current = null;
 
+    if (readOnly) return;
     if (!task || task.status === targetColId) return;
 
     const isResponsible = task.responsibleName === currentUser ||
@@ -181,9 +196,10 @@ export default function TaskKanban({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
-            Kanban de Tasks
+            {title}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+            {subtitle ? `${subtitle} · ` : ''}
             {filtroAtivo
               ? `${visibleTasks.length} de ${baseTasks.length} task${baseTasks.length !== 1 ? 's' : ''}`
               : `${visibleTasks.length} task${visibleTasks.length !== 1 ? 's' : ''} visíveis`}
@@ -194,13 +210,38 @@ export default function TaskKanban({
             )}
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
-        >
-          <Plus size={15} /> Nova Task
-        </button>
+        {!readOnly && (
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
+          >
+            <Plus size={15} /> Nova Task
+          </button>
+        )}
       </div>
+
+      {/* Escopo (só no modo acompanhamento da CS) */}
+      {temEscopo && (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+          {[
+            { id: 'mine', label: 'Meus clientes' },
+            { id: 'all',  label: 'Todos os clientes' },
+          ].map(o => (
+            <button
+              key={o.id}
+              onClick={() => { setScope(o.id); setClientFilter(''); }}
+              style={{
+                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: scope === o.id ? 'var(--neon-dim)' : 'var(--surface)',
+                color: scope === o.id ? 'var(--neon)' : 'var(--muted)',
+                border: `1px solid ${scope === o.id ? 'var(--neon-border)' : 'var(--border)'}`,
+              }}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filtros */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
@@ -285,10 +326,10 @@ export default function TaskKanban({
                 colTasks.map(task => (
                   <div
                     key={task.id}
-                    draggable
-                    onDragStart={e => handleDragStart(e, task)}
-                    onDragEnd={handleDragEnd}
-                    style={{ opacity: draggingId === task.id ? 0.4 : 1, cursor: 'grab', transition: 'opacity .15s' }}
+                    draggable={!readOnly}
+                    onDragStart={readOnly ? undefined : (e => handleDragStart(e, task))}
+                    onDragEnd={readOnly ? undefined : handleDragEnd}
+                    style={{ opacity: draggingId === task.id ? 0.4 : 1, cursor: readOnly ? 'pointer' : 'grab', transition: 'opacity .15s' }}
                   >
                     <TaskCard task={task} onClick={() => setSelectedTaskId(task.id)} />
                   </div>
@@ -307,6 +348,7 @@ export default function TaskKanban({
           currentUserSector={currentUserSector}
           collaborators={collaborators}
           isAdmin={isAdmin}
+          readOnly={readOnly}
           onClose={() => setSelectedTaskId(null)}
           onMoveToProduction={async (...args) => { await onMoveToProduction(...args); setSelectedTaskId(null); }}
           onMoveToApproval={async (...args) => { await onMoveToApproval(...args); setSelectedTaskId(null); }}
@@ -320,7 +362,7 @@ export default function TaskKanban({
       )}
 
       {/* Create task modal */}
-      {showCreate && (
+      {showCreate && !readOnly && (
         <CreateTaskModal
           clients={allClients || clients}
           collaborators={collaborators}
