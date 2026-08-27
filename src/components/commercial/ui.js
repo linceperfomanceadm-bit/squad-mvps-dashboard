@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { X, Check } from 'lucide-react';
 
 /*
@@ -17,14 +18,20 @@ export const BTN_GREEN = { background: 'linear-gradient(135deg,#22c55e,#16a34a)'
 export const BTN_CANCEL = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 16px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer' };
 export const ICON_BTN = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' };
 
+// Sempre num portal no document.body. `position: fixed` se ancora no
+// primeiro ancestral com transform — e as classes .fade-up/.fade-in
+// usam animation-fill-mode: both, que deixa o transform aplicado depois
+// da animação. Sem o portal, o modal nasce fora da viewport e a pessoa
+// precisa rolar a página para achar.
 export function Overlay({ children, onClose }) {
-  return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1300, padding: 20, overflowY: 'auto' }}>
+  const content = (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         {children}
       </div>
     </div>
   );
+  return ReactDOM.createPortal(content, document.body);
 }
 
 export function ModalHeader({ title, onClose }) {
