@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   CheckCircle2, Zap, Eye, AlarmClock, Flame, RotateCw,
-  Target, BadgeCheck, TrendingUp, Gem, Trophy, PauseCircle,
+  Target, BadgeCheck, TrendingUp, Gem, Trophy, PauseCircle, Volume2,
 } from 'lucide-react';
 import { HEALTH_LEVELS_4 } from '../hooks/useClientHealth';
 import { useTVData } from '../hooks/useTVData';
@@ -125,6 +125,11 @@ const CSS = `
 .tvparty{position:absolute;inset:0;z-index:50;background:rgba(5,5,8,.95);display:flex;align-items:center;justify-content:center;overflow:hidden;animation:tvpop .5s ease both}
 .tvcf{position:absolute;top:0;border-radius:2px;display:block}
 .tvstandby{position:absolute;inset:0;z-index:60;background:#050508;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqh}
+
+.tvsound{position:absolute;right:2.08cqw;bottom:2.6cqh;z-index:70;display:flex;align-items:center;gap:.6cqw;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);border-radius:99px;
+  padding:1.1cqh 1.5cqw;color:#fff;font-family:'Lexend',sans-serif;font-size:1cqw;font-weight:500;cursor:pointer;
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 `;
 
 // ─── Blocos reutilizáveis ──────────────────────────────────────
@@ -496,6 +501,8 @@ export default function TVPanel() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [scale, setScale] = useState(1);
+  const [audioBlocked, setAudioBlocked] = useState(false);
+  const audioRef = useRef(null);
 
   // Cena travada pelo admin tem prioridade sobre a rotação.
   const lockedIndex = d.tvLockScene ? SCENES.findIndex(s => s.id === d.tvLockScene) : -1;
@@ -539,6 +546,35 @@ export default function TVPanel() {
     return () => clearTimeout(id);
   }, []);
 
+  // ── Rádio ────────────────────────────────────────────────────
+  // A URL, o play/pause e o volume vêm do painel admin e chegam aqui
+  // em tempo real. O navegador não deixa tocar som sem um gesto do
+  // usuário: quando ele bloqueia, aparece um botão discreto no canto
+  // e um único clique libera o áudio pelo resto da sessão.
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    const v = Number(d.tvRadioVolume);
+    el.volume = Math.min(1, Math.max(0, (Number.isFinite(v) ? v : 50) / 100));
+  }, [d.tvRadioVolume, d.tvRadioUrl]);
+
+  useEffect(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (!d.tvRadioUrl || !d.tvRadioPlaying) {
+      el.pause();
+      setAudioBlocked(false);
+      return;
+    }
+    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
+  }, [d.tvRadioUrl, d.tvRadioPlaying]);
+
+  const liberarSom = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
+  };
+
   // Anti burn-in: desloca o conteúdo alguns pixels a cada cena.
   const shift = (activeIndex % 4) * 3;
 
@@ -549,6 +585,10 @@ export default function TVPanel() {
   return (
     <div className="tvroot">
       <style>{CSS}</style>
+
+      {d.tvRadioUrl && (
+        <audio key={d.tvRadioUrl} ref={audioRef} src={d.tvRadioUrl} preload="none" />
+      )}
 
       <div className="tvstage" style={stageStyle}>
         <div className="tvbar">
@@ -595,6 +635,12 @@ export default function TVPanel() {
         )}
 
         {d.celebration && <Celebration data={d.celebration} key={d.celebration.key} />}
+
+        {audioBlocked && (
+          <button className="tvsound" onClick={liberarSom}>
+            <Volume2 size={22} strokeWidth={2.2} /> Ligar som
+          </button>
+        )}
 
         {d.tvPaused && (
           <div className="tvstandby">
