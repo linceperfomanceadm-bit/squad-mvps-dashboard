@@ -170,6 +170,9 @@ export function useTVData() {
         tvPauseMessage: d.tvPauseMessage || '',
         tvLockScene: d.tvLockScene || '',
         tvCelebrations: d.tvCelebrations !== false, // ausente = ligado
+        tvRadioUrl: d.tvRadioUrl || '',
+        tvRadioPlaying: d.tvRadioPlaying === true,
+        tvRadioVolume: typeof d.tvRadioVolume === 'number' ? d.tvRadioVolume : 50,
       });
 
       // Recarregar remotamente: o admin grava um token novo e todas as
