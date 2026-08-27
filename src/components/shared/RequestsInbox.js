@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Send, CheckCircle2, Square, CheckSquare, Inbox } from 'lucide-react';
 import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS } from '../../lib/firebase';
 import {
-  Overlay, ModalHeader, Tag, Empty,
+  Overlay, ModalHeader, Tag,
   MODAL, LBL, INP, BTN_PRIMARY, BTN_CANCEL, CARD, GRID,
 } from '../commercial/ui';
 
