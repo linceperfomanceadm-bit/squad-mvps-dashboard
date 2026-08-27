@@ -100,7 +100,7 @@ function CompletionPopup({ task, onClose }) {
 }
 
 // ─── Main TaskModal ───────────────────────────────────────────
-export default function TaskModal({ task, currentUser, currentUserSector, collaborators, onClose, onMoveToProduction, onMoveToApproval, onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete, isAdmin = false }) {
+export default function TaskModal({ task, currentUser, currentUserSector, collaborators, onClose, onMoveToProduction, onMoveToApproval, onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete, isAdmin = false, readOnly = false }) {
   const [comment, setComment] = useState('');
   const [newLink, setNewLink] = useState('');
   const [newLinkName, setNewLinkName] = useState('');
@@ -131,7 +131,9 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   // entrega e conta nas métricas) não sai por aqui — só os extras.
   const principalName = task.responsibleName || respNames[0] || '';
   const extraNames    = respNames.filter(n => n !== principalName);
-  const canEditResponsibles = (isAdmin || isRequester) && task.status !== 'done';
+  // readOnly: modo acompanhamento da CS. Ela lê tudo e comenta, mas não
+  // mexe em nada — nem responsáveis, nem prazo, nem status.
+  const canEditResponsibles = (isAdmin || isRequester) && task.status !== 'done' && !readOnly;
 
   // Realtime: scroll chat to bottom when comments change
   useEffect(() => {
@@ -239,6 +241,11 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               <span style={{ fontSize: 11, color: TASK_COLUMNS.find(c => c.id === task.status)?.color || '#aaa', fontFamily: 'var(--fm)', fontWeight: 600 }}>
                 {TASK_COLUMNS.find(c => c.id === task.status)?.label}
               </span>
+              {readOnly && (
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,.06)', color: '#8F97A0', border: '1px solid rgba(255,255,255,.12)', fontFamily: 'var(--fm)' }}>
+                  ACOMPANHAMENTO
+                </span>
+              )}
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{task.name}</h2>
             <p style={{ fontSize: 12, color: '#888' }}>
@@ -246,7 +253,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            {(isAdmin || isRequester) && (
+            {(isAdmin || isRequester) && !readOnly && (
               <button style={{ background: 'rgba(238,51,99,.1)', border: '1px solid rgba(238,51,99,.25)', borderRadius: 8, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(true)}>
                 <Trash2 size={14} />
               </button>
@@ -271,7 +278,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 <div key={item.label} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
                   <span style={{ fontSize: 9, letterSpacing: '.1em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
                   <span style={{ fontSize: 13, color: item.color || '#ddd', fontWeight: 600 }}>{item.value}</span>
-                  {item.deadline && (isResponsible || isAdmin) && onChangeDeadline && (
+                  {item.deadline && (isResponsible || isAdmin) && !readOnly && onChangeDeadline && (
                     <button onClick={() => { setNewDeadline(task.deadline || ''); setDeadlineReason(''); setShowDeadlineForm(true); }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>alterar</button>
                   )}
                 </div>
@@ -401,7 +408,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 const url     = isObj ? link.url  : link;
                 const name    = isObj ? link.name : 'Link';
                 const addedBy = isObj ? link.addedBy : null;
-                const canDelete = isAdmin || !addedBy || addedBy === currentUser;
+                const canDelete = !readOnly && (isAdmin || !addedBy || addedBy === currentUser);
 
                 return (
                   <div key={i} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '9px 12px', marginBottom: 7 }}>
@@ -424,7 +431,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               })}
 
               {/* Add link */}
-              {(isAdmin || isResponsible || isRequester) && (
+              {(isAdmin || isResponsible || isRequester) && !readOnly && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                   <input style={S.input} value={newLinkName} onChange={e => setNewLinkName(e.target.value)} placeholder="Nome / descrição do link" />
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -438,7 +445,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             </div>
 
             {/* Actions */}
-            {task.status !== 'done' && (
+            {task.status !== 'done' && !readOnly && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>AÇÕES</p>
 
