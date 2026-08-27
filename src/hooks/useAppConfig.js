@@ -14,6 +14,9 @@ const DEFAULTS = {
   tvLockScene: '',        // '' = rotação normal; id da cena = travado
   tvCelebrations: true,   // confete ao concluir entrega
   tvReloadToken: 0,       // muda de valor = todas as TVs recarregam
+  tvRadioUrl: '',         // stream da rádio (mp3/aac/m3u8 direto)
+  tvRadioPlaying: false,  // false = som parado na TV
+  tvRadioVolume: 50,      // 0 a 100
 };
 export function useAppConfig() {
   const [config, setConfig] = useState(DEFAULTS);
