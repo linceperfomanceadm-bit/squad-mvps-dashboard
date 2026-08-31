@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
@@ -7,6 +8,7 @@ import RequestsInbox from '../../components/shared/RequestsInbox';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useDocuments } from '../../hooks/useDocuments';
 import { useRequests } from '../../hooks/useRequests';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
@@ -16,6 +18,7 @@ import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import SMBulkInput from '../../components/sectors/socialMedia/SMBulkInput';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
 const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
@@ -25,6 +28,7 @@ const NAV = [
   { key: 'smkanban',   label: 'Posts',          icon: Columns },
   { key: 'planning',   label: 'Planejamento',   icon: Plus },
   { key: 'kanban',     label: 'Tasks',           icon: Kanban },
+  { key: 'documentos', label: 'Documentos',      icon: FileText },
   { key: 'requests',   label: 'Reporte da CS',   icon: MessageSquare },
   { key: 'onboarding', label: 'Onboarding',      icon: ClipboardList },
   { key: 'vault',      label: 'Brand Hub',       icon: BookOpen },
@@ -42,6 +46,8 @@ export default function SocialMediaDashboard() {
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
+  const { documents, createDocument, deleteDocument } = useDocuments();
+  const navigate = useNavigate();
   const [page, setPage] = useState('overview');
 
   // `c.active !== false` e responsável em array: cliente antigo ou
@@ -56,6 +62,11 @@ export default function SocialMediaDashboard() {
       if (p.responsible === user?.name) myPosts.push({ ...p, clientName: c.name, clientId: c.id });
     });
   });
+
+  // Cada social media vê os documentos dos clientes em que é
+  // responsável. O admin usa o painel próprio.
+  const myClientIds = myClients.map(c => c.id);
+  const myDocs = documents.filter(d => myClientIds.includes(d.clientId));
 
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;
@@ -110,6 +121,29 @@ export default function SocialMediaDashboard() {
           <SMKanban myPosts={myPosts} onStatusChange={smUpdatePostStatus} />
         ) : page === 'planning' ? (
           <SMBulkInput clients={myClients} responsible={user?.name} onSave={handleBulkSave} />
+        ) : page === 'documentos' ? (
+          <DocsList
+            documents={myDocs}
+            clients={myClients}
+            currentUser={user?.name}
+            isAdmin={!!user?.isAdmin}
+            onOpen={(id) => navigate(`/documentos/${id}`)}
+            onCreate={async (dados) => {
+              const res = await createDocument({
+                ...dados,
+                autorName: user?.name,
+                autorSector: 'socialmedia',
+              });
+              if (res.success) navigate(`/documentos/${res.id}`);
+              else toast(res.error, 'e');
+              return res;
+            }}
+            onDelete={async (id) => {
+              const res = await deleteDocument(id);
+              if (res.success) toast('Documento apagado.');
+              else toast(res.error, 'e');
+            }}
+          />
         ) : page === 'onboarding' ? (
           <OnboardingBoard sectorId="socialmedia" />
         ) : page === 'requests' ? (
