@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, XCircle, TrendingUp, CheckSquare, Calendar, Package, Monitor } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, XCircle, TrendingUp, CheckSquare, Calendar, Package, Monitor, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
+import { useDocuments } from '../../hooks/useDocuments';
 import { useDeals } from '../../hooks/useDeals';
 import { useCommercialGoals } from '../../hooks/useCloserData';
 import { useToast } from '../../components/shared/Toast';
@@ -21,6 +23,7 @@ import AdminTVControl from '../../components/admin/AdminTVControl';
 import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
+import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 import { SECTORS } from '../../lib/firebase';
 
 const NAV = [
@@ -31,6 +34,7 @@ const NAV = [
   { key: 'goals',         label: 'Metas',           icon: TrendingUp },
   { key: 'commercial',    label: 'Métricas Comercial', icon: BarChart2 },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
+  { key: 'documentos',    label: 'Documentos',      icon: FileText },
   { key: 'vault',         label: 'Brand Hub',        icon: BookOpen },
   { key: 'clients',       label: 'Clientes',        icon: Users },
   { key: 'portal',        label: 'Portal de Produtos', icon: Package },
@@ -52,6 +56,8 @@ export default function AdminDashboard() {
     removeBrandMaterial,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
+  const { documents, createDocument, deleteDocument } = useDocuments();
+  const navigate = useNavigate();
   const { deals, loading: loadingDeals, deleteCall } = useDeals();
   const { goals, saveGoals } = useCommercialGoals();
   const {
@@ -215,6 +221,29 @@ export default function AdminDashboard() {
           <AdminCommercialMetrics deals={deals} user={user} onDeleteCall={async (id) => { const r = await deleteCall(id, { ...user, isAdmin: true }); if (r.success) toast('Call excluída.'); else toast(r.error, 'e'); }} />
         ) : page === 'portal' ? (
           <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
+        ) : page === 'documentos' ? (
+          <DocsList
+            documents={documents}
+            clients={clients.filter(c => c.active !== false)}
+            currentUser={user?.name}
+            isAdmin
+            onOpen={(id) => navigate(`/documentos/${id}`)}
+            onCreate={async (dados) => {
+              const res = await createDocument({
+                ...dados,
+                autorName: user?.name,
+                autorSector: 'admin',
+              });
+              if (res.success) navigate(`/documentos/${res.id}`);
+              else toast(res.error, 'e');
+              return res;
+            }}
+            onDelete={async (id) => {
+              const res = await deleteDocument(id);
+              if (res.success) toast('Documento apagado.');
+              else toast(res.error, 'e');
+            }}
+          />
         ) : page === 'vault' ? (
           <VaultPage
             clients={clients}
