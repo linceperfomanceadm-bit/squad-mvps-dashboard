@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Columns, Plus, Kanban, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, FileText, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
@@ -8,46 +8,44 @@ import RequestsInbox from '../../components/shared/RequestsInbox';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
-import { useDocuments } from '../../hooks/useDocuments';
 import { useRequests } from '../../hooks/useRequests';
+import { useDocuments } from '../../hooks/useDocuments';
 import { useToast } from '../../components/shared/Toast';
 import Sidebar from '../../components/shared/Sidebar';
 import SMOverview from '../../components/sectors/socialMedia/SMOverview';
-import SMKanban from '../../components/sectors/socialMedia/SMKanban';
+import SMMural from '../../components/sectors/socialMedia/SMMural';
+import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import SMBulkInput from '../../components/sectors/socialMedia/SMBulkInput';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import TaskKanban from '../../components/kanban/TaskKanban';
-import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
 const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
 
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',   icon: LayoutDashboard },
-  { key: 'smkanban',   label: 'Posts',          icon: Columns },
-  { key: 'planning',   label: 'Planejamento',   icon: Plus },
-  { key: 'kanban',     label: 'Tasks',           icon: Kanban },
-  { key: 'documentos', label: 'Documentos',      icon: FileText },
-  { key: 'requests',   label: 'Reporte da CS',   icon: MessageSquare },
-  { key: 'onboarding', label: 'Onboarding',      icon: ClipboardList },
-  { key: 'vault',      label: 'Brand Hub',       icon: BookOpen },
-  { key: 'todo',       label: 'Meu Dia',         icon: CheckSquare },
-  { key: 'agenda',     label: 'Agenda',          icon: Calendar },
+  { key: 'mural',      label: 'Mural',          icon: Users },
+  { key: 'kanban',     label: 'Tasks',          icon: Kanban },
+  { key: 'documentos', label: 'Documentos',     icon: FileText },
+  { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
+  { key: 'onboarding', label: 'Onboarding',     icon: ClipboardList },
+  { key: 'vault',      label: 'Brand Hub',      icon: BookOpen },
+  { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
+  { key: 'agenda',     label: 'Agenda',         icon: Calendar },
 ];
 
 export default function SocialMediaDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const {
-    clients, loading, smAddBulkPosts, smUpdatePostStatus,
-    updateBrandbook, addBrandMaterial, removeBrandMaterial,
-  } = useClients();
+  const navigate = useNavigate();
+  const { clients, loading, updateBrandbook, addBrandMaterial, removeBrandMaterial } = useClients();
   const { collaborators } = useCollaborators();
-  const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
+  const {
+    tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval,
+    approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
+  } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
   const { documents, createDocument, deleteDocument } = useDocuments();
-  const navigate = useNavigate();
   const [page, setPage] = useState('overview');
 
   // `c.active !== false` e responsável em array: cliente antigo ou
@@ -56,15 +54,8 @@ export default function SocialMediaDashboard() {
     c => c.active !== false && asArray(c.responsibles?.socialmedia).includes(user?.name)
   );
 
-  const myPosts = [];
-  myClients.forEach(c => {
-    (c.sm?.posts || []).forEach(p => {
-      if (p.responsible === user?.name) myPosts.push({ ...p, clientName: c.name, clientId: c.id });
-    });
-  });
-
-  // Cada social media vê os documentos dos clientes em que é
-  // responsável. O admin usa o painel próprio.
+  // Cada social media enxerga os documentos dos clientes em que é
+  // responsável. O admin tem a visão completa no painel próprio.
   const myClientIds = myClients.map(c => c.id);
   const myDocs = documents.filter(d => myClientIds.includes(d.clientId));
 
@@ -74,12 +65,8 @@ export default function SocialMediaDashboard() {
   // Solicitação da CS que ainda não foi respondida por esta pessoa.
   const openRequests = requests.filter(r => r.toName === user?.name && r.status === 'open').length;
 
-  const handleBulkSave = async (rows) => {
-    const res = await smAddBulkPosts(rows);
-    if (res.success) { toast(`${rows.length} post${rows.length > 1 ? 's' : ''} adicionado${rows.length > 1 ? 's' : ''}!`); setPage('smkanban'); }
-    else toast(res.error, 'e');
-    return res;
-  };
+  // Documento em rascunho ou revisão conta como trabalho em aberto.
+  const openDocs = myDocs.filter(d => d.status === 'rascunho' || d.status === 'revisao').length;
 
   const handleCreateTask = async (data) => {
     const res = await createTask(data);
@@ -95,15 +82,40 @@ export default function SocialMediaDashboard() {
     return res;
   };
 
+  const handleCreateDoc = async (dados) => {
+    const res = await createDocument({
+      ...dados,
+      autorName: user?.name,
+      autorSector: 'socialmedia',
+    });
+    if (res.success) navigate(`/documentos/${res.id}`);
+    else toast(res.error, 'e');
+    return res;
+  };
+
+  const handleDeleteDoc = async (id) => {
+    const res = await deleteDocument(id);
+    if (res.success) toast('Documento apagado.');
+    else toast(res.error, 'e');
+  };
+
+  // Criar documento a partir do card do cliente, no Mural: o cliente
+  // já vem escolhido, então cai direto no editor.
+  const handleNovoDocDoCliente = async (cliente) => {
+    await handleCreateDoc({
+      tipo: 'pre-estrategia',
+      clientId: cliente.id,
+      clientName: cliente.name,
+    });
+  };
+
   const navItems = NAV.map(n => ({
     ...n,
-    badge: n.key === 'smkanban'
-      ? myPosts.filter(p => p.status === 'client').length
-      : n.key === 'kanban' ? pendingApproval
+    badge: n.key === 'kanban' ? pendingApproval
       : n.key === 'requests' ? openRequests
+      : n.key === 'documentos' ? openDocs
       : 0,
-    badgeDanger: (n.key === 'smkanban')
-      || (n.key === 'kanban' && pendingApproval > 0)
+    badgeDanger: (n.key === 'kanban' && pendingApproval > 0)
       || (n.key === 'requests' && openRequests > 0),
   }));
 
@@ -116,11 +128,20 @@ export default function SocialMediaDashboard() {
             <div className="spinner" style={{ width: 36, height: 36 }} />
           </div>
         ) : page === 'overview' ? (
-          <SMOverview myPosts={myPosts} onNavigate={setPage} />
-        ) : page === 'smkanban' ? (
-          <SMKanban myPosts={myPosts} onStatusChange={smUpdatePostStatus} />
-        ) : page === 'planning' ? (
-          <SMBulkInput clients={myClients} responsible={user?.name} onSave={handleBulkSave} />
+          <SMOverview
+            myClients={myClients}
+            myDocs={myDocs}
+            myTasks={myTasks}
+            onNavigate={setPage}
+          />
+        ) : page === 'mural' ? (
+          <SMMural
+            clients={myClients}
+            documents={myDocs}
+            tasks={tasks}
+            onAbrirDocumento={(id) => navigate(`/documentos/${id}`)}
+            onNovoDocumento={handleNovoDocDoCliente}
+          />
         ) : page === 'documentos' ? (
           <DocsList
             documents={myDocs}
@@ -128,21 +149,8 @@ export default function SocialMediaDashboard() {
             currentUser={user?.name}
             isAdmin={!!user?.isAdmin}
             onOpen={(id) => navigate(`/documentos/${id}`)}
-            onCreate={async (dados) => {
-              const res = await createDocument({
-                ...dados,
-                autorName: user?.name,
-                autorSector: 'socialmedia',
-              });
-              if (res.success) navigate(`/documentos/${res.id}`);
-              else toast(res.error, 'e');
-              return res;
-            }}
-            onDelete={async (id) => {
-              const res = await deleteDocument(id);
-              if (res.success) toast('Documento apagado.');
-              else toast(res.error, 'e');
-            }}
+            onCreate={handleCreateDoc}
+            onDelete={handleDeleteDoc}
           />
         ) : page === 'onboarding' ? (
           <OnboardingBoard sectorId="socialmedia" />
