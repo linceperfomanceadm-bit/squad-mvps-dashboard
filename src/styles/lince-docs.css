@@ -1,0 +1,281 @@
+/* ═══════════════════════════════════════════════════════════════
+   Lince Docs — folha de estilo dos slides
+
+   Tudo aqui vive dentro de `.lince-deck`. O app usa estilos inline,
+   então as classes genéricas (.card, .grid, .num) não colidem com
+   nada — mas o escopo evita que colidam no futuro.
+
+   As unidades são `cqw` (percentual da largura do contêiner), então
+   o slide escala em qualquer largura sem recalcular nada. Preservar
+   essa técnica: é o que faz a pré-visualização e o PDF baterem.
+
+   As URLs dos arquivos de marca entram por variável CSS, injetadas
+   pelo React a partir de `src/lib/docs/marca.js`.
+   ═══════════════════════════════════════════════════════════════ */
+
+.lince-deck {
+  --rosa: #EE3363;
+  --vinho: #8E0025;
+  --grafite: #272727;
+  --branco: #FFFFFF;
+  --rosaclaro: #E6C5D2;
+  --preto: #14010F;
+  --display: 'Unbounded', system-ui, sans-serif;
+  --corpo: 'Lexend', system-ui, sans-serif;
+  --util: 'Saira Extra Condensed', 'Arial Narrow', sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+/* ── O slide ─────────────────────────────────────────────────── */
+.lince-deck .slide {
+  position: relative;
+  width: 100%;
+  max-width: 1280px;
+  aspect-ratio: 16/9;
+  container-type: size;
+  background: var(--preto);
+  color: var(--branco);
+  overflow: hidden;
+  padding: 5cqw 5.5cqw 9cqw;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--corpo);
+  font-weight: 300;
+}
+
+.lince-deck .slide::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(58% 70% at 0% 100%, rgba(238,51,99,.28), transparent 62%),
+    radial-gradient(48% 62% at 100% 0%, rgba(142,0,37,.55), transparent 60%);
+}
+
+.lince-deck .slide > * { position: relative; z-index: 2; }
+
+.lince-deck .slide.capa::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--capa) right center/cover no-repeat;
+}
+.lince-deck .slide.capa::before {
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(20,1,15,.96) 0%, rgba(20,1,15,.86) 32%, rgba(20,1,15,.34) 54%, rgba(20,1,15,0) 70%),
+    radial-gradient(52% 62% at 0% 100%, rgba(238,51,99,.22), transparent 62%);
+}
+
+.lince-deck .slide.fechamento::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--fechamento) center 42%/cover no-repeat;
+  filter: grayscale(.45) contrast(1.05) brightness(.66);
+}
+.lince-deck .slide.fechamento::before {
+  z-index: 1;
+  background:
+    radial-gradient(64% 70% at 50% 46%, rgba(20,1,15,.74) 0%, rgba(20,1,15,.52) 58%, rgba(20,1,15,.34) 100%),
+    linear-gradient(180deg, rgba(142,0,37,.30) 0%, rgba(20,1,15,.40) 100%);
+}
+
+/* Marca d'água do lince — entre 7% e 13% de opacidade, sem exceção */
+.lince-deck .slide.mascote-canto::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  right: -6cqw;
+  bottom: -14cqw;
+  width: 30cqw;
+  height: 39cqw;
+  background: var(--icone-rosa) center/contain no-repeat;
+  opacity: .07;
+}
+
+.lince-deck .pg {
+  position: absolute; top: 3.4cqw; right: 4.4cqw; z-index: 3;
+  font-family: var(--display); font-weight: 800; font-size: 2cqw; color: var(--branco);
+}
+.lince-deck .logo {
+  position: absolute; bottom: 3.4cqw; right: 4.4cqw; z-index: 3;
+  width: 15cqw; aspect-ratio: 700/201;
+  background: var(--logo-branca) center/contain no-repeat;
+}
+
+/* ── Tipografia ──────────────────────────────────────────────── */
+.lince-deck .slide h1 {
+  font-family: var(--display); font-weight: 800; font-size: 6.2cqw; line-height: .98;
+  color: var(--rosa); text-transform: uppercase; letter-spacing: -.02em;
+}
+.lince-deck .slide h2 {
+  font-family: var(--display); font-weight: 800; font-size: 4.4cqw; line-height: 1;
+  color: var(--rosa); text-transform: uppercase; letter-spacing: -.01em;
+}
+.lince-deck .slide h3 {
+  font-family: var(--display); font-weight: 600; font-size: 1.9cqw;
+  color: var(--branco); text-transform: uppercase;
+}
+.lince-deck .eyebrow {
+  font-family: var(--util); font-weight: 800; font-size: 1.5cqw; letter-spacing: .34em;
+  text-transform: uppercase; color: var(--rosaclaro); margin-bottom: 1.2cqw;
+}
+.lince-deck .slide p,
+.lince-deck .slide li { font-size: 1.55cqw; line-height: 1.5; font-weight: 300; }
+.lince-deck .slide strong { font-weight: 600; }
+.lince-deck .lede { font-size: 1.9cqw; font-weight: 300; line-height: 1.45; }
+
+/* REGRA 3.1 — o campo vazio aparece marcado, e continua no PDF */
+.lince-deck .ph { color: rgba(230,197,210,.62); font-style: italic; }
+
+.lince-deck .bar {
+  height: .85cqw; border-radius: 100px; margin: 1.6cqw 0 2.2cqw; width: 34%;
+  background: linear-gradient(90deg, var(--rosa) 0%, var(--vinho) 62%, var(--preto) 100%);
+}
+
+.lince-deck ul.ast { list-style: none; display: flex; flex-direction: column; gap: 1.1cqw; }
+.lince-deck ul.ast li { position: relative; padding-left: 2.6cqw; }
+.lince-deck ul.ast li::before {
+  content: '✳'; position: absolute; left: 0; top: -.05em;
+  color: var(--rosa); font-size: 1.7cqw; line-height: 1.4;
+}
+
+/* ── Grades e cards ──────────────────────────────────────────── */
+.lince-deck .grid { display: grid; gap: 1.6cqw; }
+.lince-deck .g2 { grid-template-columns: 1fr 1fr; }
+.lince-deck .g3 { grid-template-columns: repeat(3, 1fr); }
+.lince-deck .g4 { grid-template-columns: repeat(4, 1fr); }
+
+.lince-deck .card {
+  border: 2px solid var(--rosa); border-radius: 1.6cqw;
+  padding: 2cqw 2.2cqw; background: rgba(20,1,15,.62);
+}
+.lince-deck .card.solid { background: var(--branco); color: var(--grafite); border-color: var(--branco); }
+.lince-deck .card.solid h3, .lince-deck .card.solid .num { color: var(--vinho); }
+.lince-deck .card.claro { background: var(--rosaclaro); color: var(--grafite); border-color: var(--rosaclaro); }
+.lince-deck .card.claro h3 { color: var(--vinho); }
+.lince-deck .card h3 { margin-bottom: .9cqw; }
+.lince-deck .card p { font-size: 1.35cqw; }
+
+.lince-deck .num {
+  font-family: var(--display); font-weight: 800; font-size: 2.6cqw; color: var(--rosa);
+  line-height: 1; margin-bottom: .6cqw; display: block;
+}
+
+.lince-deck .fecho {
+  margin-top: auto; border-left: .55cqw solid var(--rosa);
+  background: rgba(230,197,210,.10); padding: 1.5cqw 2cqw; border-radius: 0 1cqw 1cqw 0;
+}
+.lince-deck .fecho .rot {
+  font-family: var(--util); font-weight: 800; font-size: 1.35cqw; letter-spacing: .26em;
+  text-transform: uppercase; color: var(--rosa); display: block; margin-bottom: .5cqw;
+}
+.lince-deck .fecho p { font-size: 1.5cqw; }
+
+/* ── Tabelas ─────────────────────────────────────────────────── */
+.lince-deck .slide table { width: 100%; border-collapse: collapse; font-size: 1.3cqw; }
+.lince-deck .slide th {
+  font-family: var(--util); font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  font-size: 1.25cqw; text-align: left; color: var(--preto); background: var(--rosa); padding: .9cqw 1.2cqw;
+}
+.lince-deck .slide th:first-child { border-radius: .8cqw 0 0 0; }
+.lince-deck .slide th:last-child { border-radius: 0 .8cqw 0 0; }
+.lince-deck .slide td {
+  padding: .85cqw 1.2cqw; border-bottom: 1px solid rgba(230,197,210,.22); font-weight: 300;
+}
+.lince-deck .slide tbody tr:nth-child(even) { background: rgba(230,197,210,.06); }
+
+/* ── Pesos dos pilares e fluxo ───────────────────────────────── */
+.lince-deck .pesos {
+  display: flex; height: 5cqw; border-radius: 1cqw; overflow: hidden; margin-bottom: 1.8cqw;
+}
+.lince-deck .pesos div {
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--display); font-weight: 800; font-size: 2cqw;
+}
+.lince-deck .p1 { background: var(--rosa); color: var(--preto); }
+.lince-deck .p2 { background: var(--vinho); color: var(--branco); }
+.lince-deck .p3 { background: var(--rosaclaro); color: var(--grafite); }
+.lince-deck .p4 { background: var(--grafite); color: var(--branco); }
+
+.lince-deck .fluxo { display: flex; align-items: stretch; gap: 1cqw; }
+.lince-deck .fluxo .card { flex: 1; }
+.lince-deck .seta { display: flex; align-items: center; color: var(--rosa); font-size: 2.6cqw; font-weight: 800; }
+
+/* ── Etiquetas e variação ────────────────────────────────────── */
+.lince-deck .tag {
+  display: inline-block; font-family: var(--util); font-weight: 800; letter-spacing: .18em;
+  text-transform: uppercase; font-size: 1.05cqw; padding: .2cqw .9cqw; border-radius: 100px;
+  border: 1px solid currentColor; color: var(--rosa); margin-bottom: .8cqw;
+}
+.lince-deck .card.claro .tag, .lince-deck .card.solid .tag { color: var(--vinho); }
+.lince-deck .tag.vazio {
+  color: rgba(230,197,210,.62); font-style: italic; letter-spacing: .08em;
+  text-transform: none; font-family: var(--corpo); font-weight: 400;
+}
+
+/* Convenção de cor do manual: alta é branca, queda é rosa.
+   Não introduzir verde e vermelho — não existem na paleta. */
+.lince-deck .delta {
+  display: inline-block; font-family: var(--util); font-weight: 800; letter-spacing: .12em;
+  font-size: 1.15cqw; padding: .2cqw .8cqw; border-radius: 100px; white-space: nowrap;
+}
+.lince-deck .delta.alta { background: rgba(255,255,255,.16); color: var(--branco); border: 1px solid rgba(255,255,255,.45); }
+.lince-deck .delta.queda { background: rgba(238,51,99,.22); color: var(--rosa); border: 1px solid var(--rosa); }
+.lince-deck .delta.estavel,
+.lince-deck .delta.novo { background: rgba(230,197,210,.12); color: var(--rosaclaro); border: 1px solid rgba(230,197,210,.35); }
+.lince-deck .card.claro .delta.alta,
+.lince-deck .card.solid .delta.alta { background: rgba(39,39,39,.12); color: var(--grafite); border-color: rgba(39,39,39,.4); }
+
+.lince-deck .card.kpi { display: flex; flex-direction: column; gap: .35cqw; padding: 1.8cqw; }
+.lince-deck .card.kpi .rotulo {
+  font-family: var(--util); font-weight: 800; letter-spacing: .2em; text-transform: uppercase;
+  font-size: 1.1cqw; color: var(--rosaclaro);
+}
+.lince-deck .card.kpi .valor {
+  font-family: var(--display); font-weight: 800; font-size: 3cqw; line-height: 1.05; color: var(--branco);
+}
+.lince-deck .card.kpi .antes { font-size: 1.1cqw; color: rgba(230,197,210,.7); margin-bottom: .6cqw; }
+.lince-deck .card.kpi .delta { align-self: flex-start; }
+
+/* Detector de transbordo — some na impressão, ver bloco abaixo */
+.lince-deck .slide.transbordo { outline: 3px solid var(--rosa); outline-offset: -3px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   IMPRESSÃO
+   A rota /documentos/:id/imprimir renderiza só o deck. O tamanho da
+   página (1280x720, margem zero) é injetado por aquela página, para
+   não alterar a impressão do resto do app.
+
+   REGRA 3.10 — o que é apoio interno nunca imprime.
+   ═══════════════════════════════════════════════════════════════ */
+@media print {
+  .lince-nao-imprime { display: none !important; }
+
+  .lince-deck { gap: 0; display: block; }
+
+  .lince-deck .slide {
+    max-width: none;
+    width: 100%;
+    page-break-after: always;
+    break-after: page;
+    outline: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .lince-deck .slide:last-child { page-break-after: auto; break-after: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lince-deck * { transition: none !important; }
+}
