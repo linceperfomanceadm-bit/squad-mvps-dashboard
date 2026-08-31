@@ -27,9 +27,10 @@ export function blocosDoDeck(doc, dados, opcionais, extras) {
       if (layout) {
         saida.push({
           id: `${e.id || `${b.id}-extra-${i}`}`,
-          nome: `${layout.nome}`,
+          nome: layout.nome,
           html: layout.render(e.d || {}),
           extra: true,
+          pai: b.nome,
         });
       }
     });
@@ -37,14 +38,42 @@ export function blocosDoDeck(doc, dados, opcionais, extras) {
   return saida;
 }
 
+// O `scrollHeight` do slide não serve para detectar transbordo: a
+// marca d'água do lince fica de propósito para fora da caixa
+// (`bottom:-14cqw`) e contaria como conteúdo que passou da página.
+// Então medimos só o que está no fluxo — texto, cards e tabelas —
+// ignorando numeração, logo e decoração posicionadas.
+function textoSobrando(el) {
+  const estilo = window.getComputedStyle(el);
+  const limite = el.clientHeight - parseFloat(estilo.paddingBottom || 0);
+  return Array.from(el.children).some((filho) => {
+    if (window.getComputedStyle(filho).position === 'absolute') return false;
+    return filho.offsetTop + filho.offsetHeight > limite + 2;
+  });
+}
+
 export default function DocPreview({
-  doc, dados, opcionais, extras, secaoAtiva, onTransbordo, imprimindo = false,
+  doc, dados, opcionais, extras, secaoAtiva, onTransbordo,
+  imprimindo = false, apenasSecao = false,
 }) {
   const refs = useRef([]);
-  const blocos = useMemo(
+  const todos = useMemo(
     () => blocosDoDeck(doc, dados, opcionais, extras),
     [doc, dados, opcionais, extras],
   );
+
+  // Mostrar só os slides da seção aberta troca aproximação por
+  // correspondência exata: o que está à direita é o que o campo à
+  // esquerda produz. O deck inteiro continua a um clique.
+  const blocos = useMemo(() => {
+    if (!apenasSecao || !secaoAtiva) return todos;
+    const doSetor = todos.filter((b) => b.nome === secaoAtiva || b.pai === secaoAtiva);
+    return doSetor.length ? doSetor : todos;
+  }, [todos, apenasSecao, secaoAtiva]);
+
+  // A numeração é sempre a do documento inteiro, mesmo filtrando:
+  // slide 7 tem que continuar sendo o 7.
+  const numero = (b) => todos.findIndex((x) => x === b) + 1;
 
   // Detector de transbordo: o slide tem altura fixa, então conteúdo
   // que passa da página é conteúdo que seria cortado na impressão.
@@ -58,9 +87,8 @@ export default function DocPreview({
         // caixa própria. Quem tem altura fixa é o `.slide` de dentro.
         const el = wrap && wrap.querySelector('.slide');
         if (!el) return;
-        const passou = el.scrollHeight > el.clientHeight + 2;
-        el.classList.toggle('transbordo', passou);
-        if (passou) estourados += 1;
+        el.classList.toggle('transbordo', textoSobrando(el));
+        if (el.classList.contains('transbordo')) estourados += 1;
       });
       if (onTransbordo) onTransbordo(estourados);
     };
@@ -74,12 +102,12 @@ export default function DocPreview({
   // slide bate com o título da seção no catálogo; sem correspondência,
   // fica onde está em vez de pular para o começo.
   useEffect(() => {
-    if (imprimindo || !secaoAtiva) return;
+    if (imprimindo || apenasSecao || !secaoAtiva) return;
     const i = blocos.findIndex((b) => b.nome === secaoAtiva);
     if (i < 0) return;
     const el = refs.current[i] && refs.current[i].querySelector('.slide');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [secaoAtiva, blocos, imprimindo]);
+  }, [secaoAtiva, blocos, imprimindo, apenasSecao]);
 
   if (!doc) return null;
 
@@ -92,7 +120,7 @@ export default function DocPreview({
           className="slide-wrap"
           style={{ width: '100%', display: 'contents' }}
           dangerouslySetInnerHTML={{
-            __html: b.html.replace('<span class="pg"></span>', `<span class="pg">${i + 1}</span>`),
+            __html: b.html.replace('<span class="pg"></span>', `<span class="pg">${numero(b)}</span>`),
           }}
         />
       ))}
