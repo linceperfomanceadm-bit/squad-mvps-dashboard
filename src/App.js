@@ -15,6 +15,8 @@ import CloserDashboard from './pages/sectors/CloserDashboard';
 import CSComercialDashboard from './pages/sectors/CSComercialDashboard';
 import CSOperacionalDashboard from './pages/sectors/CSOperacionalDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
+import DocEditorPage from './pages/sectors/DocEditorPage';
+import DocPrintPage from './pages/sectors/DocPrintPage';
 import { PortalAuthProvider, usePortalAuth } from './contexts/PortalAuthContext';
 import PortalLoginPage from './pages/PortalLoginPage';
 import PortalDashboard from './pages/PortalDashboard';
@@ -45,7 +47,7 @@ function homeFor(user) {
   return `/${user.sector}`;
 }
 
-function ProtectedRoute({ children, requireSector, requireAdmin, requireCommercialRole, requireCsRole }) {
+function ProtectedRoute({ children, requireSector, requireAdmin, requireCommercialRole, requireCsRole, allowAdmin }) {
   const { user, loading } = useAuth();
 
   if (loading) return (
@@ -57,7 +59,11 @@ function ProtectedRoute({ children, requireSector, requireAdmin, requireCommerci
   if (!user) return <Navigate to="/" replace />;
   if (user.firstAccess) return <Navigate to="/first-access" replace />;
 
-  // Admin sempre vai para /admin, exceto quando a rota já é a de admin.
+  // Admin sempre vai para /admin, exceto quando a rota já é a de admin
+  // ou quando ela é compartilhada — o editor de documentos é usado
+  // tanto pelo social media quanto pelo admin.
+  if (user.isAdmin && allowAdmin) return children;
+
   if (user.isAdmin && !requireAdmin) return <Navigate to="/admin" replace />;
 
   if (requireAdmin && !user.isAdmin) return <Navigate to={homeFor(user)} replace />;
@@ -152,6 +158,15 @@ function AppRoutes() {
       } />
       <Route path="/closer" element={
         <ProtectedRoute requireCommercialRole="closer"><CloserDashboard /></ProtectedRoute>
+      } />
+
+      {/* Lince Docs — editor e rota de impressão.
+          Compartilhadas entre social media e admin, por isso allowAdmin. */}
+      <Route path="/documentos/:docId" element={
+        <ProtectedRoute requireSector="socialmedia" allowAdmin><DocEditorPage /></ProtectedRoute>
+      } />
+      <Route path="/documentos/:docId/imprimir" element={
+        <ProtectedRoute requireSector="socialmedia" allowAdmin><DocPrintPage /></ProtectedRoute>
       } />
 
       {/* Admin */}
