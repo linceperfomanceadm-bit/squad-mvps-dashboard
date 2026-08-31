@@ -1,38 +1,41 @@
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — ARQUIVOS DE MARCA
 //
-// Os cinco arquivos ficam no Firebase Storage, em `marca/`, com
-// leitura pública. Não entram no repositório: binário grande pelo
-// editor do GitHub é caminho para arquivo fantasma.
+// Os cinco arquivos vivem no Firebase Storage, em `marca/`, e não no
+// repositório: binário grande pelo editor web do GitHub é caminho
+// para arquivo fantasma.
 //
-// COMO PREENCHER
-// 1. Firebase Console → Storage → criar a pasta `marca/`
-// 2. Subir os cinco arquivos com os nomes abaixo
-// 3. Em cada um: menu → "Copiar URL de download"
-// 4. Colar aqui, entre aspas, no lugar do texto de exemplo
+// As URLs abaixo carregam o token de acesso do Storage. O token faz
+// parte do endereço — sem ele a imagem não abre.
 //
-// A URL de download vem no formato:
-// https://firebasestorage.googleapis.com/v0/b/<bucket>/o/marca%2Fcapa.jpg?alt=media&token=...
-// O token faz parte da URL — cole ela inteira.
+// PARA TROCAR UM ARQUIVO DE MARCA
+// Suba o novo em `marca/` com OUTRO nome, copie a URL e substitua a
+// linha correspondente. Não renomeie nem sobrescreva pelo console: o
+// nome está embutido na URL, e "Revogar token" mata o link.
+//
+// Bucket: gs://lince-dashboard.firebasestorage.app
 // ─────────────────────────────────────────────────────────────
+
+const BASE = 'https://firebasestorage.googleapis.com/v0/b/lince-dashboard.firebasestorage.app/o/marca%2F';
 
 export const MARCA = {
   // Logomarca branca — rodapé de todos os slides
-  logoBranca: 'COLE_AQUI_A_URL_DE_logo-branca.png',
+  logoBranca: `${BASE}logo-branca.png?alt=media&token=d84682d3-7143-4194-a425-f2add0b0d48a`,
   // Logomarca rosa — só no slide de encerramento
-  logoRosa: 'COLE_AQUI_A_URL_DE_logo-rosa.png',
+  logoRosa: `${BASE}logo-rosa.png?alt=media&token=e663360e-7b34-4114-ad5c-50a385ea5014`,
   // Ícone do lince — marca d'água, 7% de opacidade
-  iconeRosa: 'COLE_AQUI_A_URL_DE_icone-rosa.png',
+  iconeRosa: `${BASE}icone-rosa.png?alt=media&token=60afa9b0-1bcf-43b2-8e4a-04ea5aef0329`,
   // Capa — lince de terno, fundo do primeiro slide
-  capa: 'COLE_AQUI_A_URL_DE_capa.jpg',
+  capa: `${BASE}capa.jpg?alt=media&token=9fc1381e-5aa7-490c-a762-7eac91451c6c`,
   // Fechamento — lince na neve, fundo do último slide
-  fechamento: 'COLE_AQUI_A_URL_DE_fechamento.jpg',
+  fechamento: `${BASE}fechamento.jpg?alt=media&token=e5b0dc74-5e3f-4d55-9ed1-bbfcf63aa3e2`,
 };
 
-// Enquanto as URLs não forem preenchidas, o deck renderiza sem as
-// imagens (fundo sólido, sem logo). O editor avisa em vez de quebrar.
+// Guarda contra URL não preenchida. Se um dia alguém trocar um
+// arquivo e esquecer de colar o endereço, o editor avisa em vez de
+// renderizar um slide sem capa e sem logo — que parece bug de CSS.
 export const marcaPendente = () =>
-  Object.values(MARCA).some((u) => !u || u.startsWith('COLE_AQUI'));
+  Object.values(MARCA).some((u) => !u || !u.startsWith('https://'));
 
 // Variáveis CSS injetadas no contêiner do deck. O CSS dos slides lê
 // daqui, então trocar um arquivo de marca é trocar uma URL acima.
