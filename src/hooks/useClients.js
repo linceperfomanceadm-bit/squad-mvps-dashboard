@@ -257,41 +257,6 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── Social Media actions ──────────────────────────────────
-  const smAddPost = async (clientId, post) => {
-    try {
-      const client = clients.find(c => c.id === clientId);
-      const posts = [...(client?.sm?.posts || []), { ...post, id: `post_${Date.now()}`, status: 'production', createdAt: new Date().toISOString() }];
-      await updateDoc(doc(db, 'clients', clientId), { 'sm.posts': posts });
-      return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
-  };
-
-  const smAddBulkPosts = async (postsData) => {
-    // postsData: array of { clientId, date, name, linkArt, responsible }
-    try {
-      const byClient = {};
-      postsData.forEach(p => { if (!byClient[p.clientId]) byClient[p.clientId] = []; byClient[p.clientId].push(p); });
-      for (const [clientId, posts] of Object.entries(byClient)) {
-        const client = clients.find(c => c.id === clientId);
-        const existing = client?.sm?.posts || [];
-        const newPosts = posts.map(p => ({ id: `post_${Date.now()}_${Math.random().toString(36).substr(2,5)}`, name: p.name, date: p.date, linkArt: p.linkArt, responsible: p.responsible, status: 'production', createdAt: new Date().toISOString() }));
-        await updateDoc(doc(db, 'clients', clientId), { 'sm.posts': [...existing, ...newPosts] });
-      }
-      return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
-  };
-
-  const smUpdatePostStatus = async (clientId, postId, newStatus) => {
-    try {
-      const client = clients.find(c => c.id === clientId);
-      const posts = (client?.sm?.posts || []).map(p => p.id === postId ? { ...p, status: newStatus, updatedAt: new Date().toISOString() } : p);
-      await updateDoc(doc(db, 'clients', clientId), { 'sm.posts': posts });
-      return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
-  };
-
-  // ── Design / Video deliveries ────────────────────────────
   const addDelivery = async (clientId, sector, delivery) => {
     // sector: 'design' or 'video'
     try {
@@ -379,7 +344,6 @@ export function useClients() {
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
-    smAddPost, smAddBulkPosts, smUpdatePostStatus,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
     markOnboardingSector,
