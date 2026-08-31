@@ -28,38 +28,28 @@ import '../../styles/lince-docs.css';
 const ATRASO_SALVAR = 800;
 
 // Conta os campos que ainda vão sair marcados no slide.
-function contarVazios(doc, dados, opcionais) {
-  if (!doc || !doc.secoes) return 0;
-  let n = 0;
-  doc.secoes.forEach((s) => {
-    if (s.opcional && opcionais[s.t] === false) return;
-    s.campos.forEach((c) => {
-      const val = dados[c.id];
-      if (c.tipo === 'lista') {
-        const linhas = Array.isArray(val) ? val : [];
-        for (let i = 0; i < c.linhas; i += 1) {
-          const linha = linhas[i] || {};
-          c.cols.forEach((col) => { if (!linha[col.id] || !String(linha[col.id]).trim()) n += 1; });
-        }
-      } else if (!val || !String(val).trim()) n += 1;
-    });
-  });
-  return n;
+// Uma linha de lista conta cada coluna em branco: é o que aparece
+// como [rótulo] em itálico no documento impresso.
+const vazio = (v) => !v || !String(v).trim();
+
+function vaziosDoCampo(campo, valor) {
+  if (campo.tipo !== 'lista') return vazio(valor) ? 1 : 0;
+  const linhas = Array.isArray(valor) ? valor : [];
+  return Array.from({ length: campo.linhas }).reduce((acc, _, i) => {
+    const linha = linhas[i] || {};
+    return acc + campo.cols.filter((col) => vazio(linha[col.id])).length;
+  }, 0);
 }
 
 function vaziosDaSecao(secao, dados) {
-  let n = 0;
-  secao.campos.forEach((c) => {
-    const val = dados[c.id];
-    if (c.tipo === 'lista') {
-      const linhas = Array.isArray(val) ? val : [];
-      for (let i = 0; i < c.linhas; i += 1) {
-        const linha = linhas[i] || {};
-        c.cols.forEach((col) => { if (!linha[col.id] || !String(linha[col.id]).trim()) n += 1; });
-      }
-    } else if (!val || !String(val).trim()) n += 1;
-  });
-  return n;
+  return secao.campos.reduce((acc, c) => acc + vaziosDoCampo(c, dados[c.id]), 0);
+}
+
+function contarVazios(doc, dados, opcionais) {
+  if (!doc || !doc.secoes) return 0;
+  return doc.secoes
+    .filter((s) => !(s.opcional && opcionais[s.t] === false))
+    .reduce((acc, s) => acc + vaziosDaSecao(s, dados), 0);
 }
 
 export default function DocEditorPage() {
