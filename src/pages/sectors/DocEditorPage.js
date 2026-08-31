@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileDown, Check, Layers } from 'lucide-react';
+import { ArrowLeft, FileDown, Check, Layers, Rows, Square } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useDocuments, DOC_STATUS } from '../../hooks/useDocuments';
@@ -64,6 +64,10 @@ export default function DocEditorPage() {
   const [transbordo, setTransbordo] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const [rascunho, setRascunho] = useState(null);
+  const [deckCompleto, setDeckCompleto] = useState(false);
+
+  const colMeio = useRef(null);
+  const colDeck = useRef(null);
 
   const timer = useRef(null);
   const pendenteRef = useRef(null);
@@ -106,6 +110,13 @@ export default function DocEditorPage() {
     }
     clearTimeout(timer.current);
   }, [docId, updateDocument, user]);
+
+  // Trocar de seção recomeça do topo nas duas colunas. Sem isso, a
+  // seção nova abre no meio, na altura em que a anterior estava.
+  useEffect(() => {
+    if (colMeio.current) colMeio.current.scrollTop = 0;
+    if (colDeck.current) colDeck.current.scrollTop = 0;
+  }, [aba]);
 
   const alterar = (campoId, valor) => {
     setRascunho((r) => {
@@ -264,6 +275,16 @@ export default function DocEditorPage() {
           {Object.values(DOC_STATUS).map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
 
+        <button
+          type="button"
+          style={S.btnGhost}
+          onClick={() => setDeckCompleto((v) => !v)}
+          title={deckCompleto ? 'Ver só os slides desta seção' : 'Ver o documento inteiro'}
+        >
+          {deckCompleto ? <Square size={14} /> : <Rows size={14} />}
+          {deckCompleto ? 'Só esta seção' : 'Documento inteiro'}
+        </button>
+
         <button type="button" style={S.btn} onClick={gerarPDF}>
           <FileDown size={15} /> Gerar PDF
         </button>
@@ -316,7 +337,7 @@ export default function DocEditorPage() {
           </button>
         </nav>
 
-        <section style={S.meio}>
+        <section style={S.meio} ref={colMeio}>
           {aba === -1 ? (
             <DocExtras doc={doc} extras={rascunho.extras} onChange={alterarExtras} />
           ) : (
@@ -344,13 +365,14 @@ export default function DocEditorPage() {
           </div>
         </section>
 
-        <section style={S.direita}>
+        <section style={S.direita} ref={colDeck}>
           <DocPreview
             doc={doc}
             dados={dados}
             opcionais={rascunho.opcionais}
             extras={rascunho.extras}
             secaoAtiva={secaoAtual ? secaoAtual.t : null}
+            apenasSecao={!deckCompleto && aba >= 0}
             onTransbordo={setTransbordo}
           />
         </section>
@@ -360,7 +382,11 @@ export default function DocEditorPage() {
 }
 
 const S = {
-  tela: { minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' },
+  // Altura de tela travada: as três colunas rolam por conta própria.
+  // Antes a lateral era `sticky` (supondo rolagem de página) e as
+  // colunas tinham rolagem interna — os dois modelos ao mesmo tempo
+  // faziam o formulário passar por baixo do cabeçalho.
+  tela: { height: '100vh', overflow: 'hidden', background: 'var(--bg)', display: 'flex', flexDirection: 'column' },
   centro: {
     minHeight: '100vh', background: 'var(--bg)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -368,7 +394,7 @@ const S = {
   topo: {
     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 22px',
     borderBottom: '1px solid var(--border)', background: 'rgba(12,12,24,.88)',
-    position: 'sticky', top: 0, zIndex: 10,
+    flexShrink: 0, zIndex: 10,
   },
   voltar: {
     background: 'transparent', border: '1px solid var(--border)', borderRadius: 9,
@@ -382,6 +408,11 @@ const S = {
   chip: {
     fontSize: 10.5, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase',
     border: '1px solid', borderRadius: 100, padding: '4px 10px', flexShrink: 0,
+  },
+  btnGhost: {
+    display: 'flex', alignItems: 'center', gap: 7, background: 'transparent',
+    border: '1px solid var(--border-h)', borderRadius: 9, padding: '9px 14px',
+    fontSize: 12.5, color: 'var(--muted)', flexShrink: 0, whiteSpace: 'nowrap',
   },
   btn: {
     display: 'flex', alignItems: 'center', gap: 7, background: 'var(--neon)',
@@ -399,8 +430,7 @@ const S = {
   corpo: { flex: 1, display: 'grid', gridTemplateColumns: '236px minmax(360px,1fr) minmax(420px,1.15fr)', minHeight: 0 },
   nav: {
     borderRight: '1px solid var(--border)', padding: 14,
-    display: 'flex', flexDirection: 'column', gap: 2,
-    position: 'sticky', top: 63, alignSelf: 'flex-start', maxHeight: 'calc(100vh - 63px)', overflowY: 'auto',
+    display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto',
   },
   navItem: {
     display: 'flex', alignItems: 'center', gap: 9, width: '100%',
