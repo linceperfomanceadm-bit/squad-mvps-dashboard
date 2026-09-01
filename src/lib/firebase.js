@@ -49,30 +49,43 @@ export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', emo
 // O login é o mesmo do setor; o que decide para qual painel a pessoa
 // vai é a FUNÇÃO cadastrada no colaborador.
 export const CS_ROLES = [
-  { id: 'comercial',   label: 'CS Comercial',   desc: 'Contratos, assinatura, pagamento e onboarding' },
-  { id: 'operacional', label: 'CS Operacional', desc: 'Kickoff, saúde operacional e saúde do cliente' },
+  { id: 'comercial',   label: 'CS Comercial',   desc: 'Cadastro de clientes e acompanhamento do staffing' },
+  { id: 'operacional', label: 'CS Operacional', desc: 'Onboarding, saúde operacional e saúde do cliente' },
 ];
 
-// ─── Contratos (coleção `deals`) ──────────────────────────────
-// O funil de prospecção (SDR → Closer) saiu do app: a negociação
-// acontece fora daqui e o CS Comercial cadastra o contrato fechado
-// direto no painel dele.
+// ─── Ciclo de vida do cliente ─────────────────────────────────
+// O cliente nasce no cadastro da CS Comercial e passa por dois
+// estágios antes de virar rotina:
 //
-// status:
-//   won    → contrato cadastrado, em tratativa no CS Comercial
-//   active → onboarding concluído e cliente criado em `clients`
+//   staffing → cadastrado, aguardando os líderes indicarem os
+//              responsáveis de cada setor contratado. Fica invisível
+//              para os setores porque grava `active: false`, o que já
+//              o esconde de todos os filtros existentes do app.
+//   live     → quadro de responsáveis completo. Vira `active: true` e
+//              entra na base para valer, com `kickoff.pending: true`
+//              até a call de onboarding ser realizada.
 //
-// Dentro de `won`, o CS Comercial trabalha com csStage:
-//   contract   → card em Novos Contratos (checklist)
-//   onboarding → call de onboarding agendada
-//   done       → onboarding concluído (o deal vira status 'active')
-export const CS_STAGES = {
-  contract:   { id: 'contract',   label: 'Novos Contratos' },
-  onboarding: { id: 'onboarding', label: 'Onboarding' },
-  done:       { id: 'done',       label: 'Concluído' },
+// Cliente antigo, sem o campo `stage`, conta como 'live'.
+export const CLIENT_STAGES = {
+  staffing: { id: 'staffing', label: 'Aguardando responsáveis', color: '#f59e0b' },
+  live:     { id: 'live',     label: 'Ativo',                   color: '#22c55e' },
 };
 
-// Formas de pagamento do cadastro de contrato (CS Comercial).
+export const isStaffing = (c) => c?.stage === 'staffing';
+
+// ─── Serviço contratado → setor responsável ───────────────────
+// Usado só para SUGERIR os setores no cadastro do cliente. A CS
+// confirma na mão, porque nem todo serviço mapeia para um setor
+// (SEO, Consultoria e Outro não têm dono fixo).
+export const SERVICE_SECTOR_MAP = {
+  gestao_trafego: 'trafego',
+  social_media:   'socialmedia',
+  webdesign:      'webdesign',
+  video:          'videomaker',
+  design:         'design',
+};
+
+// Formas de pagamento do cadastro de cliente (CS Comercial).
 export const PAYMENT_METHODS = [
   'PIX', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Transferência', 'Outro',
 ];
@@ -177,7 +190,7 @@ export const RECURRENCE_SERVICES = [
 
 export const SLA_DAYS = 3;
 
-// Serviços que podem ser contratados (formulário de contrato do CS).
+// Serviços que podem ser contratados (cadastro de cliente do CS).
 // Cada serviço marcado exige uma descrição >= 350 chars do que foi vendido.
 export const SALE_SERVICES = [
   { id: 'gestao_trafego', label: 'Gestão de Tráfego' },
