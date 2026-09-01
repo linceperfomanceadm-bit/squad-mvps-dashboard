@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock, Radio, Volume2, Save } from 'lucide-react';
+import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock, Radio, Volume2, Save, Eye, EyeOff, Award } from 'lucide-react';
 import { useAppConfig } from '../../hooks/useAppConfig';
+import { PRODUCTION_SECTORS, HONOR_METRIC_OPTIONS, DEFAULT_HONOR_METRICS } from '../../hooks/useTVData';
+
+const SQUAD_NOME = {
+  socialmedia: 'Supernovas (Social Media)',
+  webdesign: 'MVPS (WebDesign)',
+  videomaker: 'Outliers (VideoMaker)',
+  design: 'Dream Team (Design)',
+  trafego: 'Challengers (Tráfego Pago)',
+};
 
 /*
  * Aba "Painel de TV" no Admin. Controla em tempo real o painel que roda
@@ -12,9 +21,9 @@ import { useAppConfig } from '../../hooks/useAppConfig';
 const CENAS = [
   { id: '',           label: 'Rodar todas (padrão)' },
   { id: 'today',      label: 'Travar em Operacional' },
-  { id: 'alert',      label: 'Travar em Zona de Atenção' },
-  { id: 'highlights', label: 'Travar em Destaques da Semana' },
-  { id: 'health',     label: 'Travar em Saúde da Carteira' },
+  { id: 'alert',      label: 'Travar em Zona de atenção' },
+  { id: 'highlights', label: 'Travar em Destaques da semana' },
+  { id: 'health',     label: 'Travar em Saúde da carteira' },
 ];
 
 export default function AdminTVControl({ toast }) {
@@ -33,6 +42,8 @@ export default function AdminTVControl({ toast }) {
   const pausado = config.tvPaused === true;
   const comemora = config.tvCelebrations !== false;
   const cena = config.tvLockScene || '';
+  const visita = config.tvVisitMode === true;
+  const honra = { ...DEFAULT_HONOR_METRICS, ...(config.tvHonorMetrics || {}) };
   const tocando = config.tvRadioPlaying === true;
   const urlMudou = radioUrl.trim() !== (config.tvRadioUrl || '');
   const tvUrl = `${window.location.origin}/tv`;
@@ -61,6 +72,18 @@ export default function AdminTVControl({ toast }) {
     { tvLockScene: id },
     id ? 'Cena travada na TV.' : 'Rotação normal retomada.',
     'scene'
+  );
+
+  const toggleVisita = () => aplicar(
+    { tvVisitMode: !visita },
+    visita ? 'Modo visita desligado. A TV voltou à rotação normal.' : 'Modo visita ligado. A TV está mostrando só a tela institucional.',
+    'visita'
+  );
+
+  const trocarHonra = (sector, metricId) => aplicar(
+    { tvHonorMetrics: { ...honra, [sector]: metricId } },
+    'Métrica de honra atualizada. A cena de Destaques já reflete.',
+    'honra'
   );
 
   const recarregar = () => aplicar(
@@ -102,22 +125,24 @@ export default function AdminTVControl({ toast }) {
       {/* Status + endereço */}
       <div style={{
         ...S.box,
-        background: pausado ? 'rgba(245,158,11,.06)' : 'rgba(34,197,94,.06)',
-        borderColor: pausado ? 'rgba(245,158,11,.25)' : 'rgba(34,197,94,.25)',
+        background: pausado ? 'rgba(245,158,11,.06)' : visita ? 'rgba(56,189,248,.06)' : 'rgba(34,197,94,.06)',
+        borderColor: pausado ? 'rgba(245,158,11,.25)' : visita ? 'rgba(56,189,248,.25)' : 'rgba(34,197,94,.25)',
         display: 'flex', alignItems: 'center', gap: 14, marginBottom: 18,
       }}>
         <div style={{
           width: 44, height: 44, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: pausado ? 'rgba(245,158,11,.14)' : 'rgba(34,197,94,.14)',
+          background: pausado ? 'rgba(245,158,11,.14)' : visita ? 'rgba(56,189,248,.14)' : 'rgba(34,197,94,.14)',
         }}>
-          <Monitor size={22} color={pausado ? 'var(--amber)' : 'var(--green)'} />
+          <Monitor size={22} color={pausado ? 'var(--amber)' : visita ? 'var(--blue)' : 'var(--green)'} />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: pausado ? 'var(--amber)' : 'var(--green)' }}>
-            {pausado ? 'Painel pausado' : 'Painel no ar'}
+          <p style={{ fontSize: 14, fontWeight: 700, color: pausado ? 'var(--amber)' : visita ? 'var(--blue)' : 'var(--green)' }}>
+            {pausado ? 'Painel pausado' : visita ? 'Modo visita ligado' : 'Painel no ar'}
           </p>
           <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-            {pausado ? 'A TV está mostrando a tela de espera.' : 'As cenas estão girando normalmente na parede.'}
+            {pausado ? 'A TV está mostrando a tela de espera.'
+              : visita ? 'A TV está travada na tela institucional. Nada de atraso, farol ou cliente aparece.'
+              : 'As cenas estão girando normalmente na parede.'}
           </p>
         </div>
         <a href={tvUrl} target="_blank" rel="noopener noreferrer" style={S.link}>
@@ -125,13 +150,40 @@ export default function AdminTVControl({ toast }) {
         </a>
       </div>
 
+      {/* Modo visita — botão grande, porque é acionado com a visita na porta */}
+      <div style={{
+        ...S.box, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 16,
+        background: visita ? 'rgba(56,189,248,.08)' : 'var(--surface)',
+        borderColor: visita ? 'rgba(56,189,248,.35)' : 'var(--border)',
+      }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ ...S.boxTitle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {visita ? <EyeOff size={16} color="var(--blue)" /> : <Eye size={16} color="var(--muted)" />}
+            Modo visita
+          </p>
+          <p style={{ ...S.boxText, marginBottom: 0 }}>
+            Trava a TV numa tela só de coisa boa: entregas, ritmo, squads e a equipe. Some tudo que
+            pode pegar mal — atraso, refação, farol de cliente, nome de cliente e qualquer porcentagem.
+            Use quando tiver gente de fora na agência.
+          </p>
+        </div>
+        <button
+          onClick={toggleVisita}
+          disabled={saving === 'visita'}
+          style={{ ...S.btn, ...(visita ? S.btnAmber : S.btnBlue), width: 'auto', padding: '14px 22px', fontSize: 14, flexShrink: 0 }}
+        >
+          {visita ? <Eye size={16} /> : <EyeOff size={16} />}
+          {visita ? 'Voltar ao normal' : 'Ligar modo visita'}
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
         {/* Pausar */}
         <div style={S.box}>
           <p style={S.boxTitle}>Pausar o painel</p>
           <p style={S.boxText}>
-            Troca tudo por uma tela de espera com o relógio. Use quando o dado estiver errado
-            ou quando houver visita que não deve ver a operação.
+            Troca tudo por uma tela de espera com o relógio. Use quando o dado estiver errado.
+            Para visita, prefira o modo visita acima — ele mostra a agência bem em vez de esconder tudo.
           </p>
           <input
             value={msg}
@@ -197,6 +249,41 @@ export default function AdminTVControl({ toast }) {
             <PartyPopper size={15} />
             {comemora ? 'Desligar comemorações' : 'Ligar comemorações'}
           </button>
+        </div>
+
+        {/* Métrica de honra por squad */}
+        <div style={{ ...S.box, gridColumn: '1 / -1' }}>
+          <p style={{ ...S.boxTitle, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Award size={16} color="var(--neon)" /> Destaques da semana — métrica de cada squad
+          </p>
+          <p style={S.boxText}>
+            Na cena de Destaques, cada squad é comparado só consigo mesmo, na métrica que faz sentido
+            pro ofício. O destaque é quem lidera essa métrica dentro do próprio time. Nunca há ranking
+            entre squads.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
+            {PRODUCTION_SECTORS.map(sector => {
+              const atual = HONOR_METRIC_OPTIONS.find(o => o.id === honra[sector]) || HONOR_METRIC_OPTIONS[0];
+              return (
+                <div key={sector} style={{ background: '#12121f', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                  <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>{SQUAD_NOME[sector]}</p>
+                  <select
+                    value={honra[sector]}
+                    onChange={e => trocarHonra(sector, e.target.value)}
+                    disabled={saving === 'honra'}
+                    style={{ ...S.select, padding: '8px 10px', fontSize: 12.5 }}
+                  >
+                    {HONOR_METRIC_OPTIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  </select>
+                  <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginTop: 6 }}>{atual.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+          <p style={{ ...S.boxText, marginTop: 12, marginBottom: 0 }}>
+            Métricas em porcentagem exigem pelo menos 3 entregas na semana para alguém concorrer —
+            sem isso, 1 de 1 viraria 100% e ganharia de 11 de 11.
+          </p>
         </div>
 
         {/* Rádio */}
