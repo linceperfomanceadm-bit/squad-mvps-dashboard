@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, FileText, PenTool, CreditCard, Activity,
   CheckSquare, Calendar, Check, Video, Clock, Kanban, MessageSquare,
+  Plus, Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -16,10 +17,11 @@ import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
+import BriefingForm from '../../components/commercial/BriefingForm';
 import CSResponsiblesModal from '../../components/commercial/CSResponsiblesModal';
 import { SECTORS } from '../../lib/firebase';
 import {
-  Overlay, ModalHeader, ScheduleModal, Stat, Tag, Empty, Spinner, Section, RO,
+  Overlay, ModalHeader, ConfirmModal, ScheduleModal, Stat, Tag, Empty, Spinner, Section, RO,
   money, fmtDateTime, toLocalInput,
   CARD, GRID, MODAL, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
 } from '../../components/commercial/ui';
@@ -29,7 +31,9 @@ const COLOR = SECTORS.cs.color;
 /*
  * CS COMERCIAL — 4 abas, exatamente como o fluxograma:
  *
- *  1. Novos Contratos    → card com checklist (Gerar Contrato /
+ *  1. Novos Contratos    → o CS cadastra o contrato fechado pelo
+ *                          botão "Novo Contrato" e o card nasce aqui,
+ *                          com checklist (Gerar Contrato /
  *                          Gerar link de Pagamento). Ao marcar cada
  *                          item, o cliente aparece no painel
  *                          correspondente. Com assinatura E pagamento
@@ -48,7 +52,8 @@ export default function CSComercialDashboard() {
   const { clients, addClient } = useClients();
   const { collaborators } = useCollaborators();
   const {
-    deals, loading, toggleCsChecklist, confirmSignature, confirmPayment,
+    deals, loading, addContract, deleteContract,
+    toggleCsChecklist, confirmSignature, confirmPayment,
     moveToOnboarding, rescheduleOnboardingCall, finishOnboarding,
   } = useDeals();
   const {
@@ -64,6 +69,8 @@ export default function CSComercialDashboard() {
   const [scheduleTarget, setScheduleTarget] = useState(null);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [responsiblesTarget, setResponsiblesTarget] = useState(null);
+  const [showNewContract, setShowNewContract] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const me = user?.name;
 
@@ -103,7 +110,7 @@ export default function CSComercialDashboard() {
   ];
 
   const HEAD = {
-    contracts:  ['Novos Contratos', 'Vendas ganhas aguardando contrato e cobrança'],
+    contracts:  ['Novos Contratos', 'Contratos fechados aguardando contrato e cobrança'],
     signature:  ['Painel de Assinatura', 'Contratos pendentes de assinatura'],
     payment:    ['Painel de Pagamento', 'Contratos pendentes de pagamento'],
     onboarding: ['Onboarding', 'Calls de onboarding agendadas'],
@@ -112,6 +119,16 @@ export default function CSComercialDashboard() {
     overview:   ['Visão Geral', 'Seu funil de contratos no mês'],
     todo:       ['Meu Dia', ''],
     agenda:     ['Agenda', ''],
+  };
+
+  // Cadastro manual do contrato fechado (substitui o antigo
+  // pré-formulário que vinha do Closer).
+  const handleAddContract = async (briefing) => {
+    const res = await addContract(me, briefing);
+    if (!res.success) { toast(res.error, 'e'); return res; }
+    toast('Contrato cadastrado em Novos Contratos!');
+    setShowNewContract(false);
+    return res;
   };
 
   // Conclui o onboarding: cria o cliente e fecha o deal.
@@ -140,27 +157,33 @@ export default function CSComercialDashboard() {
             {page === 'overview' && <Overview buckets={buckets} deals={deals} />}
 
             {page === 'contracts' && (
-              buckets.contracts.length === 0
-                ? <Empty msg="Nenhum contrato novo aguardando. ✨" />
-                : (
-                  <div style={GRID}>
-                    {buckets.contracts.map(d => (
-                      <ContractCard
-                        key={d.id}
-                        deal={d}
-                        onOpen={() => setOpenDeal(d.id)}
-                        onToggle={async (item, done) => {
-                          const r = await toggleCsChecklist(d.id, item, me, done);
-                          if (!r.success) toast(r.error, 'e');
-                          else toast(done
-                            ? `Enviado para o painel de ${item === 'contract' ? 'assinatura' : 'pagamento'}.`
-                            : 'Item desmarcado.');
-                        }}
-                        onMove={() => setScheduleTarget(d)}
-                      />
-                    ))}
-                  </div>
-                )
+              <>
+                <button style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }} onClick={() => setShowNewContract(true)}>
+                  <Plus size={15} /> Novo Contrato
+                </button>
+                {buckets.contracts.length === 0
+                  ? <Empty msg="Nenhum contrato novo aguardando. Cadastre um contrato fechado no botão acima. ✨" />
+                  : (
+                    <div style={GRID}>
+                      {buckets.contracts.map(d => (
+                        <ContractCard
+                          key={d.id}
+                          deal={d}
+                          onOpen={() => setOpenDeal(d.id)}
+                          onToggle={async (item, done) => {
+                            const r = await toggleCsChecklist(d.id, item, me, done);
+                            if (!r.success) toast(r.error, 'e');
+                            else toast(done
+                              ? `Enviado para o painel de ${item === 'contract' ? 'assinatura' : 'pagamento'}.`
+                              : 'Item desmarcado.');
+                          }}
+                          onMove={() => setScheduleTarget(d)}
+                          onDelete={() => setDeleteTarget(d)}
+                        />
+                      ))}
+                    </div>
+                  )}
+              </>
             )}
 
             {page === 'signature' && (
@@ -307,6 +330,33 @@ export default function CSComercialDashboard() {
           }}
         />, document.body)}
 
+      {/* Cadastro manual de um contrato fechado */}
+      {showNewContract && ReactDOM.createPortal(
+        <Overlay onClose={() => setShowNewContract(false)}>
+          <div style={{ ...MODAL, maxWidth: 640 }}>
+            <ModalHeader title="Novo Contrato" onClose={() => setShowNewContract(false)} />
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 16 }}>
+              Preencha os dados da venda fechada. O card entra em Novos Contratos para gerar contrato e cobrança.
+            </p>
+            <BriefingForm onSubmit={handleAddContract} onCancel={() => setShowNewContract(false)} />
+          </div>
+        </Overlay>, document.body)}
+
+      {/* Exclusão de contrato cadastrado por engano */}
+      {deleteTarget && ReactDOM.createPortal(
+        <ConfirmModal
+          title="Excluir contrato"
+          text={`Apagar o contrato de ${deleteTarget.briefing?.companyName || deleteTarget.leadName}? Essa ação não pode ser desfeita.`}
+          confirmLabel="Excluir"
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={async () => {
+            const r = await deleteContract(deleteTarget.id, user);
+            if (r.success) toast('Contrato excluído.');
+            else toast(r.error, 'e');
+            setDeleteTarget(null);
+          }}
+        />, document.body)}
+
       {/* Call realizada → define responsáveis e cria o cliente */}
       {responsiblesTarget && ReactDOM.createPortal(
         <CSResponsiblesModal
@@ -350,7 +400,7 @@ function Overview({ buckets, deals }) {
 }
 
 // ── Card de Novos Contratos (checklist) ────────────────────────
-function ContractCard({ deal, onOpen, onToggle, onMove }) {
+function ContractCard({ deal, onOpen, onToggle, onMove, onDelete }) {
   const b = deal.briefing || {};
   const cl = deal.csChecklist || {};
   const ready = canMoveToOnboarding(deal);
@@ -414,19 +464,28 @@ function ContractCard({ deal, onOpen, onToggle, onMove }) {
         ))}
       </div>
 
-      <button
-        onClick={onMove}
-        disabled={!ready}
-        style={{
-          ...BTN_GREEN, width: '100%', marginTop: 14,
-          opacity: ready ? 1 : .4, cursor: ready ? 'pointer' : 'not-allowed',
-          background: ready ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'var(--surface)',
-          color: ready ? '#fff' : 'var(--muted)',
-          border: ready ? 'none' : '1px solid var(--border)',
-        }}
-      >
-        Mover para Onboarding
-      </button>
+      <div style={{ display: 'flex', gap: 8, marginTop: 14, alignItems: 'stretch' }}>
+        <button
+          onClick={onMove}
+          disabled={!ready}
+          style={{
+            ...BTN_GREEN, flex: 1,
+            opacity: ready ? 1 : .4, cursor: ready ? 'pointer' : 'not-allowed',
+            background: ready ? 'linear-gradient(135deg,#22c55e,#16a34a)' : 'var(--surface)',
+            color: ready ? '#fff' : 'var(--muted)',
+            border: ready ? 'none' : '1px solid var(--border)',
+          }}
+        >
+          Mover para Onboarding
+        </button>
+        <button
+          onClick={onDelete}
+          title="Excluir contrato"
+          style={{ ...BTN_CANCEL, padding: '11px 13px', display: 'flex', alignItems: 'center' }}
+        >
+          <Trash2 size={14} color="rgba(238,51,99,.7)" />
+        </button>
+      </div>
       {!ready && (
         <p style={{ fontSize: 10, color: '#666', marginTop: 6, textAlign: 'center', lineHeight: 1.4 }}>
           Libera quando assinatura e pagamento forem confirmados nos painéis.
@@ -508,7 +567,7 @@ function ContractDrawer({ deal, onClose }) {
       <div style={{ ...MODAL, maxWidth: 620 }}>
         <ModalHeader title={b.companyName || deal.leadName} onClose={onClose} />
         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 16 }}>
-          Fechado por {deal.closerName || '—'}{deal.secondCloser ? ` + ${deal.secondCloser}` : ''}
+          Cadastrado por {deal.createdBy || deal.closerName || '—'}
           {deal.wonAt ? ` · ${fmtDateTime(deal.wonAt)}` : ''}
         </p>
 
