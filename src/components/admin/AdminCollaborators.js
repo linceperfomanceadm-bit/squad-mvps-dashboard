@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff, Crown } from 'lucide-react';
 import { SECTORS, CS_ROLES } from '../../lib/firebase';
 
 export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '' });
+  const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '', leaderOf: [] });
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,7 +25,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
     setLoading(true);
     const res = await onAdd({ ...form, loginId: form.loginId.trim() });
     setLoading(false);
-    if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '' }); setShowForm(false); setError(''); }
+    if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '', leaderOf: [] }); setShowForm(false); setError(''); }
     else setError(res.error);
   };
 
@@ -35,6 +35,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
       phone: editForm.phone || '',
       sector: editForm.sector,
       isAdmin: editForm.isAdmin || false,
+      leaderOf: editForm.leaderOf || [],
       csRole: editForm.sector === 'cs' ? (editForm.csRole || 'operacional') : '',
     });
     setEditId(null);
@@ -121,6 +122,14 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                 Permissões de Admin
               </label>
             </div>
+            <div style={{ ...S.field, gridColumn: '1/-1' }}>
+              <label style={S.label}>LIDERANÇA DE SETOR</label>
+              <p style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.5 }}>
+                O líder indica os responsáveis pelos clientes novos do setor. Pode liderar mais de um,
+                inclusive setores diferentes do dele. Sem isso, o colaborador não vê a fila de indicação.
+              </p>
+              <LeaderPicker value={form.leaderOf} onChange={v => set('leaderOf', v)} />
+            </div>
             {error && <p style={{ gridColumn: '1/-1', fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
             <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button type="button" style={S.cancelBtn} onClick={() => setShowForm(false)}>Cancelar</button>
@@ -150,7 +159,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                   sector={sector}
                   isEditing={editId === collab.id}
                   editForm={editForm}
-                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false, csRole: collab.csRole || (collab.sector === 'cs' ? 'operacional' : '') }); }}
+                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false, leaderOf: Array.isArray(collab.leaderOf) ? collab.leaderOf : [], csRole: collab.csRole || (collab.sector === 'cs' ? 'operacional' : '') }); }}
                   onSaveEdit={() => handleEdit(collab.id)}
                   onCancelEdit={() => setEditId(null)}
                   onEditFormChange={(k, v) => setEditForm(f => ({ ...f, [k]: v }))}
@@ -164,6 +173,28 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
               ))}
             </div>
           </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Seleção de setores que a pessoa lidera. Independente do setor dela.
+function LeaderPicker({ value, onChange }) {
+  const toggle = (id) => onChange(value.includes(id) ? value.filter(v => v !== id) : [...value, id]);
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+      {Object.values(SECTORS).map(s => {
+        const active = value.includes(s.id);
+        return (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => toggle(s.id)}
+            style={{ fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', background: active ? `${s.color}22` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `${s.color}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 4 }}
+          >
+            {active && <Check size={10} />} {s.emoji} {s.label}
+          </button>
         );
       })}
     </div>
@@ -194,6 +225,10 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
             <input type="checkbox" checked={editForm.isAdmin} onChange={e => onEditFormChange('isAdmin', e.target.checked)} style={{ accentColor: 'var(--neon)' }} />
             Permissões de Admin
           </label>
+          <div>
+            <p style={{ ...S.label, marginBottom: 6 }}>LIDERANÇA DE SETOR</p>
+            <LeaderPicker value={editForm.leaderOf || []} onChange={v => onEditFormChange('leaderOf', v)} />
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button style={{ ...S.iconBtnGreen, flex: 1, justifyContent: 'center', gap: 6, padding: 7 }} onClick={onSaveEdit}><Check size={14} /> Salvar</button>
             <button style={{ ...S.iconBtn, padding: '7px 12px' }} onClick={onCancelEdit}><X size={14} /></button>
@@ -231,6 +266,11 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               {collab.active ? '● Ativo' : '○ Inativo'}
             </span>
             {collab.isAdmin && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)', fontFamily: 'var(--fm)' }}>👑 Admin</span>}
+            {(collab.leaderOf || []).map(sid => (
+              <span key={sid} style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: `${SECTORS[sid]?.color || '#8F97A0'}18`, color: SECTORS[sid]?.color || 'var(--muted)', border: `1px solid ${SECTORS[sid]?.color || '#8F97A0'}40`, fontFamily: 'var(--fm)', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <Crown size={9} /> Líder {SECTORS[sid]?.label || sid}
+              </span>
+            ))}
             {collab.firstAccess && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>1º Acesso pendente</span>}
           </div>
           {showReset

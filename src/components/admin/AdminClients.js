@@ -173,7 +173,9 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Clientes</h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{clients.filter(c => c.active).length} ativos · {clients.length} total</p>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+            {clients.filter(c => c.active).length} ativos · {clients.filter(c => c.stage === 'staffing').length} aguardando responsáveis · {clients.length} total
+          </p>
         </div>
         <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           <Plus size={15} /> Novo Cliente
@@ -198,7 +200,14 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
             <tbody>
               {filtered.map(c => (
                 <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                  <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>{c.name}</td>
+                  <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
+                    {c.name}
+                    {c.stage === 'staffing' && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)', verticalAlign: 'middle' }}>
+                        AGUARDANDO RESPONSÁVEIS
+                      </span>
+                    )}
+                  </td>
                   <td style={{ padding: '12px 14px' }}>
                     {c.wd?.status
                       ? <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${wdStatusColor(c.wd.status)}15`, color: wdStatusColor(c.wd.status) }}>{wdStatusLabel(c.wd.status)}</span>
