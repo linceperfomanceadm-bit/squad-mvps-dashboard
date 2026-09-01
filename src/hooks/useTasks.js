@@ -4,6 +4,7 @@ import {
   deleteDoc, doc, serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
 
 // ─── Auto-reparo de tasks presas em aprovação ──────────────────
 // Bug histórico: ao enviar para aprovação sem escolher aprovador, a
@@ -147,6 +148,9 @@ export function useTasks() {
             deliveredBy: null,
             deliveredBySector: null,
             approvalAt: null,
+            // Sai do congelamento junto — senão a task volta para
+            // produção com o relógio de prazo ainda parado.
+            approvalStartedAt: null,
           }).catch(() => {});
         });
 
@@ -204,6 +208,16 @@ export function useTasks() {
         startedAt: null,
         approvalAt: null,
         completedAt: null,
+        // ── Controle de prazo ──────────────────────────────────
+        // pausedMs: tempo ÚTIL que a task passou congelada em
+        // aprovação. É devolvido ao prazo se ela voltar para ajuste.
+        pausedMs: 0,
+        approvalStartedAt: null,
+        deliveredAt: null,
+        deliveredOnTime: null,
+        firstDeliveredAt: null,
+        firstDeliveredOnTime: null,
+        timeStats: null,
         createdAt: serverTimestamp(),
       });
       return { success: true };
@@ -233,7 +247,13 @@ export function useTasks() {
   };
 
   // ── Move to Em Aprovação ─────────────────────────────────────
-  // deliveredBy = who actually did the work (current responsible before handoff)
+  // deliveredBy = quem realmente fez o trabalho (responsável atual
+  // antes do handoff).
+  //
+  // É AQUI que o prazo congela. O que define se o colaborador entregou
+  // no prazo é ESTE instante — não a data em que o aprovador resolveu
+  // clicar. Enquanto a task estiver em aprovação ela não acumula
+  // atraso; se voltar para ajuste, o tempo parado volta para o prazo.
   const moveToApproval = async (taskId, approverName, approverSector, updatedLinks) => {
     try {
       const task = tasks.find(t => t.id === taskId);
@@ -243,17 +263,26 @@ export function useTasks() {
       if (!approverName || !approverSector) {
         return { success: false, error: 'Selecione quem vai aprovar antes de enviar.' };
       }
-      const now = new Date().toISOString();
+      const at = new Date();
+      const now = at.toISOString();
+      const onTime = isDeliveryOnTime(task, at);
+
       const timeline = [...(task.timeline || []), {
         action: 'sent_for_approval',
         by: task.responsibleName,
         sector: task.responsibleSector,
         to: approverName,
         at: now,
+        onTime,
       }];
-      await updateDoc(doc(db, 'tasks', taskId), {
+
+      const patch = {
         status: 'approval',
         approvalAt: now,
+        // Marca o início do congelamento do prazo.
+        approvalStartedAt: now,
+        deliveredAt: now,
+        deliveredOnTime: onTime,
         // Save who delivered before changing responsible to approver
         deliveredBy: task.responsibleName,
         deliveredBySector: task.responsibleSector,
@@ -266,39 +295,79 @@ export function useTasks() {
         responsibleSectors: [approverSector],
         links: updatedLinks || task.links,
         timeline,
-      });
+      };
+
+      // A primeira entrega é o que conta no KPI do colaborador —
+      // gravada uma única vez, imune a rodadas de ajuste posteriores.
+      if (!task.firstDeliveredAt) {
+        patch.firstDeliveredAt = now;
+        patch.firstDeliveredOnTime = onTime;
+      }
+
+      await updateDoc(doc(db, 'tasks', taskId), patch);
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
   // ── Approve (complete) task ──────────────────────────────────
+  // Fecha o congelamento e grava o retrato do tempo no próprio doc,
+  // para o Extrato e os Relatórios não precisarem recalcular a
+  // timeline inteira a cada render.
   const approveTask = async (taskId) => {
     try {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
-      const now = new Date().toISOString();
+      const at = new Date();
+      const now = at.toISOString();
       const timeline = [...(task.timeline || []), {
         action: 'completed',
         by: task.responsibleName,
         sector: task.responsibleSector,
         at: now,
       }];
+
+      const pausedMs = (Number(task.pausedMs) || 0) + (
+        task.approvalStartedAt ? businessMsBetween(task.approvalStartedAt, at) : 0
+      );
+
+      // Calcula em cima do estado FINAL da task (com o evento de
+      // conclusão já incluído), senão o último trecho fica de fora.
+      const stats = taskTimeStats(
+        { ...task, timeline, status: 'done', completedAt: now },
+        at
+      );
+
       await updateDoc(doc(db, 'tasks', taskId), {
         status: 'done',
         completedAt: now,
         isRework: false,
+        approvalStartedAt: null,
+        pausedMs,
         timeline,
+        timeStats: {
+          totalMs: stats.totalMs,
+          queueMs: stats.queueMs,
+          workMs: stats.workMs,
+          reworkMs: stats.reworkMs,
+          approvalMs: stats.approvalMs,
+          byPerson: stats.byPerson,
+          computedAt: now,
+        },
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
   // ── Reject (send back for rework) ───────────────────────────
+  // Encerra o congelamento e devolve ao prazo o tempo útil que a task
+  // passou esperando aprovação. Quem vai ajustar não herda o atraso de
+  // quem demorou para revisar.
   const rejectTask = async (taskId, reworkNote, newResponsibleName, newResponsibleSector) => {
     try {
       const task = tasks.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
-      const now = new Date().toISOString();
+      const at = new Date();
+      const now = at.toISOString();
       const reworkCount = (task.reworkCount || 0) + 1;
       const reworkComment = {
         id: `c_${Date.now()}`,
@@ -311,10 +380,17 @@ export function useTasks() {
       const timeline = [...(task.timeline || []), {
         action: 'rejected',
         by: task.responsibleName,
+        sector: task.responsibleSector,
         note: reworkNote,
         newResponsible: newResponsibleName,
+        newResponsibleSector: newResponsibleSector,
         at: now,
       }];
+
+      const pausedMs = (Number(task.pausedMs) || 0) + (
+        task.approvalStartedAt ? businessMsBetween(task.approvalStartedAt, at) : 0
+      );
+
       await updateDoc(doc(db, 'tasks', taskId), {
         status: 'doing',
         isRework: true,
@@ -327,6 +403,11 @@ export function useTasks() {
         // Reset deliveredBy so next approval cycle tracks correctly
         deliveredBy: null,
         deliveredBySector: null,
+        // Sai do congelamento: o relógio do prazo volta a correr, já
+        // descontado o tempo que ficou parado.
+        approvalAt: null,
+        approvalStartedAt: null,
+        pausedMs,
         comments: [...(task.comments || []), reworkComment],
         timeline,
       });
