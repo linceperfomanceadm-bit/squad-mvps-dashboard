@@ -54,24 +54,53 @@ export const CS_ROLES = [
 ];
 
 // ─── Ciclo de vida do cliente ─────────────────────────────────
-// O cliente nasce no cadastro da CS Comercial e passa por dois
+// O cliente nasce no cadastro da CS Comercial e passa por quatro
 // estágios antes de virar rotina:
 //
-//   staffing → cadastrado, aguardando os líderes indicarem os
-//              responsáveis de cada setor contratado. Fica invisível
-//              para os setores porque grava `active: false`, o que já
-//              o esconde de todos os filtros existentes do app.
-//   live     → quadro de responsáveis completo. Vira `active: true` e
-//              entra na base para valer, com `kickoff.pending: true`
-//              até a call de onboarding ser realizada.
+//   staffing   → cadastrado, aguardando os líderes indicarem os
+//                responsáveis de cada setor contratado.
+//   kickoff    → quadro completo. A CS COMERCIAL agenda e realiza a
+//                call de Kick Off, junto com a CS Operacional.
+//   onboarding → Kick Off realizado. A CS OPERACIONAL agenda a call
+//                de onboarding com o time. É no AGENDAMENTO dessa
+//                call que o cliente fica visível para os responsáveis.
+//   live       → call de onboarding realizada. Rotina normal.
+//
+// Enquanto não chega em `onboarding` agendado, o cliente grava
+// `active: false` — é o que já o esconde de todos os filtros do app
+// (`active !== false`) sem precisar mexer em dezenas de telas.
 //
 // Cliente antigo, sem o campo `stage`, conta como 'live'.
 export const CLIENT_STAGES = {
-  staffing: { id: 'staffing', label: 'Aguardando responsáveis', color: '#f59e0b' },
-  live:     { id: 'live',     label: 'Ativo',                   color: '#22c55e' },
+  staffing:   { id: 'staffing',   label: 'Aguardando responsáveis', color: '#f59e0b' },
+  kickoff:    { id: 'kickoff',    label: 'Kick Off',                color: '#a78bfa' },
+  onboarding: { id: 'onboarding', label: 'Onboarding',              color: '#3EFFFF' },
+  live:       { id: 'live',       label: 'Ativo',                   color: '#22c55e' },
 };
 
-export const isStaffing = (c) => c?.stage === 'staffing';
+/*
+ * Estágio efetivo do cliente.
+ *
+ * Deriva em vez de confiar cegamente no campo, porque os clientes
+ * cadastrados no fluxo antigo (uma call só) têm `stage: 'live'` com
+ * `kickoff.pending: true`. Eles continuam funcionando: caem em
+ * 'onboarding' e seguem o caminho normal até o fim, sem migração.
+ */
+export const stageOf = (c) => {
+  if (!c) return 'live';
+  if (c.stage === 'staffing')   return 'staffing';
+  if (c.stage === 'kickoff')    return 'kickoff';
+  if (c.stage === 'onboarding') return 'onboarding';
+  if (c.kickoff?.pending)       return 'onboarding'; // legado do fluxo antigo
+  return 'live';
+};
+
+export const isStaffing = (c) => stageOf(c) === 'staffing';
+
+// Dias sem indicação de responsável até o sistema cobrar os líderes.
+// O alerta vai para o admin e para o líder do setor travado.
+export const STAFFING_ALERT_DAYS = 2;
+
 
 // ─── Serviço contratado → setor responsável ───────────────────
 // Usado só para SUGERIR os setores no cadastro do cliente. A CS
@@ -149,6 +178,16 @@ export const REQUEST_STATUS = {
 
 // Setores de produção que recebem Reporte da CS.
 export const REQUEST_SECTORS = ['socialmedia', 'webdesign', 'design', 'videomaker', 'trafego'];
+
+// SLA de resposta por urgência, em HORAS ÚTEIS (seg-sex, 09h-18h48).
+// Serve para ordenar a fila e marcar o que está estourando — não
+// bloqueia nada, só dá à CS um critério objetivo para cobrar.
+export const REQUEST_SLA_HOURS = {
+  urgent: 4,
+  high:   24,
+  medium: 48,
+  low:    72,
+};
 
 // ─── Social Media Kanban columns ─────────────────────────────
 export const SM_COLUMNS = [
