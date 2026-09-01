@@ -120,7 +120,6 @@ export function AuthProvider({ children }) {
       name: c.name,
       loginId: c.loginId,
       sector: c.sector,
-      commercialRole: c.commercialRole || null,
       // Função dentro do CS: 'comercial' | 'operacional'.
       // Colaboradores antigos, sem o campo, caem em 'operacional'.
       csRole: c.sector === 'cs' ? (c.csRole || 'operacional') : null,
