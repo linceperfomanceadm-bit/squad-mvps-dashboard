@@ -10,8 +10,6 @@ import WebDesignDashboard from './pages/sectors/WebDesignDashboard';
 import SocialMediaDashboard from './pages/sectors/SocialMediaDashboard';
 import CreativeDashboard from './pages/sectors/CreativeDashboard';
 import GenericSectorDashboard from './pages/sectors/GenericSectorDashboard';
-import SDRDashboard from './pages/sectors/SDRDashboard';
-import CloserDashboard from './pages/sectors/CloserDashboard';
 import CSComercialDashboard from './pages/sectors/CSComercialDashboard';
 import CSOperacionalDashboard from './pages/sectors/CSOperacionalDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -25,13 +23,6 @@ import PortalDashboard from './pages/PortalDashboard';
 // quem só usa o dashboard normal.
 const TVPanel = lazy(() => import('./pages/TVPanel'));
 
-// Destino do usuário comercial conforme o subpapel.
-function commercialHome(user) {
-  if (user?.commercialRole === 'sdr') return '/sdr';
-  if (user?.commercialRole === 'closer') return '/closer';
-  return '/comercial'; // sem subpapel definido — cai no genérico
-}
-
 // Destino do usuário de CS conforme o subpapel.
 // Sem subpapel cadastrado, cai no CS Operacional (padrão seguro).
 function csHome(user) {
@@ -42,12 +33,11 @@ function csHome(user) {
 function homeFor(user) {
   if (!user) return '/';
   if (user.isAdmin) return '/admin';
-  if (user.sector === 'comercial') return commercialHome(user);
   if (user.sector === 'cs') return csHome(user);
   return `/${user.sector}`;
 }
 
-function ProtectedRoute({ children, requireSector, requireAdmin, requireCommercialRole, requireCsRole, allowAdmin }) {
+function ProtectedRoute({ children, requireSector, requireAdmin, requireCsRole, allowAdmin }) {
   const { user, loading } = useAuth();
 
   if (loading) return (
@@ -68,13 +58,6 @@ function ProtectedRoute({ children, requireSector, requireAdmin, requireCommerci
 
   if (requireAdmin && !user.isAdmin) return <Navigate to={homeFor(user)} replace />;
 
-  // Rota que exige um subpapel comercial específico (sdr/closer).
-  if (requireCommercialRole) {
-    if (user.sector !== 'comercial') return <Navigate to={homeFor(user)} replace />;
-    if (user.commercialRole !== requireCommercialRole) return <Navigate to={homeFor(user)} replace />;
-    return children;
-  }
-
   // Rota que exige um subpapel de CS específico (comercial/operacional).
   if (requireCsRole) {
     if (user.sector !== 'cs') return <Navigate to={homeFor(user)} replace />;
@@ -88,21 +71,6 @@ function ProtectedRoute({ children, requireSector, requireAdmin, requireCommerci
   }
 
   return children;
-}
-
-// Redireciona /comercial para o painel certo conforme o subpapel.
-function CommercialRedirect() {
-  const { user, loading } = useAuth();
-  if (loading) return null;
-  if (!user) return <Navigate to="/" replace />;
-  if (user.firstAccess) return <Navigate to="/first-access" replace />;
-  if (user.isAdmin) return <Navigate to="/admin" replace />;
-  if (user.sector !== 'comercial') return <Navigate to={homeFor(user)} replace />;
-  // Comercial com subpapel definido vai para o painel específico;
-  // sem subpapel, mostra o dashboard genérico (fallback seguro).
-  if (user.commercialRole === 'sdr') return <Navigate to="/sdr" replace />;
-  if (user.commercialRole === 'closer') return <Navigate to="/closer" replace />;
-  return <GenericSectorDashboard sectorId="comercial" />;
 }
 
 // Redireciona /cs para o painel certo conforme a função do colaborador.
@@ -149,15 +117,6 @@ function AppRoutes() {
       } />
       <Route path="/trafego" element={
         <ProtectedRoute requireSector="trafego"><GenericSectorDashboard sectorId="trafego" /></ProtectedRoute>
-      } />
-
-      {/* Comercial — redireciona para SDR ou Closer conforme subpapel */}
-      <Route path="/comercial" element={<CommercialRedirect />} />
-      <Route path="/sdr" element={
-        <ProtectedRoute requireCommercialRole="sdr"><SDRDashboard /></ProtectedRoute>
-      } />
-      <Route path="/closer" element={
-        <ProtectedRoute requireCommercialRole="closer"><CloserDashboard /></ProtectedRoute>
       } />
 
       {/* Lince Docs — editor e rota de impressão.
