@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, Rocket, Activity, HeartPulse, Calendar, X,
-  Kanban, MessageSquare, Clock, Video,
+  Kanban, MessageSquare, Clock, Video, Lock,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
@@ -16,7 +16,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
 import ClientOnboardingModal from '../../components/commercial/ClientOnboardingModal';
 import StaffingModal from '../../components/commercial/StaffingModal';
-import { SECTORS } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
   HEALTH_LEVELS_4, HEALTH_ORDER_4,
@@ -28,19 +28,28 @@ import {
 } from '../../components/commercial/ui';
 
 const COLOR = SECTORS.cs.color;
+const KICKOFF_COLOR = '#a78bfa';
 
 /*
- * CS OPERACIONAL — 3 abas, como no fluxograma:
+ * CS OPERACIONAL:
  *
- *  1. Onboarding de Clientes → todo cliente novo cai aqui já no
- *                        cadastro da CS Comercial. O card fica
- *                        bloqueado enquanto algum setor não tiver
- *                        responsável indicado. Com o quadro completo,
- *                        a CS agenda a call e depois confirma que ela
- *                        aconteceu — aí o cliente sai desta aba.
- *  2. Saúde Operacional→ farol AUTOMÁTICO por tasks em atraso:
+ *  1. Kick Off         → LEITURA. Todo cliente novo aparece aqui já
+ *                        no cadastro da CS Comercial. Fica bloqueado
+ *                        enquanto algum setor não tiver responsável;
+ *                        quem lidera um setor pendente indica por
+ *                        aqui mesmo. Com o quadro fechado, o card
+ *                        mostra "Aguardando agendamento de Kick Off"
+ *                        até a CS COMERCIAL marcar e realizar a call.
+ *                        Esta tela não agenda Kick Off — na ausência
+ *                        da CS Comercial, quem agenda é o admin.
+ *  2. Onboarding de Clientes → AÇÃO. Kick Off realizado, o cliente cai
+ *                        aqui. A CS Operacional agenda a call de
+ *                        onboarding (é o agendamento que torna o
+ *                        cliente visível para os responsáveis) e
+ *                        depois confirma que ela aconteceu.
+ *  3. Saúde Operacional→ farol AUTOMÁTICO por tasks em atraso:
  *                        0 verde · 1 amarelo · 2 laranja · 3+ vermelho
- *  3. Saúde do Cliente → farol MANUAL, alimentado pela CS com base no
+ *  4. Saúde do Cliente → farol MANUAL, alimentado pela CS com base no
  *                        relacionamento e nas pendências do cliente.
  */
 export default function CSOperacionalDashboard() {
@@ -56,7 +65,7 @@ export default function CSOperacionalDashboard() {
     requests, createRequest, addReply, closeRequest, deleteRequest,
   } = useRequests();
 
-  const [page, setPage] = useState('kickoff');
+  const [page, setPage] = useState('onboarding');
   const [onlyMine, setOnlyMine] = useState(false);
   const [opsFilter, setOpsFilter] = useState('all');
   const [openId, setOpenId] = useState(null);
@@ -94,28 +103,41 @@ export default function CSOperacionalDashboard() {
   // Não estão em `activeClients` porque gravam `active: false`.
   const staffingClients = useMemo(
     () => clients
-      .filter(c => c.stage === 'staffing')
+      .filter(c => stageOf(c) === 'staffing')
       .sort((a, b) => new Date(a.staffing?.startedAt || 0) - new Date(b.staffing?.startedAt || 0)),
     [clients]
   );
 
-  // Quadro completo, aguardando agendamento ou a call acontecer.
-  const kickoffPending = useMemo(
-    () => activeClients
-      .filter(c => c.kickoff?.pending)
+  // Quadro fechado, esperando a CS Comercial marcar o Kick Off.
+  // Aparece aqui só para acompanhamento — esta tela não agenda.
+  const kickoffClients = useMemo(
+    () => clients
+      .filter(c => stageOf(c) === 'kickoff')
+      .sort((a, b) => {
+        const aa = a.kickoffCall?.at ? new Date(a.kickoffCall.at).getTime() : Infinity;
+        const bb = b.kickoffCall?.at ? new Date(b.kickoffCall.at).getTime() : Infinity;
+        return aa - bb;
+      }),
+    [clients]
+  );
+
+  // Kick Off realizado: agora é com a CS Operacional.
+  const onboardingClients = useMemo(
+    () => clients
+      .filter(c => stageOf(c) === 'onboarding')
       .sort((a, b) => {
         const aa = a.kickoff?.at ? new Date(a.kickoff.at).getTime() : Infinity;
         const bb = b.kickoff?.at ? new Date(b.kickoff.at).getTime() : Infinity;
         return aa - bb;
       }),
-    [activeClients]
+    [clients]
   );
 
-  const onboardingTotal = staffingClients.length + kickoffPending.length;
-  const semAgenda = kickoffPending.filter(c => !c.kickoff?.at).length;
+  const kickoffTotal = staffingClients.length + kickoffClients.length;
+  const semAgenda = onboardingClients.filter(c => !c.kickoff?.at).length;
 
   const liveClients = useMemo(
-    () => activeClients.filter(c => !c.kickoff?.pending).filter(mineFilter),
+    () => activeClients.filter(c => stageOf(c) === 'live').filter(mineFilter),
     [activeClients, onlyMine, me] // eslint-disable-line react-hooks/exhaustive-deps
   );
 
@@ -146,6 +168,11 @@ export default function CSOperacionalDashboard() {
 
   const visibleOps = opsFilter === 'all' ? withOps : withOps.filter(w => w.health.level === opsFilter);
 
+  // A CS Operacional só age depois do Kick Off. Antes disso o modal
+  // é leitura pura — quem agenda o Kick Off é a CS Comercial (ou o
+  // admin, na ausência dela).
+  const podeAgendarOnboarding = (c) => stageOf(c) === 'onboarding';
+
   const openClient = openId ? liveClients.find(c => c.id === openId) || null : null;
   const onboardingClient = onboardingId ? clients.find(c => c.id === onboardingId) || null : null;
 
@@ -153,7 +180,8 @@ export default function CSOperacionalDashboard() {
   const requestsToClose = requests.filter(r => r.status === 'answered').length;
 
   const NAV = [
-    { key: 'kickoff',  label: 'Onboarding de Clientes', icon: Rocket, badge: onboardingTotal, badgeDanger: semAgenda > 0 },
+    { key: 'kickoff',    label: 'Kick Off', icon: Lock, badge: kickoffTotal },
+    { key: 'onboarding', label: 'Onboarding de Clientes', icon: Rocket, badge: onboardingClients.length, badgeDanger: semAgenda > 0 },
     { key: 'ops',      label: 'Saúde Operacional', icon: Activity,   badge: opsCounts.red, badgeDanger: opsCounts.red > 0 },
     { key: 'client',   label: 'Saúde do Cliente',  icon: HeartPulse },
     { key: 'kanban',   label: 'Produção',          icon: Kanban },
@@ -163,7 +191,8 @@ export default function CSOperacionalDashboard() {
   ];
 
   const HEAD = {
-    kickoff:  ['Onboarding de Clientes', 'Clientes novos entrando na agência, do cadastro até a call realizada'],
+    kickoff:     ['Kick Off', 'Clientes novos, do cadastro até a call de Kick Off da CS Comercial'],
+    onboarding:  ['Onboarding de Clientes', 'Kick Off realizado — agende a call de onboarding com o time'],
     ops:      ['Saúde Operacional', 'Farol automático pelas tasks em atraso de cada cliente'],
     client:   ['Saúde do Cliente', 'Farol manual — relacionamento e pendências por parte do cliente'],
     kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
@@ -198,14 +227,14 @@ export default function CSOperacionalDashboard() {
               <div className="fade-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
                 <Stat label="Clientes ativos" value={liveClients.length} color={COLOR} />
                 <Stat label="Saúde crítica" value={criticalCount} color={criticalCount > 0 ? '#ef4444' : 'var(--muted)'} hint="Vermelho no farol operacional ou no farol do cliente" />
-                <Stat label="Em onboarding" value={onboardingTotal} color="var(--amber)" />
+                <Stat label="Em onboarding" value={onboardingClients.length + kickoffTotal} color="var(--amber)" />
                 <Stat label="Em dia (operacional)" value={opsCounts.green} color="var(--green)" />
               </div>
             )}
 
             {page === 'kickoff' && (
-              onboardingTotal === 0
-                ? <Empty msg="Nenhum cliente em onboarding. ✨" />
+              kickoffTotal === 0
+                ? <Empty msg="Nenhum cliente aguardando Kick Off. ✨" />
                 : (
                   <>
                     {staffingClients.length > 0 && (
@@ -235,33 +264,46 @@ export default function CSOperacionalDashboard() {
                       </div>
                     )}
 
-                    {kickoffPending.length > 0 && (
+                    {kickoffClients.length > 0 && (
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <span style={{ width: 3, height: 15, background: COLOR, borderRadius: 2 }} />
-                          <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Prontos para a call</h2>
+                          <span style={{ width: 3, height: 15, background: KICKOFF_COLOR, borderRadius: 2 }} />
+                          <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Aguardando Kick Off</h2>
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
-                          Quadro de responsáveis completo. Marque a data da call de onboarding e confirme quando ela acontecer.
+                          Quadro de responsáveis completo. A CS Comercial agenda e realiza a call de Kick Off — você participa dela.
+                          Depois disso o cliente cai na sua aba de Onboarding.
                         </p>
                         <div style={GRID}>
-                          {kickoffPending.map(c => (
-                            <KickoffCard
-                              key={c.id}
-                              client={c}
-                              onOpen={() => setOnboardingId(c.id)}
-                              onSchedule={() => setScheduleTarget(c)}
-                              onConfirm={async () => {
-                                const r = await confirmKickoff(c.id, me);
-                                if (r.success) toast(`Onboarding de ${c.name} concluído! 🚀`);
-                                else toast(r.error, 'e');
-                              }}
-                            />
+                          {kickoffClients.map(c => (
+                            <KickoffWatchCard key={c.id} client={c} onOpen={() => setOnboardingId(c.id)} />
                           ))}
                         </div>
                       </div>
                     )}
                   </>
+                )
+            )}
+
+            {page === 'onboarding' && (
+              onboardingClients.length === 0
+                ? <Empty msg="Nenhum cliente aguardando onboarding. ✨" />
+                : (
+                  <div style={GRID}>
+                    {onboardingClients.map(c => (
+                      <KickoffCard
+                        key={c.id}
+                        client={c}
+                        onOpen={() => setOnboardingId(c.id)}
+                        onSchedule={() => setScheduleTarget(c)}
+                        onConfirm={async () => {
+                          const r = await confirmKickoff(c.id, me);
+                          if (r.success) toast(`Onboarding de ${c.name} concluído! 🚀`);
+                          else toast(r.error, 'e');
+                        }}
+                      />
+                    ))}
+                  </div>
                 )
             )}
 
@@ -365,14 +407,20 @@ export default function CSOperacionalDashboard() {
         <ClientOnboardingModal
           client={onboardingClient}
           onClose={() => setOnboardingId(null)}
-          onSchedule={() => { setScheduleTarget(onboardingClient); setOnboardingId(null); }}
-          onReschedule={() => { setScheduleTarget(onboardingClient); setOnboardingId(null); }}
-          onConfirm={async () => {
-            const r = await confirmKickoff(onboardingClient.id, me);
-            if (r.success) toast(`Onboarding de ${onboardingClient.name} concluído! 🚀`);
-            else toast(r.error, 'e');
-            setOnboardingId(null);
-          }}
+          onSchedule={podeAgendarOnboarding(onboardingClient)
+            ? () => { setScheduleTarget(onboardingClient); setOnboardingId(null); }
+            : undefined}
+          onReschedule={podeAgendarOnboarding(onboardingClient)
+            ? () => { setScheduleTarget(onboardingClient); setOnboardingId(null); }
+            : undefined}
+          onConfirm={podeAgendarOnboarding(onboardingClient) && onboardingClient.kickoff?.at
+            ? async () => {
+              const r = await confirmKickoff(onboardingClient.id, me);
+              if (r.success) toast(`Onboarding de ${onboardingClient.name} concluído! 🚀`);
+              else toast(r.error, 'e');
+              setOnboardingId(null);
+            }
+            : undefined}
         />
       )}
 
@@ -424,7 +472,7 @@ function LockedCard({ client, pendentes, meus = [], onStaff }) {
   const dias = client.staffing?.startedAt
     ? Math.floor((Date.now() - new Date(client.staffing.startedAt).getTime()) / 86400000)
     : null;
-  const atrasado = dias != null && dias >= 3;
+  const atrasado = dias != null && dias >= STAFFING_ALERT_DAYS;
 
   return (
     <div style={{ ...CARD, border: `1px solid ${atrasado ? 'var(--neon-border)' : 'var(--border)'}`, opacity: .82 }}>
@@ -471,6 +519,58 @@ function LockedCard({ client, pendentes, meus = [], onStaff }) {
   );
 }
 
+// ── Kick Off: card de acompanhamento (leitura) ─────────────────
+// A CS Operacional participa da call, mas não a agenda. Este card
+// existe para ela saber o que está travado e cobrar a CS Comercial.
+function KickoffWatchCard({ client, onOpen }) {
+  const contrato = client.contrato || {};
+  const call = client.kickoffCall || {};
+  const agendada = !!call.at;
+  const passou = agendada && new Date(call.at) < new Date();
+  const desde = call.scheduledAt || client.staffing?.completedAt;
+  const diasParado = !agendada && desde
+    ? Math.floor((Date.now() - new Date(desde).getTime()) / 86400000)
+    : null;
+
+  return (
+    <button
+      onClick={onOpen}
+      style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        {agendada
+          ? <Tag text={passou ? 'CALL PASSOU' : 'KICK OFF AGENDADO'} color={passou ? 'var(--amber)' : KICKOFF_COLOR} />
+          : <Tag text="AGUARDANDO AGENDAMENTO DE KICK OFF" color="var(--muted)" />}
+      </div>
+
+      {agendada ? (
+        <p style={{ fontSize: 13, fontWeight: 700, color: passou ? 'var(--amber)' : KICKOFF_COLOR, fontFamily: 'var(--fm)', marginTop: 10 }}>
+          📅 {fmtDateTime(call.at)}
+        </p>
+      ) : (
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
+          Time completo. A CS Comercial ainda vai definir data e hora da call.
+        </p>
+      )}
+
+      {(contrato.contactName || client.contactName) && (
+        <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>👤 {contrato.contactName || client.contactName}</p>
+      )}
+
+      {diasParado != null && diasParado >= STAFFING_ALERT_DAYS && (
+        <p style={{ fontSize: 11, color: 'var(--neon)', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <Clock size={11} /> parado há {diasParado} dias · vale cobrar a CS Comercial
+        </p>
+      )}
+
+      {call.meetLink && (
+        <p style={{ fontSize: 11, color: 'var(--blue)', fontFamily: 'var(--fm)', marginTop: 8 }}>🔗 link da call disponível</p>
+      )}
+    </button>
+  );
+}
+
 // ── Onboarding: card liberado ──────────────────────────────────
 function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
   const contrato = client.contrato || {};
@@ -495,7 +595,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
           </p>
         ) : (
           <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-            Time definido. Falta marcar a data e a hora da call de onboarding.
+            Kick Off realizado. Marque a data da call de onboarding — é o agendamento que libera o cliente para o time.
           </p>
         )}
 
