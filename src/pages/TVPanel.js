@@ -76,8 +76,8 @@ const CSS = `
 @keyframes tvprog{from{width:0}to{width:100%}}
 
 .tv-rail{width:4cqw;flex-shrink:0;margin:1.6cqw 0 1.6cqw 1.6cqw;border-radius:1.4cqw;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;align-items:center;padding:1.3cqw 0;gap:.9cqw}
-.tv-mark{width:2.4cqw;height:2.4cqw;border-radius:.75cqw;background:#EE3363;display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:.8cqw;box-shadow:0 0 30px rgba(238,51,99,.45);padding:.42cqw}
-.tv-mark img{width:100%;height:100%;object-fit:contain;display:block}
+.tv-mark{width:3.2cqw;height:3.2cqw;display:flex;align-items:center;justify-content:center;margin-bottom:1cqw}
+.tv-mark img{width:100%;height:100%;object-fit:contain;display:block;filter:brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0,0,0,.6))}
 .tv-ic{width:2.3cqw;height:2.3cqw;border-radius:.7cqw;display:flex;align-items:center;justify-content:center;color:#8a7b83;transition:.3s}
 .tv-ic.on{background:rgba(255,255,255,.09);color:#f5eff2;border:1px solid rgba(255,255,255,.14)}
 .tv-live{width:.5cqw;height:.5cqw;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80;animation:tvblink 2.4s ease-in-out infinite}
