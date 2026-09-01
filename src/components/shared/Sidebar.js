@@ -1,12 +1,33 @@
 import React from 'react';
-import { LogOut, Plus } from 'lucide-react';
+import { LogOut, Plus, Bell, BellOff } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { SECTORS } from '../../lib/firebase';
+import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
 
 export default function Sidebar({ navItems, activeKey, onNav, onAddClient, sectorId }) {
   const { user, logout } = useAuth();
   const sector = SECTORS[sectorId];
   const color = sector?.color || 'var(--neon)';
+
+  // Só o interruptor liga/desliga. Quem dispara as notificações é o
+  // NotificationCenter, montado uma vez no App — passando listas
+  // vazias, este hook não observa nada e não duplica aviso.
+  const notify = useDesktopNotifications({ user });
+
+  const bloqueado = !notify.supported || notify.permission === 'denied';
+  const notifLabel = !notify.supported
+    ? 'Navegador sem suporte a notificações'
+    : notify.permission === 'denied'
+      ? 'Notificações bloqueadas nas configurações do navegador'
+      : notify.active
+        ? 'Notificações ligadas — clique para desligar'
+        : 'Notificações desligadas — clique para ligar';
+
+  const handleNotify = () => {
+    if (bloqueado) return;
+    if (notify.permission === 'default') { notify.request(); return; }
+    notify.toggle();
+  };
 
   return (
     <aside style={{ ...S.sb, borderColor: `${color}22` }}>
@@ -45,6 +66,15 @@ export default function Sidebar({ navItems, activeKey, onNav, onAddClient, secto
             <Plus size={14} /> Novo Cliente
           </button>
         )}
+        <button
+          style={{ ...S.logoutBtn, opacity: bloqueado ? .4 : 1 }}
+          onClick={handleNotify}
+          title={notifLabel}
+        >
+          {notify.active
+            ? <Bell size={14} color={color} />
+            : <BellOff size={14} color="var(--muted)" />}
+        </button>
         <button style={S.logoutBtn} onClick={logout} title="Sair">
           <LogOut size={14} color="var(--muted)" />
         </button>
@@ -65,5 +95,5 @@ const S = {
   badge: { marginLeft: 'auto', background: 'rgba(255,255,255,.07)', borderRadius: 10, padding: '1px 7px', fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' },
   bottom: { paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 },
   addBtn: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 9, padding: 9, fontSize: 12, fontWeight: 600, transition: 'all .2s' },
-  logoutBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 10px', display: 'flex', alignItems: 'center' },
+  logoutBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 10px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
 };
