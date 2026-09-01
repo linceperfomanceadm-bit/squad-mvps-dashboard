@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, CheckSquare, Calendar, Package, Monitor, FileText } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, CheckSquare, Calendar, Package, Monitor, FileText, Rocket } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -15,6 +15,7 @@ import AdminCollaborators from '../../components/admin/AdminCollaborators';
 import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import AdminTVControl from '../../components/admin/AdminTVControl';
+import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
@@ -25,6 +26,7 @@ const NAV = [
   { key: 'overview',      label: 'Visão Geral',    icon: LayoutDashboard },
   { key: 'kanban',        label: 'Tasks',           icon: Kanban },
   { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
+  { key: 'onboarding',    label: 'Onboarding',      icon: Rocket },
   { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
   { key: 'documentos',    label: 'Documentos',      icon: FileText },
   { key: 'vault',         label: 'Brand Hub',        icon: BookOpen },
@@ -104,11 +106,14 @@ export default function AdminDashboard() {
   };
 
   const pendingTasks = tasks.filter(t => t.status === 'approval').length;
+  // Clientes cadastrados pela CS que ainda esperam indicação de
+  // responsável. O admin destrava quando um líder está ausente.
+  const staffingCount = clients.filter(c => c.stage === 'staffing').length;
 
   const navItems = NAV.map(n => ({
     ...n,
-    badge: n.key === 'kanban' ? pendingTasks : 0,
-    badgeDanger: n.key === 'kanban' && pendingTasks > 0,
+    badge: n.key === 'kanban' ? pendingTasks : (n.key === 'onboarding' ? staffingCount : 0),
+    badgeDanger: (n.key === 'kanban' && pendingTasks > 0) || (n.key === 'onboarding' && staffingCount > 0),
   }));
 
   return (
@@ -201,6 +206,8 @@ export default function AdminDashboard() {
             onChangeDeadline={changeDeadline}
             onDelete={deleteTask}
           />
+        ) : page === 'onboarding' ? (
+          <OnboardingBoard sectorId="admin" isAdminView />
         ) : page === 'charts' ? (
           <AdminCharts clients={clients} tasks={tasks} />
         ) : page === 'portal' ? (
