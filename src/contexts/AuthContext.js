@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
       // Conta admin master sem doc no Firestore.
       if (loginIdFromEmail === ADMIN_ID) {
         try { await withTimeout(setDoc(doc(db, 'userIndex', uid), { collabId: null, isAdmin: true, sector: null }, { merge: true }), 5000, 'idx-admin'); } catch {}
-        return { id: uid, authUid: uid, name: 'Admin', loginId: ADMIN_ID, sector: null, role: 'superadmin', isAdmin: true, firstAccess: false };
+        return { id: uid, authUid: uid, name: 'Admin', loginId: ADMIN_ID, sector: null, role: 'superadmin', isAdmin: true, leaderOf: [], firstAccess: false };
       }
       throw new Error('Perfil não encontrado.');
     }
@@ -123,6 +123,10 @@ export function AuthProvider({ children }) {
       // Função dentro do CS: 'comercial' | 'operacional'.
       // Colaboradores antigos, sem o campo, caem em 'operacional'.
       csRole: c.sector === 'cs' ? (c.csRole || 'operacional') : null,
+      // Setores que esta pessoa lidera. Independente de `sector`: dá
+      // para liderar um setor diferente do próprio, e mais de um.
+      // É o que libera a indicação de responsáveis no onboarding.
+      leaderOf: Array.isArray(c.leaderOf) ? c.leaderOf : [],
       role: c.isAdmin ? 'admin' : 'collaborator',
       isAdmin: c.isAdmin || false,
       firstAccess: c.firstAccess || false,
