@@ -3,6 +3,9 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimest
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG } from '../lib/firebase';
 
+// Responsável pode estar salvo como string (docs antigos) ou array.
+const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+
 export function useClients() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,16 +18,23 @@ export function useClients() {
     });
   }, []);
 
-  // Add client — admin cria, ou o CS Comercial cria ao fechar o
-  // onboarding. Campos extras (dados do contrato, kickoff, etc.) são
-  // preservados: só `name`, `responsibles` e os blocos de setor têm
-  // tratamento especial.
+  // Add client — o CS Comercial cadastra o cliente novo (estágio
+  // `staffing`) ou o admin cadastra direto. Campos extras (bloco
+  // `contrato`, `kickoff`, etc.) são preservados: só `name`,
+  // `responsibles` e os blocos de setor têm tratamento especial.
+  //
+  // Em `staffing` o cliente grava `active: false` de propósito: é o
+  // que já o esconde de todos os filtros do app (`active !== false`)
+  // sem precisar mexer em dezenas de telas. Ele volta a `true` quando
+  // o quadro de responsáveis fecha.
   const addClient = async (data) => {
     try {
-      const { name, responsibles, wdService, idVisualResponsible, ...extra } = data || {};
+      const { name, responsibles, wdService, idVisualResponsible, stage, ...extra } = data || {};
+      const emStaffing = stage === 'staffing';
       const newClient = {
         ...extra,
         name,
+        stage: stage || 'live',
         // Responsible per sector (optional)
         responsibles: responsibles || {},
         // ID Visual — bloco próprio, dono próprio. Só o designer
@@ -56,7 +66,7 @@ export function useClients() {
         // Brandbook (shared Design + Video)
         brandbook: { colors: [], typography: '', driveLink: '' },
         createdAt: serverTimestamp(),
-        active: true,
+        active: !emStaffing,
       };
       const ref = await addDoc(collection(db, 'clients'), newClient);
       return { success: true, id: ref.id };
@@ -289,32 +299,84 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── Onboarding: marca o "ok" de um setor no checklist ────────
-  // Cada colaborador marca apenas o próprio setor. Quando todos os
-  // setores envolvidos estão ok, o status vira 'ready' (pronto p/ CS).
-  const markOnboardingSector = async (clientId, sector, byName, done = true) => {
+  // ════════════════════════════════════════════════════════════
+  //  ONBOARDING DE CLIENTES
+  //  staffing → quadro completo → agendamento → call realizada
+  // ════════════════════════════════════════════════════════════
+
+  // Setores que ainda não têm ninguém indicado.
+  // `staffing.sectors` é definido no cadastro (serviços contratados).
+  const pendingSectorsOf = (client) => {
+    const exigidos = client?.staffing?.sectors || [];
+    return exigidos.filter(sid => !asArray(client?.responsibles?.[sid]).length);
+  };
+
+  // Líder indica os responsáveis do SETOR DELE. Se com isso o quadro
+  // fechar, o cliente é ativado na mesma escrita — nada de rodar duas
+  // vezes e deixar o cliente meio ativo se a segunda falhar.
+  const setSectorResponsibles = async (clientId, sector, names, byName, opts = {}) => {
     try {
       const client = clients.find(c => c.id === clientId);
-      if (!client || !client.onboarding) return { success: false, error: 'Cliente sem onboarding ativo.' };
-      const checklist = { ...(client.onboarding.checklist || {}) };
-      checklist[sector] = done
-        ? { ok: true, by: byName, at: new Date().toISOString() }
-        : { ok: false, by: null, at: null };
-      const sectors = client.onboarding.sectors || Object.keys(checklist);
-      const allOk = sectors.every(s => checklist[s]?.ok);
+      if (!client) return { success: false, error: 'Cliente não encontrado.' };
+      const lista = asArray(names).filter(Boolean);
+      if (!lista.length) return { success: false, error: 'Selecione ao menos um responsável.' };
+
       const patch = {
-        'onboarding.checklist': checklist,
-        'onboarding.status': allOk ? 'ready' : 'running',
+        [`responsibles.${sector}`]: lista,
+        [`staffing.log.${sector}`]: { by: byName || null, at: new Date().toISOString() },
       };
-      if (allOk) patch['onboarding.readyAt'] = new Date().toISOString();
+
+      // ID Visual vendido: o bloco `idv` nasce agora, com o designer
+      // que o líder escolheu. É o mesmo formato de antes, só que o
+      // dono é definido aqui em vez de no cadastro da CS.
+      if (sector === 'design' && client.contrato?.hasIdVisual && !client.idv?.responsible) {
+        const dono = opts.idvResponsible && lista.includes(opts.idvResponsible) ? opts.idvResponsible : lista[0];
+        patch.idv = {
+          responsible: dono,
+          status: 'onboarding',
+          onboardingStartedAt: new Date().toISOString(),
+          productionStartedAt: null,
+          checklist: [],
+          notes: '',
+        };
+      }
+
+      // Simula o resultado para saber se este foi o último setor.
+      const simulado = {
+        ...client,
+        responsibles: { ...(client.responsibles || {}), [sector]: lista },
+      };
+      const aindaFalta = pendingSectorsOf(simulado);
+
+      if (aindaFalta.length === 0 && client.stage === 'staffing') {
+        patch.stage = 'live';
+        patch.active = true;
+        patch['staffing.completedAt'] = new Date().toISOString();
+        patch.kickoff = { pending: true, at: null, meetLink: '', scheduledBy: null, confirmedAt: null, confirmedBy: null };
+      }
+
       await updateDoc(doc(db, 'clients', clientId), patch);
-      return { success: true, allOk };
+      return { success: true, activated: aindaFalta.length === 0 && client.stage === 'staffing' };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── CS Operacional: Kickoff ─────────────────────────────────
-  // O cliente entra em `kickoff.pending` quando o CS Comercial conclui
-  // o onboarding. Ao confirmar o kickoff, ele sai da aba de pendentes.
+  // CS Operacional agenda a call de onboarding.
+  const scheduleOnboarding = async (clientId, byName, at, meetLink) => {
+    if (!at) return { success: false, error: 'Defina a data e a hora da call.' };
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'kickoff.pending': true,
+        'kickoff.at': at,
+        'kickoff.meetLink': String(meetLink || '').trim(),
+        'kickoff.scheduledBy': byName || null,
+        'kickoff.scheduledAt': new Date().toISOString(),
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // CS Operacional confirma que a call aconteceu. O cliente sai da
+  // aba de onboarding de todo mundo e entra na rotina normal.
   const confirmKickoff = async (clientId, byName) => {
     try {
       await updateDoc(doc(db, 'clients', clientId), {
@@ -323,6 +385,45 @@ export function useClients() {
         'kickoff.confirmedBy': byName || null,
       });
       return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Cancela um cadastro feito por engano. Só antes de qualquer
+  // indicação de responsável — depois disso o cliente já existe para
+  // outras pessoas e apagar viraria surpresa.
+  const cancelStaffing = async (clientId) => {
+    try {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return { success: false, error: 'Cliente não encontrado.' };
+      if (client.stage !== 'staffing') {
+        return { success: false, error: 'Este cliente já está ativo na base.' };
+      }
+      const indicados = Object.values(client.responsibles || {}).filter(v => asArray(v).length);
+      if (indicados.length) {
+        return { success: false, error: 'Já existe setor com responsável indicado — não dá para cancelar.' };
+      }
+      await deleteDoc(doc(db, 'clients', clientId));
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Anexos do cadastro (briefing e contrato) ────────────────
+  // Pastas separadas de propósito: o contrato tem CPF, CNPJ e valores
+  // e nunca é renderizado em tela nenhuma do app.
+  const uploadClientFile = async (kind, file) => {
+    const MAX = 25 * 1024 * 1024;
+    if (!file) return { success: false, error: 'Nenhum arquivo selecionado.' };
+    if (file.size > MAX) return { success: false, error: `"${file.name}" passa de 25MB.` };
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const pasta = kind === 'contrato' ? 'contratos' : 'briefings';
+      const path = `${pasta}/${Date.now()}_${clean}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      return {
+        success: true,
+        file: { name: file.name, url: await getDownloadURL(storageRef), path, type: file.type },
+      };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
@@ -346,6 +447,7 @@ export function useClients() {
     idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
-    markOnboardingSector,
+    setSectorResponsibles, scheduleOnboarding, cancelStaffing,
+    pendingSectorsOf, uploadClientFile,
   };
 }
