@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff } from 'lucide-react';
-import { SECTORS, COMMERCIAL_ROLES, CS_ROLES } from '../../lib/firebase';
+import { SECTORS, CS_ROLES } from '../../lib/firebase';
 
 export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, commercialRole: '', csRole: '' });
+  const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '' });
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -21,12 +21,11 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
     if (!form.loginId.trim()) { setError('Defina o ID de acesso.'); return; }
     if (!form.password.trim() || form.password.length < 4) { setError('Senha provisória deve ter pelo menos 4 caracteres.'); return; }
     if (collaborators.some(c => c.loginId === form.loginId.trim())) { setError('Este ID já está em uso.'); return; }
-    if (form.sector === 'comercial' && !form.commercialRole) { setError('Defina a função no comercial (SDR ou Closer).'); return; }
     if (form.sector === 'cs' && !form.csRole) { setError('Defina a função no CS (Comercial ou Operacional).'); return; }
     setLoading(true);
     const res = await onAdd({ ...form, loginId: form.loginId.trim() });
     setLoading(false);
-    if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, commercialRole: '', csRole: '' }); setShowForm(false); setError(''); }
+    if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '' }); setShowForm(false); setError(''); }
     else setError(res.error);
   };
 
@@ -36,7 +35,6 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
       phone: editForm.phone || '',
       sector: editForm.sector,
       isAdmin: editForm.isAdmin || false,
-      commercialRole: editForm.sector === 'comercial' ? (editForm.commercialRole || '') : '',
       csRole: editForm.sector === 'cs' ? (editForm.csRole || 'operacional') : '',
     });
     setEditId(null);
@@ -47,6 +45,21 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
     const res = await onResetPassword(id, newPw);
     if (!res?.success) { setError(res?.error || 'Falha ao redefinir a senha.'); }
   };
+
+  // Agrupamento por setor. Colaboradores cujo setor não existe mais
+  // (ex.: o antigo Comercial) caem num grupo "Setor removido" para
+  // que o admin ainda consiga desativar, editar ou excluir a conta —
+  // sem isso eles sumiriam da tela e ficariam com login ativo.
+  const groups = [
+    ...Object.values(SECTORS).map(sector => ({
+      sector,
+      collabs: collaborators.filter(c => c.sector === sector.id),
+    })),
+    {
+      sector: { id: '__legacy__', label: 'Setor removido', color: '#8F97A0', emoji: '📦' },
+      collabs: collaborators.filter(c => !SECTORS[c.sector]),
+    },
+  ];
 
   return (
     <div className="fade-up">
@@ -93,15 +106,6 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                 </button>
               </div>
             </div>
-            {form.sector === 'comercial' && (
-              <div style={S.field}>
-                <label style={S.label}>Função no Comercial *</label>
-                <select style={S.select} value={form.commercialRole} onChange={e => set('commercialRole', e.target.value)}>
-                  <option value="">Selecione...</option>
-                  {COMMERCIAL_ROLES.map(r => <option key={r.id} value={r.id}>{r.label} ({r.desc})</option>)}
-                </select>
-              </div>
-            )}
             {form.sector === 'cs' && (
               <div style={S.field}>
                 <label style={S.label}>Função no CS *</label>
@@ -129,8 +133,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
       )}
 
       {/* List grouped by sector */}
-      {Object.values(SECTORS).map(sector => {
-        const sectorCollabs = collaborators.filter(c => c.sector === sector.id);
+      {groups.map(({ sector, collabs: sectorCollabs }) => {
         if (!sectorCollabs.length) return null;
         return (
           <div key={sector.id} style={{ marginBottom: 24 }}>
@@ -147,7 +150,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                   sector={sector}
                   isEditing={editId === collab.id}
                   editForm={editForm}
-                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false, commercialRole: collab.commercialRole || '', csRole: collab.csRole || (collab.sector === 'cs' ? 'operacional' : '') }); }}
+                  onEdit={() => { setEditId(collab.id); setEditForm({ name: collab.name, phone: collab.phone || '', sector: collab.sector, isAdmin: collab.isAdmin || false, csRole: collab.csRole || (collab.sector === 'cs' ? 'operacional' : '') }); }}
                   onSaveEdit={() => handleEdit(collab.id)}
                   onCancelEdit={() => setEditId(null)}
                   onEditFormChange={(k, v) => setEditForm(f => ({ ...f, [k]: v }))}
@@ -177,15 +180,10 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input style={S.input} value={editForm.name} onChange={e => onEditFormChange('name', e.target.value)} placeholder="Nome" />
           <input style={S.input} value={editForm.phone} onChange={e => onEditFormChange('phone', e.target.value)} placeholder="Telefone" />
-          <select style={S.select} value={editForm.sector} onChange={e => onEditFormChange('sector', e.target.value)}>
+          <select style={S.select} value={editForm.sector || ''} onChange={e => onEditFormChange('sector', e.target.value)}>
+            {!SECTORS[editForm.sector] && <option value={editForm.sector || ''}>📦 Setor removido ({editForm.sector || '—'})</option>}
             {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
           </select>
-          {editForm.sector === 'comercial' && (
-            <select style={S.select} value={editForm.commercialRole || ''} onChange={e => onEditFormChange('commercialRole', e.target.value)}>
-              <option value="">Função no comercial...</option>
-              {COMMERCIAL_ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-          )}
           {editForm.sector === 'cs' && (
             <select style={S.select} value={editForm.csRole || ''} onChange={e => onEditFormChange('csRole', e.target.value)}>
               <option value="">Função no CS...</option>
@@ -210,9 +208,6 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               </div>
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{collab.name}
-                  {collab.sector === 'comercial' && collab.commercialRole && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `${sector.color}20`, color: sector.color, verticalAlign: 'middle' }}>{collab.commercialRole === 'closer' ? 'CLOSER' : 'SDR'}</span>
-                  )}
                   {collab.sector === 'cs' && (
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `${sector.color}20`, color: sector.color, verticalAlign: 'middle' }}>{(collab.csRole || 'operacional') === 'comercial' ? 'CS COMERCIAL' : 'CS OPERACIONAL'}</span>
                   )}
