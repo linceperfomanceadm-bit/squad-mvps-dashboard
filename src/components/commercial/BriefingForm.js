@@ -1,13 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Check } from 'lucide-react';
 import { SECTORS, SALE_SERVICES, PAYMENT_METHODS } from '../../lib/firebase';
 
-const COLOR = SECTORS.comercial.color;
+const COLOR = SECTORS.cs.color;
 const MIN_SERVICE_DESC = 350;
 const MIN_BRIEFING = 200;
 
 /*
- * PRÉ-FORMULÁRIO — Venda Ganha (Closer → CS Comercial).
+ * FORMULÁRIO DE CONTRATO — cadastrado pelo CS Comercial.
  * Campos exigidos pelo fluxograma:
  *   Nome do Responsável, CPF, Nome Fantasia/Empresa, CNPJ, Endereço,
  *   Serviços Contratados, Duração do contrato, Valor,
@@ -44,11 +44,10 @@ const empty = {
   observations: '',
 };
 
-export default function BriefingForm({ initial, callForm, onSubmit, onCancel }) {
+export default function BriefingForm({ initial, onSubmit, onCancel }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState({ ...empty, ...(initial || {}) });
   const [submitting, setSubmitting] = useState(false);
-  const [showAutofill, setShowAutofill] = useState(false);
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
   const toggleService = (id) => setData(d => ({
@@ -56,24 +55,6 @@ export default function BriefingForm({ initial, callForm, onSubmit, onCancel }) 
     services: d.services.includes(id) ? d.services.filter(s => s !== id) : [...d.services, id],
   }));
   const setDesc = (id, v) => setData(d => ({ ...d, serviceDescs: { ...d.serviceDescs, [id]: v } }));
-
-  // Auto-preenchimento com o que veio do cadastro do SDR.
-  const canAutofill = useMemo(() => {
-    if (!callForm) return false;
-    return (callForm.company && callForm.company !== data.companyName)
-        || (callForm.leadName && callForm.leadName !== data.contactName)
-        || (callForm.contact && !data.contactPhone);
-  }, [callForm, data]);
-
-  const applyAutofill = () => {
-    setData(d => ({
-      ...d,
-      companyName: d.companyName || callForm.company || '',
-      contactName: d.contactName || callForm.leadName || '',
-      contactPhone: d.contactPhone || callForm.contact || '',
-    }));
-    setShowAutofill(false);
-  };
 
   // ── Validação por etapa ──────────────────────────────────────
   const step1Valid = (
@@ -134,12 +115,6 @@ export default function BriefingForm({ initial, callForm, onSubmit, onCancel }) 
 
   return (
     <div>
-      {canAutofill && (
-        <button onClick={() => setShowAutofill(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: `${COLOR}15`, border: `1px solid ${COLOR}44`, borderRadius: 10, padding: '10px 14px', color: COLOR, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: 16 }}>
-          <Check size={15} /> Preencher com os dados do cadastro do SDR
-        </button>
-      )}
-
       {/* Stepper */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
         {STEPS.map((t, i) => (
@@ -285,28 +260,13 @@ export default function BriefingForm({ initial, callForm, onSubmit, onCancel }) 
               disabled={!step3Valid || submitting}
               onClick={submit}
             >
-              {submitting ? 'Enviando...' : '✓ Confirmar Venda Ganha'}
+              {submitting ? 'Salvando...' : '✓ Cadastrar Contrato'}
             </button>
           </div>
           {!step3Valid && <Hint text={`Valor, duração, forma de pagamento e briefing (mín. ${MIN_BRIEFING} caracteres) são obrigatórios.`} />}
         </div>
       )}
 
-      {/* Popup de auto-preenchimento */}
-      {showAutofill && (
-        <div onClick={() => setShowAutofill(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1400, padding: 20 }}>
-          <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 14, padding: 22, maxWidth: 400, width: '100%' }}>
-            <h4 style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Preencher automaticamente?</h4>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.5 }}>
-              Vamos usar os dados do cadastro do SDR nos campos que ainda estão vazios. Nada já preenchido será sobrescrito.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button style={{ ...BTN, flex: 1 }} onClick={applyAutofill}>Preencher</button>
-              <button style={CANCEL} onClick={() => setShowAutofill(false)}>Agora não</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
