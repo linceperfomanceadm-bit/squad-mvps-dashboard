@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, CheckSquare, Calendar, Package, Monitor, FileText, Rocket } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Calendar, Package, Monitor, FileText, Rocket } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -16,7 +16,6 @@ import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import AdminTVControl from '../../components/admin/AdminTVControl';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import TodoView from '../../components/shared/TodoView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
@@ -33,7 +32,6 @@ const NAV = [
   { key: 'clients',       label: 'Clientes',        icon: Users },
   { key: 'portal',        label: 'Portal de Produtos', icon: Package },
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
-  { key: 'todo',          label: 'Meu Dia',         icon: CheckSquare },
   { key: 'agenda',        label: 'Agenda',          icon: Calendar },
   { key: 'tv',            label: 'Painel de TV',    icon: Monitor },
 ];
@@ -255,8 +253,6 @@ export default function AdminDashboard() {
             onWdMoveBackToOnboarding={wdMoveBackToOnboarding}
             onWdMoveStatus={wdMoveStatus}
           />
-        ) : page === 'todo' ? (
-          <TodoView accent="var(--neon)" />
         ) : page === 'agenda' ? (
           <AdminAgenda toast={toast} />
         ) : page === 'tv' ? (
