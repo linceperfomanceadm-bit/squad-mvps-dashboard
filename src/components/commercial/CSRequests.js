@@ -257,7 +257,7 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
             <button
               onClick={enviar}
               disabled={!text.trim() || busy}
-              style={{ ...BTN_CANCEL, width: '100%', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, opacity: text.trim() ? 1 : .5 }}
+              style={{ ...BTN_PRIMARY, width: '100%', marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, opacity: (text.trim() && !busy) ? 1 : .5, cursor: text.trim() ? 'pointer' : 'not-allowed' }}
             >
               <Send size={14} /> {busy ? 'Enviando...' : 'Enviar resposta'}
             </button>
