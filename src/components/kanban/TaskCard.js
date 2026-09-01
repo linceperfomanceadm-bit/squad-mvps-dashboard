@@ -1,32 +1,35 @@
 import React from 'react';
-import { differenceInDays, format } from 'date-fns';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Clock, AlertTriangle, MessageSquare, RefreshCw, Link } from 'lucide-react';
+import { Clock, AlertTriangle, MessageSquare, RefreshCw, Link, PauseCircle } from 'lucide-react';
 import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
+import {
+  parseLocalDate, deadlineState, businessMsBetween, formatBusinessDuration,
+} from '../../lib/taskTime';
 
-// Interpreta "YYYY-MM-DD" no fuso LOCAL (evita o bug de 1 dia antes,
-// causado por new Date("YYYY-MM-DD") ser lido como meia-noite UTC).
-export function parseLocalDate(str) {
-  if (!str) return null;
-  const [y, m, d] = String(str).split('-').map(Number);
-  if (!y || !m || !d) return new Date(str);
-  return new Date(y, m - 1, d);
-}
+// Reexportado porque outras telas já importavam daqui.
+export { parseLocalDate };
 
 export default function TaskCard({ task, onClick }) {
   const priority = TASK_PRIORITIES.find(p => p.id === task.priority);
   const sector = SECTORS[task.responsibleSector];
   const now = new Date();
   const deadline = task.deadline ? parseLocalDate(task.deadline) : null;
-  const isOverdue = deadline && differenceInDays(now, deadline) > 0 && task.status !== 'done';
-  const isUrgentDeadline = deadline && !isOverdue && differenceInDays(deadline, now) <= 1;
+  const state = deadlineState(task, now);
+  const isLate = state?.kind === 'late';
+  const isFrozen = state?.kind === 'frozen';
+
+  // Há quanto tempo (útil) esta task está parada na mão do aprovador.
+  const waitingMs = task.status === 'approval' && task.approvalStartedAt
+    ? businessMsBetween(task.approvalStartedAt, now)
+    : 0;
 
   return (
     <div
       onClick={onClick}
       style={{
         background: 'rgba(12,12,24,.92)',
-        border: `1px solid ${task.isRework ? 'rgba(245,158,11,0.4)' : isOverdue ? 'rgba(238,51,99,0.35)' : 'rgba(255,255,255,0.07)'}`,
+        border: `1px solid ${task.isRework ? 'rgba(245,158,11,0.4)' : isLate ? 'rgba(238,51,99,0.35)' : 'rgba(255,255,255,0.07)'}`,
         borderRadius: 10,
         padding: '12px 13px',
         cursor: 'pointer',
@@ -74,20 +77,33 @@ export default function TaskCard({ task, onClick }) {
         👤 {task.clientName}
       </p>
 
-      {/* Deadline */}
-      {deadline && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
-          {isOverdue
-            ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'pulse 1.5s infinite' }} />
-            : <Clock size={11} color={isUrgentDeadline ? 'var(--amber)' : 'var(--muted)'} />}
-          <span style={{
-            fontSize: 11, fontFamily: 'var(--fm)',
-            color: isOverdue ? 'var(--neon)' : isUrgentDeadline ? 'var(--amber)' : 'var(--muted)',
-          }}>
-            {isOverdue
-              ? `${differenceInDays(now, deadline)}d atrasada`
-              : format(deadline, "dd MMM", { locale: ptBR })}
-          </span>
+      {/* Prazo — congelado enquanto a task está em aprovação */}
+      {deadline && state && (
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            {isFrozen
+              ? <PauseCircle size={11} color={state.color} />
+              : isLate
+                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'pulse 1.5s infinite' }} />
+                : <Clock size={11} color={state.kind === 'warn' ? 'var(--amber)' : 'var(--muted)'} />}
+            <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: state.color }}>
+              {isFrozen
+                ? 'prazo congelado'
+                : state.kind === 'done'
+                  ? format(deadline, 'dd MMM', { locale: ptBR })
+                  : isLate
+                    ? state.label
+                    : format(deadline, 'dd MMM', { locale: ptBR })}
+            </span>
+          </div>
+
+          {/* Envelhecimento na aprovação: o prazo parou, mas a espera
+              fica visível para ninguém se esconder atrás do congelamento. */}
+          {isFrozen && waitingMs > 0 && (
+            <p style={{ fontSize: 10, color: '#777', fontFamily: 'var(--fm)', marginTop: 4 }}>
+              aguardando {task.responsibleName || 'aprovação'} há {formatBusinessDuration(waitingMs)}
+            </p>
+          )}
         </div>
       )}
 

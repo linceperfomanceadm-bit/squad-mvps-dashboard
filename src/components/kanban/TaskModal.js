@@ -5,48 +5,24 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
 import { updateTaskResponsibles } from '../../hooks/useTasks';
-
-// Interpreta "YYYY-MM-DD" no fuso local (corrige o bug de 1 dia antes).
-function parseLocalDate(str) {
-  if (!str) return null;
-  const [y, m, d] = String(str).split('-').map(Number);
-  if (!y || !m || !d) return new Date(str);
-  return new Date(y, m - 1, d);
-}
+import {
+  parseLocalDate, resolveTimeStats, taskTimeStats, deadlineState,
+  formatBusinessDuration, businessMsBetween,
+} from '../../lib/taskTime';
 
 // ─── Success popup ────────────────────────────────────────────
+// Todo tempo exibido aqui é ÚTIL (seg-sex, 09h-18h48). "1d" é um
+// expediente inteiro, não 24 horas corridas.
 function CompletionPopup({ task, onClose }) {
   const tl = task.timeline || [];
   const created   = tl.find(t => t.action === 'created');
   const started   = tl.find(t => t.action === 'started');
   const completed = tl.find(t => t.action === 'completed');
 
-  const calcDiff = (from, to) => {
-    if (!from || !to) return null;
-    const ms = new Date(to) - new Date(from);
-    if (ms <= 0) return null;
-    const totalMins = Math.round(ms / 60000);
-    if (totalMins < 60) return `${totalMins}min`;
-    const hours = Math.floor(totalMins / 60);
-    if (hours < 24) return `${hours}h`;
-    const days = Math.floor(hours / 24);
-    const remH = hours % 24;
-    return remH > 0 ? `${days}d ${remH}h` : `${days}d`;
-  };
-
-  // Time each collaborator held the task
-  const collabTimes = [];
-  for (let i = 0; i < tl.length; i++) {
-    const entry = tl[i];
-    const next  = tl[i + 1];
-    if ((entry.action === 'started' || entry.action === 'rejected') && entry.by) {
-      const endTime = next?.at || completed?.at;
-      const diff = calcDiff(entry.at, endTime);
-      if (diff) collabTimes.push({ name: entry.by, time: diff });
-    }
-  }
-
-  const totalTime = calcDiff(created?.at, completed?.at);
+  const stats = resolveTimeStats(task);
+  const collabTimes = stats.byPerson || [];
+  const totalTime = formatBusinessDuration(stats.totalMs);
+  const onTime = task.deliveredOnTime !== false;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
@@ -68,24 +44,44 @@ function CompletionPopup({ task, onClose }) {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: collabTimes.length > 0 ? 16 : 24 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div style={{ background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 12 }}>
-            <p style={{ fontSize: 10, color: 'var(--green)', marginBottom: 4, fontFamily: 'var(--fm)' }}>TEMPO TOTAL</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: 'var(--green)' }}>{totalTime || '—'}</p>
+            <p style={{ fontSize: 10, color: 'var(--green)', marginBottom: 4, fontFamily: 'var(--fm)' }}>TEMPO ÚTIL</p>
+            <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)' }}>{totalTime}</p>
+          </div>
+          <div style={{ background: 'rgba(56,189,248,.08)', border: '1px solid rgba(56,189,248,.25)', borderRadius: 10, padding: 12 }}>
+            <p style={{ fontSize: 10, color: 'var(--blue)', marginBottom: 4, fontFamily: 'var(--fm)' }}>EM APROVAÇÃO</p>
+            <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>{formatBusinessDuration(stats.approvalMs)}</p>
           </div>
           <div style={{ background: task.reworkCount > 0 ? 'var(--amber-dim)' : 'var(--green-dim)', border: `1px solid ${task.reworkCount > 0 ? 'var(--amber-b)' : 'var(--green-b)'}`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 10, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)', marginBottom: 4, fontFamily: 'var(--fm)' }}>AJUSTES</p>
-            <p style={{ fontSize: 20, fontWeight: 800, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)' }}>{task.reworkCount || 0}</p>
+            <p style={{ fontSize: 18, fontWeight: 800, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)' }}>{task.reworkCount || 0}</p>
           </div>
+        </div>
+
+        <div style={{ background: onTime ? 'var(--green-dim)' : 'rgba(238,51,99,.08)', border: `1px solid ${onTime ? 'var(--green-b)' : 'var(--neon-border)'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: onTime ? 'var(--green)' : 'var(--neon)', fontFamily: 'var(--fm)' }}>
+            {onTime ? '✓ ENTREGUE DENTRO DO PRAZO' : '⚠ ENTREGUE FORA DO PRAZO'}
+          </p>
+          <p style={{ fontSize: 11, color: '#888', marginTop: 4, lineHeight: 1.5 }}>
+            O que vale para o KPI é o momento do envio para aprovação — o tempo de espera do aprovador não conta contra quem executou.
+          </p>
         </div>
 
         {collabTimes.length > 0 && (
           <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'left' }}>
             <p style={{ fontSize: 10, color: '#888', fontFamily: 'var(--fm)', marginBottom: 10 }}>TEMPO POR COLABORADOR</p>
             {collabTimes.map((c, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: i < collabTimes.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
-                <span style={{ fontSize: 13, color: '#ddd', fontWeight: 500 }}>{c.name}</span>
-                <span style={{ fontSize: 13, color: 'var(--blue)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{c.time}</span>
+              <div key={c.name || i} style={{ padding: '6px 0', borderBottom: i < collabTimes.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 13, color: '#ddd', fontWeight: 500 }}>{c.name}</span>
+                  <span style={{ fontSize: 13, color: 'var(--blue)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{formatBusinessDuration(c.totalMs)}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
+                  {c.workMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(c.workMs)}</span>}
+                  {c.reworkMs > 0 && <span style={{ fontSize: 10, color: 'var(--amber)', fontFamily: 'var(--fm)' }}>retrabalho {formatBusinessDuration(c.reworkMs)}</span>}
+                  {c.approvalMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(c.approvalMs)}</span>}
+                </div>
               </div>
             ))}
           </div>
@@ -125,6 +121,13 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const isRequester   = task.requestedBy === currentUser;
   const priority      = TASK_PRIORITIES.find(p => p.id === task.priority);
   const responsibleSector = SECTORS[task.responsibleSector];
+
+  // Prazo e tempo — recalculados a cada render, em tempo útil.
+  const dlState = deadlineState(task);
+  const timeStats = task.status === 'done' ? resolveTimeStats(task) : taskTimeStats(task);
+  const waitingMs = task.status === 'approval' && task.approvalStartedAt
+    ? businessMsBetween(task.approvalStartedAt, new Date())
+    : 0;
 
   // ── Responsáveis: principal + extras ─────────────────────────
   // Só o criador da task e o admin podem mexer. O principal (quem
@@ -272,18 +275,65 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               {[
                 { label: 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${principalName || '—'}`, color: responsibleSector?.color },
                 { label: 'SETOR',       value: responsibleSector?.label, color: responsibleSector?.color },
-                task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: '#ddd', deadline: true } : null,
+                task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: dlState?.color || '#ddd', deadline: true, hint: dlState?.badge } : null,
                 { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : '#888' },
               ].filter(Boolean).map(item => (
                 <div key={item.label} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
                   <span style={{ fontSize: 9, letterSpacing: '.1em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
                   <span style={{ fontSize: 13, color: item.color || '#ddd', fontWeight: 600 }}>{item.value}</span>
+                  {item.hint && (
+                    <span style={{ fontSize: 9, letterSpacing: '.08em', color: item.color, fontFamily: 'var(--fm)', fontWeight: 700 }}>{item.hint}</span>
+                  )}
                   {item.deadline && (isResponsible || isAdmin) && !readOnly && onChangeDeadline && (
                     <button onClick={() => { setNewDeadline(task.deadline || ''); setDeadlineReason(''); setShowDeadlineForm(true); }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>alterar</button>
                   )}
                 </div>
               ))}
             </div>
+
+            {/* Aviso de congelamento do prazo */}
+            {dlState?.frozen && (
+              <div style={{ background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.3)', borderRadius: 10, padding: '10px 12px', marginBottom: 18 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', fontFamily: 'var(--fm)' }}>PRAZO CONGELADO</p>
+                <p style={{ fontSize: 11, color: '#999', marginTop: 4, lineHeight: 1.55 }}>
+                  A task saiu da produção {dlState.label}. Enquanto estiver em aprovação ela não acumula atraso.
+                  {waitingMs > 0 && ` Parada com ${task.responsibleName || 'o aprovador'} há ${formatBusinessDuration(waitingMs)}.`}
+                  {' '}Se voltar para ajuste, esse tempo é devolvido ao prazo.
+                </p>
+              </div>
+            )}
+
+            {/* Tempo por colaborador — vale para task em andamento também */}
+            {(timeStats.byPerson || []).length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
+                    TEMPO ÚTIL {timeStats.running ? '(em andamento)' : ''}
+                  </p>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', fontFamily: 'var(--fm)' }}>
+                    {formatBusinessDuration(timeStats.totalMs)}
+                  </span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px' }}>
+                  {timeStats.byPerson.map((p, i) => (
+                    <div key={p.name || i} style={{ padding: '5px 0', borderBottom: i < timeStats.byPerson.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: 12, color: '#ddd', fontWeight: 600 }}>{p.name}</span>
+                        <span style={{ fontSize: 12, color: '#bbb', fontFamily: 'var(--fm)' }}>{formatBusinessDuration(p.totalMs)}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
+                        {p.workMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(p.workMs)}</span>}
+                        {p.reworkMs > 0 && <span style={{ fontSize: 10, color: 'var(--amber)', fontFamily: 'var(--fm)' }}>retrabalho {formatBusinessDuration(p.reworkMs)}</span>}
+                        {p.approvalMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(p.approvalMs)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={{ fontSize: 10, color: '#555', marginTop: 6, lineHeight: 1.5 }}>
+                  Conta apenas expediente: seg a sex, 09h às 18h48. Um "d" equivale a um dia útil inteiro.
+                </p>
+              </div>
+            )}
 
             {/* Responsáveis (principal + extras) */}
             <div style={{ marginBottom: 18 }}>
