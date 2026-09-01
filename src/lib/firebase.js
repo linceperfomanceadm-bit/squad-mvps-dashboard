@@ -40,7 +40,6 @@ export const SECTORS = {
   videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
   cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
   trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
-  comercial:   { id: 'comercial',   label: 'Comercial',     color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
 };
 
 // Entrada do Admin (não é um "setor" comum, mas a tela de login usa).
@@ -49,48 +48,31 @@ export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', emo
 // ─── Subpapéis (funções dentro do setor) ──────────────────────
 // O login é o mesmo do setor; o que decide para qual painel a pessoa
 // vai é a FUNÇÃO cadastrada no colaborador.
-export const COMMERCIAL_ROLES = [
-  { id: 'sdr',    label: 'SDR',    desc: 'Cadastro de calls agendadas' },
-  { id: 'closer', label: 'Closer', desc: 'Calls, follow up e fechamento' },
-];
-
 export const CS_ROLES = [
   { id: 'comercial',   label: 'CS Comercial',   desc: 'Contratos, assinatura, pagamento e onboarding' },
   { id: 'operacional', label: 'CS Operacional', desc: 'Kickoff, saúde operacional e saúde do cliente' },
 ];
 
-// ─── Funil comercial (coleção `deals`) ────────────────────────
-// scheduled → call agendada pelo SDR, visível a todos os closers
-// followup  → call realizada, aguardando desfecho do closer
-// won       → Venda Ganha (segue para o CS Comercial)
-// mq        → Mal Qualificado (base de análise do Líder Comercial)
-// noshow    → cliente não compareceu; volta ao painel do SDR
-// active    → CS concluiu o onboarding e o cliente foi criado
-export const DEAL_STATUS = {
-  scheduled: { id: 'scheduled', label: 'Agendada',    color: '#38bdf8' },
-  followup:  { id: 'followup',  label: 'Follow Up',   color: '#f59e0b' },
-  won:       { id: 'won',       label: 'Venda Ganha', color: '#22c55e' },
-  mq:        { id: 'mq',        label: 'MQ',          color: '#EE3363' },
-  noshow:    { id: 'noshow',    label: 'No-Show',     color: '#8F97A0' },
-  active:    { id: 'active',    label: 'Ativo',       color: '#3EFFFF' },
-};
-
-// Etapas do CS Comercial dentro de um deal ganho.
+// ─── Contratos (coleção `deals`) ──────────────────────────────
+// O funil de prospecção (SDR → Closer) saiu do app: a negociação
+// acontece fora daqui e o CS Comercial cadastra o contrato fechado
+// direto no painel dele.
+//
+// status:
+//   won    → contrato cadastrado, em tratativa no CS Comercial
+//   active → onboarding concluído e cliente criado em `clients`
+//
+// Dentro de `won`, o CS Comercial trabalha com csStage:
+//   contract   → card em Novos Contratos (checklist)
+//   onboarding → call de onboarding agendada
+//   done       → onboarding concluído (o deal vira status 'active')
 export const CS_STAGES = {
   contract:   { id: 'contract',   label: 'Novos Contratos' },
   onboarding: { id: 'onboarding', label: 'Onboarding' },
   done:       { id: 'done',       label: 'Concluído' },
 };
 
-// BANT — qualificação registrada pelo SDR no cadastro da call.
-export const BANT_FIELDS = [
-  { id: 'budget',    label: 'B — Budget (orçamento)',      placeholder: 'Quanto pode investir? Já investe hoje?' },
-  { id: 'authority', label: 'A — Authority (decisor)',     placeholder: 'Quem decide a compra? Está na call?' },
-  { id: 'need',      label: 'N — Need (necessidade)',      placeholder: 'Qual a dor principal? O que quer resolver?' },
-  { id: 'timing',    label: 'T — Timing (urgência)',       placeholder: 'Para quando? O que faz ser agora?' },
-];
-
-// Formas de pagamento do pré-formulário (Venda Ganha).
+// Formas de pagamento do cadastro de contrato (CS Comercial).
 export const PAYMENT_METHODS = [
   'PIX', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Transferência', 'Outro',
 ];
@@ -195,7 +177,7 @@ export const RECURRENCE_SERVICES = [
 
 export const SLA_DAYS = 3;
 
-// Serviços que o Closer pode vender (formulário de Venda Fechada).
+// Serviços que podem ser contratados (formulário de contrato do CS).
 // Cada serviço marcado exige uma descrição >= 350 chars do que foi vendido.
 export const SALE_SERVICES = [
   { id: 'gestao_trafego', label: 'Gestão de Tráfego' },
