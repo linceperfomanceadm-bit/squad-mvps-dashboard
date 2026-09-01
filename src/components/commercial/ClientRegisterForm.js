@@ -55,6 +55,10 @@ const empty = {
   services: [],
   serviceDescs: {},
   sectors: [],
+  // CS Operacional que vai tocar o cliente. Diferente dos demais
+  // setores, este não passa por indicação de líder: quem escolhe é a
+  // própria CS Comercial, aqui no cadastro.
+  csResponsible: '',
   // Entregas com pipeline próprio. As duas convivem: dá para vender
   // ID Visual junto de um serviço web no mesmo contrato.
   wdService: '',        // '' | 'ecommerce' | 'landing_page' | 'lp_catalogo'
@@ -73,7 +77,7 @@ const empty = {
   observations: '',
 };
 
-export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
+export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, collaborators = [] }) {
   const [step, setStep] = useState(1);
   const [data, setData] = useState(empty);
   const [submitting, setSubmitting] = useState(false);
@@ -83,6 +87,13 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
   const [uploadError, setUploadError] = useState('');
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
+
+  // Só CS Operacional ativo entra na lista — a CS Comercial não vira
+  // responsável operacional pelo cliente.
+  const csOperacionais = collaborators.filter(
+    c => c.active !== false && c.sector === 'cs' && (c.csRole || 'operacional') === 'operacional'
+  );
+
   const toggleService = (id) => setData(d => ({
     ...d,
     services: d.services.includes(id) ? d.services.filter(s => s !== id) : [...d.services, id],
@@ -149,6 +160,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
     data.services.length > 0 &&
     data.services.every(id => (data.serviceDescs[id] || '').trim().length >= MIN_SERVICE_DESC) &&
     data.sectors.length > 0 &&
+    data.csResponsible &&
     (!data.wdService || data.sectors.includes('webdesign')) &&
     (!data.hasIdVisual || data.sectors.includes('design'))
   );
@@ -202,7 +214,9 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
     const clientData = {
       name: data.clientName.trim(),
       stage: 'staffing',
-      responsibles: {},
+      // A CS Operacional já entra definida. Os demais setores ficam
+      // em branco até o líder de cada um indicar quem assume.
+      responsibles: { cs: [data.csResponsible] },
       staffing: { sectors: data.sectors, startedAt: new Date().toISOString() },
       // Pipeline do WebDesign: nasce junto com o cliente, como antes.
       wdService: data.wdService || null,
@@ -256,8 +270,12 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
       services: servicos,
       briefing: data.briefing.trim(),
       observations: data.observations.trim(),
-      // Só vira `pending: true` quando o quadro de responsáveis fecha.
-      kickoff: { pending: false, at: null, meetLink: '', scheduledBy: null, confirmedAt: null, confirmedBy: null },
+      // Call 1 (Kick Off, CS Comercial) e call 2 (Onboarding, CS
+      // Operacional). Ambas só viram `pending: true` no seu momento:
+      // a primeira quando o quadro de responsáveis fecha, a segunda
+      // quando o Kick Off é dado como realizado.
+      kickoffCall: { pending: false, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null },
+      kickoff: { pending: false, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null },
       clientHealth: null,
     };
 
@@ -368,13 +386,30 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
           </div>
 
           <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+            <p style={LBL}>CS OPERACIONAL RESPONSÁVEL *</p>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, marginBottom: 10, lineHeight: 1.5 }}>
+              Quem vai tocar este cliente no dia a dia. Participa da call de Kick Off com você
+              e depois agenda a call de onboarding com o time.
+            </p>
+            <select style={SEL} value={data.csResponsible} onChange={e => set('csResponsible', e.target.value)}>
+              <option value="">Selecionar...</option>
+              {csOperacionais.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+            {csOperacionais.length === 0 && (
+              <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: 8, lineHeight: 1.5 }}>
+                Nenhum colaborador de CS Operacional ativo encontrado. Cadastre um no painel Admin antes de seguir.
+              </p>
+            )}
+          </div>
+
+          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
             <p style={LBL}>SETORES ENVOLVIDOS NO PROJETO *</p>
             <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, marginBottom: 10, lineHeight: 1.5 }}>
-              Cada setor marcado precisa que o líder dele indique um responsável antes do cliente entrar na base.
+              Cada setor marcado precisa que o líder dele indique um responsável antes da call de Kick Off ser liberada.
               Sugerimos pelos serviços, mas confira: SEO, Consultoria e Outro não têm setor fixo.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {Object.values(SECTORS).map(s => {
+              {Object.values(SECTORS).filter(s => s.id !== 'cs').map(s => {
                 const active = data.sectors.includes(s.id);
                 return (
                   <button key={s.id} type="button" onClick={() => toggleSector(s.id)} style={{ fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 14, cursor: 'pointer', background: active ? `${s.color}22` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `${s.color}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -440,11 +475,13 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel }) {
           </div>
           {!step2Valid && (
             <Hint text={
-              data.wdService && !data.sectors.includes('webdesign')
-                ? 'O serviço de WebDesign exige o setor WebDesign marcado.'
-                : data.hasIdVisual && !data.sectors.includes('design')
-                  ? 'O ID Visual exige o setor Design marcado.'
-                  : `Marque ao menos um serviço, descreva cada um com no mínimo ${MIN_SERVICE_DESC} caracteres e escolha ao menos um setor.`
+              !data.csResponsible
+                ? 'Escolha o CS Operacional responsável pelo cliente.'
+                : data.wdService && !data.sectors.includes('webdesign')
+                  ? 'O serviço de WebDesign exige o setor WebDesign marcado.'
+                  : data.hasIdVisual && !data.sectors.includes('design')
+                    ? 'O ID Visual exige o setor Design marcado.'
+                    : `Marque ao menos um serviço, descreva cada um com no mínimo ${MIN_SERVICE_DESC} caracteres e escolha ao menos um setor.`
             } />
           )}
         </div>

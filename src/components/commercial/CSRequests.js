@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Send, Eye, EyeOff, CheckCircle2, Trash2 } from 'lucide-react';
-import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS, REQUEST_SECTORS } from '../../lib/firebase';
+import { Plus, Send, Eye, EyeOff, CheckCircle2, Trash2, Search, LayoutGrid, List } from 'lucide-react';
+import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS, REQUEST_SECTORS, REQUEST_SLA_HOURS } from '../../lib/firebase';
+import { businessMsBetween, formatBusinessDuration } from '../../lib/taskTime';
 import {
   Overlay, ModalHeader, Tag, Empty,
   MODAL, LBL, INP, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL, CARD, GRID,
@@ -13,6 +14,19 @@ import {
  * responde, o card mostra se ele já abriu (visualizado) ou não — é o
  * que evita a solicitação morrer no silêncio. Mesmo que o colaborador
  * marque "resolvi", quem encerra é a CS.
+ *
+ * POR QUE OS FILTROS MUDARAM: antes havia um filtro de status único e
+ * excludente mais um botão "abertas por mim". Com as duas CSs jogando
+ * na mesma lista, isso virava uma pilha de cards sem como recortar. O
+ * pedido era conseguir acompanhar o trabalho da outra CS e cobrar
+ * quem está devendo — daí:
+ *
+ *   · escopo: minhas / da outra CS / todas
+ *   · filtros combináveis de cliente, colaborador e urgência
+ *   · busca por texto no assunto e na descrição
+ *   · ordenação por urgência e tempo em aberto
+ *   · selo de idade e de "ainda não visualizada"
+ *   · lista compacta para varrer volume, além da grade
  */
 
 const fmt = (iso) => iso
@@ -21,81 +35,216 @@ const fmt = (iso) => iso
 
 const urgencyOf = (id) => TASK_PRIORITIES.find(p => p.id === id) || TASK_PRIORITIES[1];
 
+const URGENCY_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
+
+// Idade em tempo ÚTIL e comparação com o SLA da urgência. Serve para
+// ordenar a fila e marcar o que estourou — não bloqueia nada.
+function agingOf(request) {
+  if (!request?.createdAt) return null;
+  const fim = request.status === 'closed' ? (request.closedAt || new Date()) : new Date();
+  const ms = businessMsBetween(request.createdAt, fim);
+  const slaMs = (REQUEST_SLA_HOURS[request.urgency] || REQUEST_SLA_HOURS.medium) * 3600000;
+  return { ms, slaMs, estourou: ms > slaMs && request.status === 'open' };
+}
+
+const SCOPES = [
+  { id: 'mine',   label: 'Minhas' },
+  { id: 'others', label: 'Da outra CS' },
+  { id: 'all',    label: 'Todas' },
+];
+
 export default function CSRequests({
   requests, clients, collaborators, currentUser, currentUserSector,
   onCreate, onReply, onCloseRequest, onDelete, toast,
 }) {
-  const [filter, setFilter] = useState('open');
-  const [onlyMine, setOnlyMine] = useState(false);
+  const [scope, setScope] = useState('all');
+  const [statuses, setStatuses] = useState(['open']);
+  const [clientFilter, setClientFilter] = useState('');
+  const [personFilter, setPersonFilter] = useState('');
+  const [urgencyFilter, setUrgencyFilter] = useState('');
+  const [search, setSearch] = useState('');
+  const [view, setView] = useState('list');
   const [showCreate, setShowCreate] = useState(false);
   const [openId, setOpenId] = useState(null);
 
-  const base = useMemo(
-    () => requests.filter(r => (onlyMine ? r.createdBy === currentUser : true)),
-    [requests, onlyMine, currentUser]
-  );
+  // Escopo primeiro: é o recorte que responde "isso é meu ou dela?".
+  const scoped = useMemo(() => requests.filter(r => {
+    if (scope === 'mine')   return r.createdBy === currentUser;
+    if (scope === 'others') return r.createdBy !== currentUser;
+    return true;
+  }), [requests, scope, currentUser]);
 
   const counts = useMemo(() => ({
-    open:     base.filter(r => r.status === 'open').length,
-    answered: base.filter(r => r.status === 'answered').length,
-    closed:   base.filter(r => r.status === 'closed').length,
-  }), [base]);
+    open:     scoped.filter(r => r.status === 'open').length,
+    answered: scoped.filter(r => r.status === 'answered').length,
+    closed:   scoped.filter(r => r.status === 'closed').length,
+  }), [scoped]);
 
-  const visible = base.filter(r => r.status === filter);
+  const atrasadas = useMemo(
+    () => scoped.filter(r => r.status === 'open' && agingOf(r)?.estourou).length,
+    [scoped]
+  );
+
+  const visible = useMemo(() => {
+    const termo = search.trim().toLowerCase();
+    return scoped
+      .filter(r => {
+        if (statuses.length && !statuses.includes(r.status)) return false;
+        if (clientFilter && r.clientId !== clientFilter) return false;
+        if (personFilter && r.toName !== personFilter) return false;
+        if (urgencyFilter && r.urgency !== urgencyFilter) return false;
+        if (termo) {
+          const alvo = `${r.subject || ''} ${r.description || ''} ${r.clientName || ''} ${r.toName || ''}`.toLowerCase();
+          if (!alvo.includes(termo)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        // Fila de trabalho: o que estourou o SLA primeiro, depois por
+        // urgência, depois pelo que está esperando há mais tempo.
+        const ea = agingOf(a)?.estourou ? 0 : 1;
+        const eb = agingOf(b)?.estourou ? 0 : 1;
+        if (ea !== eb) return ea - eb;
+        const ua = URGENCY_RANK[a.urgency] ?? 2;
+        const ub = URGENCY_RANK[b.urgency] ?? 2;
+        if (ua !== ub) return ua - ub;
+        return new Date(a.createdAt || 0) - new Date(b.createdAt || 0);
+      });
+  }, [scoped, statuses, clientFilter, personFilter, urgencyFilter, search]);
+
+  // Só quem já recebeu alguma solicitação entra no filtro de pessoa —
+  // evita um select com a agência inteira.
+  const pessoas = useMemo(() => {
+    const nomes = new Set(requests.map(r => r.toName).filter(Boolean));
+    return Array.from(nomes).sort();
+  }, [requests]);
+
+  const clientesComRequest = useMemo(() => {
+    const ids = new Set(requests.map(r => r.clientId).filter(Boolean));
+    return clients.filter(c => ids.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [requests, clients]);
+
+  const toggleStatus = (id) => setStatuses(prev =>
+    prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+  );
+
+  const limparFiltros = () => {
+    setClientFilter(''); setPersonFilter(''); setUrgencyFilter(''); setSearch('');
+  };
+  const temFiltro = clientFilter || personFilter || urgencyFilter || search.trim();
 
   // Sempre do array vivo — o thread precisa atualizar em tempo real.
   const openRequest = openId ? requests.find(r => r.id === openId) || null : null;
 
   const handleCreate = async (data) => {
     const r = await onCreate(data);
-    if (r.success) { toast('Solicitação enviada.'); setShowCreate(false); setFilter('open'); }
+    if (r.success) { toast('Solicitação enviada.'); setShowCreate(false); setStatuses(['open']); }
     else toast(r.error, 'e');
     return r;
   };
 
   return (
     <div className="fade-up">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 18, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {Object.values(REQUEST_STATUS).map(s => (
+      {/* Escopo + ação */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4 }}>
+          {SCOPES.map(s => (
             <button
               key={s.id}
-              onClick={() => setFilter(s.id)}
-              style={{
-                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: filter === s.id ? `${s.color}20` : 'var(--surface)',
-                color: filter === s.id ? s.color : 'var(--muted)',
-                border: `1px solid ${filter === s.id ? `${s.color}55` : 'var(--border)'}`,
-              }}
+              onClick={() => setScope(s.id)}
+              style={{ background: scope === s.id ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '7px 14px', color: scope === s.id ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             >
-              {s.label} ({counts[s.id]})
+              {s.label}
             </button>
           ))}
-          <button
-            onClick={() => setOnlyMine(v => !v)}
-            style={{
-              padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: onlyMine ? 'var(--neon-dim)' : 'var(--surface)',
-              color: onlyMine ? 'var(--neon)' : 'var(--muted)',
-              border: `1px solid ${onlyMine ? 'var(--neon-border)' : 'var(--border)'}`,
-            }}
-          >
-            {onlyMine ? '✓ Abertas por mim' : 'Abertas por mim'}
-          </button>
         </div>
 
-        <button onClick={() => setShowCreate(true)} style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plus size={15} /> Nova solicitação
-        </button>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 9, padding: 3 }}>
+            <button onClick={() => setView('list')} title="Lista compacta"
+              style={{ background: view === 'list' ? 'var(--surface)' : 'transparent', border: 'none', borderRadius: 6, padding: '6px 8px', color: view === 'list' ? 'var(--text)' : 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
+              <List size={14} />
+            </button>
+            <button onClick={() => setView('grid')} title="Grade"
+              style={{ background: view === 'grid' ? 'var(--surface)' : 'transparent', border: 'none', borderRadius: 6, padding: '6px 8px', color: view === 'grid' ? 'var(--text)' : 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+          <button onClick={() => setShowCreate(true)} style={{ ...BTN_PRIMARY, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Plus size={15} /> Nova solicitação
+          </button>
+        </div>
+      </div>
+
+      {/* Status (combinável) */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        {Object.values(REQUEST_STATUS).map(s => {
+          const on = statuses.includes(s.id);
+          return (
+            <button
+              key={s.id}
+              onClick={() => toggleStatus(s.id)}
+              style={{
+                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: on ? `${s.color}20` : 'var(--surface)',
+                color: on ? s.color : 'var(--muted)',
+                border: `1px solid ${on ? `${s.color}55` : 'var(--border)'}`,
+              }}
+            >
+              {on ? '✓ ' : ''}{s.label} ({counts[s.id]})
+            </button>
+          );
+        })}
+        {atrasadas > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--neon)', fontFamily: 'var(--fm)', marginLeft: 4 }}>
+            {atrasadas} fora do SLA
+          </span>
+        )}
+      </div>
+
+      {/* Filtros combináveis */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ position: 'relative', flex: '1 1 200px', minWidth: 180 }}>
+          <Search size={13} color="var(--muted)" style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)' }} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por assunto, descrição, cliente..."
+            style={{ ...INP, paddingLeft: 32, fontSize: 12 }}
+          />
+        </div>
+        <select value={clientFilter} onChange={e => setClientFilter(e.target.value)} style={SELECT}>
+          <option value="">Todos os clientes</option>
+          {clientesComRequest.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+        <select value={personFilter} onChange={e => setPersonFilter(e.target.value)} style={SELECT}>
+          <option value="">Todos os colaboradores</option>
+          {pessoas.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <select value={urgencyFilter} onChange={e => setUrgencyFilter(e.target.value)} style={SELECT}>
+          <option value="">Todas as urgências</option>
+          {TASK_PRIORITIES.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+        </select>
+        {temFiltro && (
+          <button onClick={limparFiltros} style={{ ...BTN_CANCEL, padding: '8px 12px', fontSize: 12 }}>Limpar</button>
+        )}
       </div>
 
       {visible.length === 0
-        ? <Empty msg={filter === 'open' ? 'Nenhuma solicitação aguardando resposta.' : 'Nada por aqui.'} />
-        : (
-          <div style={GRID}>
-            {visible.map(r => <RequestCard key={r.id} request={r} onClick={() => setOpenId(r.id)} />)}
-          </div>
-        )}
+        ? <Empty msg={temFiltro ? 'Nada encontrado com esses filtros.' : 'Nenhuma solicitação neste recorte.'} />
+        : view === 'grid'
+          ? (
+            <div style={GRID}>
+              {visible.map(r => <RequestCard key={r.id} request={r} onClick={() => setOpenId(r.id)} />)}
+            </div>
+          )
+          : (
+            <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+              {visible.map((r, i) => (
+                <RequestRow key={r.id} request={r} last={i === visible.length - 1} onClick={() => setOpenId(r.id)} />
+              ))}
+            </div>
+          )}
 
       {showCreate && (
         <CreateRequestModal
@@ -129,14 +278,67 @@ export default function CSRequests({
   );
 }
 
+const SELECT = {
+  background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+  padding: '9px 12px', color: 'var(--text)', fontSize: 12, outline: 'none',
+  cursor: 'pointer', fontFamily: 'var(--f)',
+};
+
+// ── Linha da lista compacta ────────────────────────────────────
+// É a visão para varrer volume: quem pediu, para quem, há quanto
+// tempo e se já foi visto. Tudo o que a CS precisa para cobrar.
+function RequestRow({ request, last, onClick }) {
+  const u = urgencyOf(request.urgency);
+  const st = REQUEST_STATUS[request.status] || REQUEST_STATUS.open;
+  const sec = SECTORS[request.toSector];
+  const aging = agingOf(request);
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
+        background: 'transparent', border: 'none',
+        borderBottom: last ? 'none' : '1px solid rgba(255,255,255,.05)',
+        padding: '11px 14px', cursor: 'pointer',
+      }}
+    >
+      <span style={{ width: 3, height: 30, borderRadius: 2, background: u.color, flexShrink: 0 }} />
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {request.subject}
+        </p>
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+          {request.clientName} · para <strong style={{ color: sec?.color || '#bbb' }}>{request.toName}</strong> · por {request.createdBy}
+        </p>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        {request.status === 'open' && (
+          request.seenAt
+            ? <Eye size={13} color="var(--blue)" />
+            : <EyeOff size={13} color="var(--muted)" />
+        )}
+        {aging && (
+          <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : '#777', minWidth: 58, textAlign: 'right' }}>
+            {formatBusinessDuration(aging.ms)}
+          </span>
+        )}
+        <Tag text={st.label} color={st.color} />
+      </div>
+    </button>
+  );
+}
 // ── Card ───────────────────────────────────────────────────────
 function RequestCard({ request, onClick }) {
   const u = urgencyOf(request.urgency);
   const st = REQUEST_STATUS[request.status] || REQUEST_STATUS.open;
   const sec = SECTORS[request.toSector];
+  const aging = agingOf(request);
 
   return (
-    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${st.color}33` }}>
+    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${aging?.estourou ? 'var(--neon-border)' : `${st.color}33`}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{request.subject}</p>
         <Tag text={u.label.toUpperCase()} color={u.color} />
@@ -144,8 +346,15 @@ function RequestCard({ request, onClick }) {
 
       <p style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {request.clientName}</p>
       <p style={{ fontSize: 12, color: sec?.color || 'var(--text)', marginTop: 4 }}>
-        {sec?.emoji} Para {request.toName}
+        {sec?.emoji} Para {request.toName} · aberta por {request.createdBy}
       </p>
+
+      {aging && (
+        <p style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : '#777', marginTop: 6 }}>
+          {aging.estourou ? '⚠ ' : ''}em aberto há {formatBusinessDuration(aging.ms)}
+          {aging.estourou ? ' · fora do SLA' : ''}
+        </p>
+      )}
 
       <p style={{ fontSize: 12, color: '#999', marginTop: 10, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {request.description}
