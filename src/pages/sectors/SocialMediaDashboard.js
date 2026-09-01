@@ -28,7 +28,7 @@ const NAV = [
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
   { key: 'documentos', label: 'Documentos',     icon: FileText },
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
-  { key: 'onboarding', label: 'Onboarding',     icon: ClipboardList },
+  { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
   { key: 'vault',      label: 'Brand Hub',      icon: BookOpen },
   { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',     label: 'Agenda',         icon: Calendar },

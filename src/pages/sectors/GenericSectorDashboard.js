@@ -120,12 +120,21 @@ export default function GenericSectorDashboard({ sectorId }) {
     return res;
   };
 
-  // CS e Comercial não têm a ferramenta de Tasks (Kanban).
-  const hideTasks = sectorId === 'cs' || sectorId === 'comercial';
-  // Onboarding de novos clientes: setores operacionais (não CS/Comercial).
-  const showOnboarding = sectorId !== 'cs' && sectorId !== 'comercial';
-  // Badge: nº de clientes em onboarding aguardando este setor (qualquer um do setor pode marcar).
-  const onboardingCount = clients.filter(c => c.onboarding && c.onboarding.status === 'running' && (c.onboarding.sectors || []).includes(sectorId) && !c.onboarding.checklist?.[sectorId]?.ok).length;
+  // O CS tem painéis próprios; aqui fica só o setor de produção.
+  const hideTasks = sectorId === 'cs';
+  const showOnboarding = sectorId !== 'cs';
+  // Badge: clientes esperando a indicação de um setor que ESTA pessoa
+  // lidera, mais os clientes em onboarding onde ela é responsável.
+  const meuNome = user?.name;
+  const lidero = Array.isArray(user?.leaderOf) ? user.leaderOf : [];
+  const souResp = (c) => Object.values(c.responsibles || {}).some(v => (Array.isArray(v) ? v : v ? [v] : []).includes(meuNome));
+  const onboardingCount = clients.filter(c => {
+    if (c.stage === 'staffing') {
+      if (user?.isAdmin) return true;
+      return (c.staffing?.sectors || []).some(sid => lidero.includes(sid) && !(Array.isArray(c.responsibles?.[sid]) ? c.responsibles[sid].length : !!c.responsibles?.[sid]));
+    }
+    return c.active !== false && c.kickoff?.pending && (user?.isAdmin || souResp(c));
+  }).length;
   // Reporte da CS: só setores de produção recebem solicitação.
   const showRequests = showOnboarding;
   const openRequests = requests.filter(r => r.toName === user?.name && r.status === 'open').length;
@@ -134,7 +143,7 @@ export default function GenericSectorDashboard({ sectorId }) {
     { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard, badge: 0 },
     ...(hideTasks ? [] : [{ key: 'kanban', label: 'Tasks', icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 }]),
     ...(showRequests ? [{ key: 'requests', label: 'Reporte da CS', icon: MessageSquare, badge: openRequests, badgeDanger: openRequests > 0 }] : []),
-    ...(showOnboarding ? [{ key: 'onboarding', label: 'Onboarding', icon: ClipboardList, badge: onboardingCount, badgeDanger: onboardingCount > 0 }] : []),
+    ...(showOnboarding ? [{ key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList, badge: onboardingCount, badgeDanger: onboardingCount > 0 }] : []),
     { key: 'todo',     label: 'Meu Dia',      icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];

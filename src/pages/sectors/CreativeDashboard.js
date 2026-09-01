@@ -88,7 +88,7 @@ export default function CreativeDashboard({ sectorId }) {
     { key: 'kanban',    label: 'Tasks',          icon: Kanban },
     { key: 'requests',  label: 'Reporte da CS',  icon: MessageSquare },
     ...(isDesign ? [{ key: 'idvisual', label: 'ID Visual', icon: Palette }] : []),
-    { key: 'onboarding', label: 'Onboarding',    icon: ClipboardList },
+    { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
     { key: 'vault',     label: 'Brand Hub',      icon: BookOpen },
     { key: 'hallofame', label: 'Hall da Fama',   icon: Trophy },
     { key: 'todo',      label: 'Meu Dia',        icon: CheckSquare },

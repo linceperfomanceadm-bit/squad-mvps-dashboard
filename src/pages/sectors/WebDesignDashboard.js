@@ -26,7 +26,7 @@ const NAV = [
   { key: 'finished',   label: 'Finalizados',   icon: CheckCircle },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
-  { key: 'client_onboarding', label: 'Onboarding Clientes', icon: ClipboardList },
+  { key: 'client_onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
   { key: 'portal',     label: 'Portal de Produtos', icon: Package },
   { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',     label: 'Agenda',         icon: Calendar },
