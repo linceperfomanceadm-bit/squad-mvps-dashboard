@@ -17,6 +17,16 @@ const DEFAULTS = {
   tvRadioUrl: '',         // stream da rádio (mp3/aac/m3u8 direto)
   tvRadioPlaying: false,  // false = som parado na TV
   tvRadioVolume: 50,      // 0 a 100
+  tvVisitMode: false,     // true = TV travada na tela de visita (só coisa boa)
+  // Métrica de honra de cada squad na cena de Destaques. Cada squad é
+  // comparado só consigo mesmo, na métrica que faz sentido pro ofício.
+  tvHonorMetrics: {
+    socialmedia: 'cobertura',
+    webdesign: 'prazo',
+    videomaker: 'primeira',
+    design: 'entregas',
+    trafego: 'constancia',
+  },
 };
 export function useAppConfig() {
   const [config, setConfig] = useState(DEFAULTS);
