@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { Plus, X, Search, Trash2, Check, Edit2 } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
 
@@ -250,8 +251,17 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         </div>
       </div>
 
-      {showAdd && <AddClientModal collaborators={collaborators} onClose={() => setShowAdd(false)} onAdd={onAdd} />}
-      {editClient && <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} />}
+      {/* Os dois modais vão para o body via portal. Sem isso eles ficam
+          presos dentro do `.fade-up` da tela: o `animation-fill-mode`
+          cria um containing block e o `position: fixed` do overlay passa
+          a se ancorar nele, não na viewport — o modal aparece no meio do
+          conteúdo, fora de vista. Mesmo caso já corrigido no Brand Hub. */}
+      {showAdd && ReactDOM.createPortal(
+        <AddClientModal collaborators={collaborators} onClose={() => setShowAdd(false)} onAdd={onAdd} />,
+        document.body)}
+      {editClient && ReactDOM.createPortal(
+        <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} />,
+        document.body)}
     </div>
   );
 }
