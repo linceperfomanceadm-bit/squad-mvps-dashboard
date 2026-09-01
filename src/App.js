@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from './components/shared/Toast';
 import PatchNotesPopup from './components/shared/PatchNotesPopup';
+import NotificationCenter from './components/shared/NotificationCenter';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import FirstAccessPage from './pages/FirstAccessPage';
@@ -89,6 +90,9 @@ function AppRoutes() {
   return (
     <>
       {user && !user.firstAccess && <PatchNotesPopup user={user} />}
+      {/* Notificações de desktop — válidas em qualquer tela, por isso
+          montadas aqui e não dentro de cada painel. */}
+      {user && !user.firstAccess && <NotificationCenter />}
       <Routes>
         <Route path="/" element={<HomePage />} />
       <Route path="/login/:sectorId" element={<LoginPage />} />
