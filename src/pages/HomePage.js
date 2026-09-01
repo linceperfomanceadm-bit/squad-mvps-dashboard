@@ -11,16 +11,15 @@ const SECTORS = [
   { id: 'design',      label: 'Design',       route: '/login/design',      color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
   { id: 'cs',          label: 'CS',           route: '/login/cs',          color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
   { id: 'trafego',     label: 'Tráfego Pago', route: '/login/trafego',     color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
-  { id: 'comercial',   label: 'Comercial',    route: '/login/comercial',   color: '#191B24', emoji: '💼', logo: '/logos/comercial.png' },
 ];
 
 export default function HomePage() {
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(null);
 
-  // Split: first row 4, second row 3 centered
-  const row1 = SECTORS.slice(0, 4);
-  const row2 = SECTORS.slice(4);
+  // Split: 3 setores por linha, centralizados
+  const row1 = SECTORS.slice(0, 3);
+  const row2 = SECTORS.slice(3);
 
   const SectorCard = ({ sector }) => {
     const isHov = hovered === sector.id;
@@ -85,7 +84,7 @@ export default function HomePage() {
           <p style={S.sub}>Selecione seu setor para acessar o dashboard</p>
         </div>
 
-        {/* Row 1 — 4 sectors */}
+        {/* Row 1 — 3 sectors */}
         <div style={{ display: 'flex', gap: 40, alignItems: 'flex-end', justifyContent: 'center', flexWrap: 'wrap' }}>
           {row1.map(s => <SectorCard key={s.id} sector={s} />)}
         </div>
