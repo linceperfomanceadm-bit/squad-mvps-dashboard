@@ -76,7 +76,8 @@ const CSS = `
 @keyframes tvprog{from{width:0}to{width:100%}}
 
 .tv-rail{width:4cqw;flex-shrink:0;margin:1.6cqw 0 1.6cqw 1.6cqw;border-radius:1.4cqw;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.09);display:flex;flex-direction:column;align-items:center;padding:1.3cqw 0;gap:.9cqw}
-.tv-mark{width:2.2cqw;height:2.2cqw;border-radius:.7cqw;background:#EE3363;display:flex;align-items:center;justify-content:center;font-family:'Unbounded',sans-serif;font-weight:700;font-size:1.1cqw;color:#fff;margin-bottom:.8cqw;box-shadow:0 0 30px rgba(238,51,99,.45)}
+.tv-mark{width:2.4cqw;height:2.4cqw;border-radius:.75cqw;background:#EE3363;display:flex;align-items:center;justify-content:center;color:#fff;margin-bottom:.8cqw;box-shadow:0 0 30px rgba(238,51,99,.45);padding:.42cqw}
+.tv-mark img{width:100%;height:100%;object-fit:contain;display:block}
 .tv-ic{width:2.3cqw;height:2.3cqw;border-radius:.7cqw;display:flex;align-items:center;justify-content:center;color:#8a7b83;transition:.3s}
 .tv-ic.on{background:rgba(255,255,255,.09);color:#f5eff2;border:1px solid rgba(255,255,255,.14)}
 .tv-live{width:.5cqw;height:.5cqw;border-radius:50%;background:#4ade80;box-shadow:0 0 10px #4ade80;animation:tvblink 2.4s ease-in-out infinite}
@@ -764,7 +765,7 @@ export default function TVPanel() {
         ) : (
           <>
             <aside className="tv-rail">
-              <div className="tv-mark">L</div>
+              <div className="tv-mark"><img src="/lince-icon.svg" alt="Lince" /></div>
               {[LayoutGrid, AlertTriangle, Award, HeartPulse].map((Icon, i) => (
                 <div key={ROTATION[i].id} className={`tv-ic ${!visita && i === activeIndex ? 'on' : ''}`}><Icon size={19} strokeWidth={1.8} /></div>
               ))}
