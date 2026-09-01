@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Kanban, CheckSquare, Calendar, ClipboardList, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar, ClipboardList, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 import { useClients } from '../../hooks/useClients';
@@ -144,7 +143,6 @@ export default function GenericSectorDashboard({ sectorId }) {
     ...(hideTasks ? [] : [{ key: 'kanban', label: 'Tasks', icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 }]),
     ...(showRequests ? [{ key: 'requests', label: 'Reporte da CS', icon: MessageSquare, badge: openRequests, badgeDanger: openRequests > 0 }] : []),
     ...(showOnboarding ? [{ key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList, badge: onboardingCount, badgeDanger: onboardingCount > 0 }] : []),
-    { key: 'todo',     label: 'Meu Dia',      icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];
 
@@ -170,8 +168,6 @@ export default function GenericSectorDashboard({ sectorId }) {
           />
         ) : page === 'onboarding' && showOnboarding ? (
           <OnboardingBoard sectorId={sectorId} />
-        ) : page === 'todo' ? (
-          <TodoView accent={SECTORS[sectorId]?.color || 'var(--neon)'} />
         ) : page === 'agenda' ? (
           <AgendaView />
         ) : (page === 'kanban' && !hideTasks) ? (

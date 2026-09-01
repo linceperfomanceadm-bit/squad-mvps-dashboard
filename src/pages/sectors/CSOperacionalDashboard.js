@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
-  LayoutDashboard, Rocket, Activity, HeartPulse, CheckSquare, Calendar, X,
+  LayoutDashboard, Rocket, Activity, HeartPulse, Calendar, X,
   Kanban, MessageSquare, Clock, Video,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,7 +11,6 @@ import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
 import Sidebar from '../../components/shared/Sidebar';
-import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
@@ -160,7 +159,6 @@ export default function CSOperacionalDashboard() {
     { key: 'kanban',   label: 'Produção',          icon: Kanban },
     { key: 'requests', label: 'Solicitações',      icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
     { key: 'overview', label: 'Visão Geral',       icon: LayoutDashboard },
-    { key: 'todo',     label: 'Meu Dia',           icon: CheckSquare },
     { key: 'agenda',   label: 'Agenda',            icon: Calendar },
   ];
 
@@ -171,7 +169,6 @@ export default function CSOperacionalDashboard() {
     kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
     requests: ['Reporte da CS', 'Solicitações abertas para os times de produção'],
     overview: ['Visão Geral', 'Sua carteira em números'],
-    todo:     ['Meu Dia', ''],
     agenda:   ['Agenda', ''],
   };
 
@@ -350,7 +347,6 @@ export default function CSOperacionalDashboard() {
               />
             )}
 
-            {page === 'todo' && <TodoView accent={COLOR} />}
             {page === 'agenda' && <AgendaView />}
           </>
         )}

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, CheckSquare, Calendar, Package, ClipboardList, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, Calendar, Package, ClipboardList, MessageSquare } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -11,7 +11,6 @@ import WDOverview from '../../components/sectors/webdesign/WDOverview';
 import WDClientList from '../../components/sectors/webdesign/WDClientList';
 import WDAddClientModal from '../../components/sectors/webdesign/WDAddClientModal';
 import TaskKanban from '../../components/kanban/TaskKanban';
-import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import RequestsInbox from '../../components/shared/RequestsInbox';
@@ -28,7 +27,6 @@ const NAV = [
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
   { key: 'client_onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
   { key: 'portal',     label: 'Portal de Produtos', icon: Package },
-  { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',     label: 'Agenda',         icon: Calendar },
 ];
 
@@ -133,8 +131,6 @@ export default function WebDesignDashboard() {
             onReply={addReply}
             toast={toast}
           />
-        ) : page === 'todo' ? (
-          <TodoView accent="var(--neon)" />
         ) : page === 'agenda' ? (
           <AgendaView />
         ) : page === 'portal' ? (

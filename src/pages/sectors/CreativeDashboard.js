@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban, CheckSquare, Calendar, ClipboardList, Palette, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, ClipboardList, Palette, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useTasks } from '../../hooks/useTasks';
@@ -13,7 +13,6 @@ import HallOfFame from '../../components/sectors/creative/HallOfFame';
 import IdVisualBoard from '../../components/sectors/creative/IdVisualBoard';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 
@@ -91,7 +90,6 @@ export default function CreativeDashboard({ sectorId }) {
     { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
     { key: 'vault',     label: 'Brand Hub',      icon: BookOpen },
     { key: 'hallofame', label: 'Hall da Fama',   icon: Trophy },
-    { key: 'todo',      label: 'Meu Dia',        icon: CheckSquare },
     { key: 'agenda',    label: 'Agenda',         icon: Calendar },
   ];
 
@@ -170,8 +168,6 @@ export default function CreativeDashboard({ sectorId }) {
             onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, sectorId)}
             onRemoveMaterial={removeBrandMaterial}
           />
-        ) : page === 'todo' ? (
-          <TodoView accent={sectorId === 'design' ? '#a78bfa' : '#fb923c'} />
         ) : page === 'agenda' ? (
           <AgendaView />
         ) : (

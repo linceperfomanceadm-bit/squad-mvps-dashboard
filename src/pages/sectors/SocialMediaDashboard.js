@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Kanban, FileText, CheckSquare, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, FileText, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import TodoView from '../../components/shared/TodoView';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 import { useClients } from '../../hooks/useClients';
@@ -30,7 +29,6 @@ const NAV = [
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
   { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
   { key: 'vault',      label: 'Brand Hub',      icon: BookOpen },
-  { key: 'todo',       label: 'Meu Dia',        icon: CheckSquare },
   { key: 'agenda',     label: 'Agenda',         icon: Calendar },
 ];
 
@@ -172,8 +170,6 @@ export default function SocialMediaDashboard() {
             onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, 'socialmedia')}
             onRemoveMaterial={removeBrandMaterial}
           />
-        ) : page === 'todo' ? (
-          <TodoView accent="#38bdf8" />
         ) : page === 'agenda' ? (
           <AgendaView />
         ) : (
