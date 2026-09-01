@@ -5,6 +5,14 @@ import { ptBR } from 'date-fns/locale';
 import { SLA_DAYS, SM_COLUMNS, TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
 import TaskModal from '../kanban/TaskModal';
 import { useAuth } from '../../contexts/AuthContext';
+import {
+  resolveTimeStats, formatBusinessDuration, BUSINESS_MS_PER_DAY,
+} from '../../lib/taskTime';
+
+// SLA em DIAS ÚTEIS. Antes o extrato mostrava differenceInDays entre
+// início e conclusão, o que dava "0d" para tudo que fechava no mesmo
+// dia e contava fim de semana como atraso.
+const SLA_MS = SLA_DAYS * BUSINESS_MS_PER_DAY;
 
 const DATE_FILTERS = [
   { key: 'today',     label: 'Hoje' },
@@ -24,11 +32,11 @@ function inRange(dateStr, filter) {
   return true;
 }
 
-function SLABadge({ days }) {
-  const ok = days <= SLA_DAYS;
+function SLABadge({ ms }) {
+  const ok = ms <= SLA_MS;
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700, fontFamily: 'var(--fm)' }}>
-      <span style={{ fontSize: 14 }}>{ok ? '🟢' : '🔴'}</span>{days}d
+      <span style={{ fontSize: 14 }}>{ok ? '🟢' : '🔴'}</span>{formatBusinessDuration(ms)}
     </span>
   );
 }
@@ -123,12 +131,14 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                     {filteredTasks.map(t => {
                       const priority  = TASK_PRIORITIES.find(p => p.id === t.priority);
                       const sector    = SECTORS[t.responsibleSector];
-                      const slaDays   = t.startedAt && t.completedAt
-                        ? differenceInDays(new Date(t.completedAt), new Date(t.startedAt))
-                        : null;
+                      const stats     = resolveTimeStats(t);
+                      const slaMs     = stats.totalMs > 0 ? stats.totalMs : null;
                       const deliveredBy = t.status === 'done'
                         ? (t.deliveredBy || t.responsibleName)
                         : t.responsibleName;
+                      // null em task antiga, que nunca passou pelo
+                      // novo fluxo — não marca nem verde nem vermelho.
+                      const onTime = t.firstDeliveredOnTime ?? t.deliveredOnTime ?? null;
 
                       return (
                         <tr
@@ -168,7 +178,12 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                             </span>
                           </td>
                           <td style={{ padding: '10px 12px' }}>
-                            {slaDays !== null ? <SLABadge days={slaDays} /> : '—'}
+                            {slaMs !== null ? <SLABadge ms={slaMs} /> : '—'}
+                            {onTime !== null && (
+                              <span style={{ display: 'block', fontSize: 9, letterSpacing: '.06em', fontFamily: 'var(--fm)', fontWeight: 700, marginTop: 3, color: onTime ? 'var(--green)' : 'var(--neon)' }}>
+                                {onTime ? 'NO PRAZO' : 'FORA DO PRAZO'}
+                              </span>
+                            )}
                           </td>
                           <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : '#666', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
                             {t.reworkCount || 0}
