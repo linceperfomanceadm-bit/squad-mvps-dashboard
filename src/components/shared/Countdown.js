@@ -23,10 +23,10 @@ export default function Countdown({ startDate, totalDays }) {
           {isLate ? <AlertTriangle size={12} style={{ animation: 'pulse 1.5s infinite' }} /> : <Clock size={12} />}
           {label}
         </span>
-        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: `${color}18`, color, border: `1px solid ${color}50`, fontFamily: 'var(--fm)' }}>{badge}</span>
+        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: `color-mix(in srgb, ${color} 9%, transparent)`, color, border: `1px solid color-mix(in srgb, ${color} 31%, transparent)`, fontFamily: 'var(--fm)' }}>{badge}</span>
       </div>
       <div style={{ height: 4, background: 'var(--soft)', borderRadius: 2, overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 2, boxShadow: `0 0 8px ${color}50`, transition: 'width .6s ease' }} />
+        <div style={{ height: '100%', width: `${pct}%`, background: fill, borderRadius: 2, boxShadow: `0 0 8px color-mix(in srgb, ${color} 31%, transparent)`, transition: 'width .6s ease' }} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
         <span style={{ fontSize: 10, color: 'var(--muted)' }}>Início</span>

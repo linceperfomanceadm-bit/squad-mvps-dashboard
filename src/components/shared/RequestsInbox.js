@@ -67,9 +67,9 @@ export default function RequestsInbox({
             onClick={() => setFilter(f.id)}
             style={{
               padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: filter === f.id ? `${accent}20` : 'var(--surface)',
+              background: filter === f.id ? `color-mix(in srgb, ${accent} 13%, transparent)` : 'var(--surface)',
               color: filter === f.id ? accent : 'var(--muted)',
-              border: `1px solid ${filter === f.id ? `${accent}55` : 'var(--border)'}`,
+              border: `1px solid ${filter === f.id ? `color-mix(in srgb, ${accent} 33%, transparent)` : 'var(--border)'}`,
             }}
           >
             {f.label} ({f.count})
@@ -115,7 +115,7 @@ function InboxCard({ request, onClick }) {
   const nova = !request.seenAt;
 
   return (
-    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${nova ? 'var(--amber-b)' : `${st.color}33`}`, position: 'relative' }}>
+    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${nova ? 'var(--amber-b)' : `color-mix(in srgb, ${st.color} 20%, transparent)`}`, position: 'relative' }}>
       {nova && <div style={{ position: 'absolute', top: 14, right: 14, width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)', boxShadow: '0 0 8px var(--amber)' }} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginBottom: 8 }}>
