@@ -57,7 +57,7 @@ export default function WDAddClientModal({ onClose, onAdd, collaborators }) {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={S.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" style={S.submitBtn} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Cadastrar'}
+              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar'}
             </button>
           </div>
         </form>
@@ -68,15 +68,15 @@ export default function WDAddClientModal({ onClose, onAdd, collaborators }) {
 
 const S = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
-  modal: { background: '#0e0e1c', border: '1px solid var(--neon-border)', borderRadius: 16, width: '100%', maxWidth: 460, boxShadow: '0 24px 80px rgba(0,0,0,.7)' },
+  modal: { background: 'var(--bg2)', border: '1px solid var(--neon-border)', borderRadius: 16, width: '100%', maxWidth: 460, boxShadow: '0 24px 80px rgba(0,0,0,.7)' },
   hd: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' },
   icon: { width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: 700, color: '#fff' },
+  title: { fontSize: 18, fontWeight: 700, color: 'var(--text)' },
   xbtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { padding: 22, display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 8 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
   input: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
-  submitBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '9px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
+  submitBtn: { background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '9px 22px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
 };

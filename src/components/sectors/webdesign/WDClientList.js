@@ -9,7 +9,7 @@ function Ring({ checked, total }) {
   const r = 14, circ = 2 * Math.PI * r;
   const pct = total > 0 ? checked / total : 0;
   const dash = pct * circ;
-  const color = pct === 1 ? '#22c55e' : '#EE3363';
+  const color = pct === 1 ? 'var(--green)' : '#EE3363';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{checked}/{total}</span>
@@ -141,7 +141,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
       {showRecModal && (
         <div style={S.overlay} onClick={() => setShowRecModal(false)}>
           <div style={S.recModal} onClick={e => e.stopPropagation()} className="fade-up">
-            <h3 style={{ fontSize: 17, fontWeight: 700, color: '#fff', marginBottom: 6 }}>Qual serviço na Recorrência?</h3>
+            <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Qual serviço na Recorrência?</h3>
             <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Para <strong style={{ color: 'var(--text)' }}>{client.name}</strong></p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {RECURRENCE_SERVICES.map(s => (
@@ -181,13 +181,13 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 3 }}>{PAGE_LABELS[page]}</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 3 }}>{PAGE_LABELS[page]}</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
             {display.length} cliente{display.length !== 1 ? 's' : ''}
             {page === 'onboarding' && overdueOnb > 0 && <span style={{ color: 'var(--neon)' }}> · {overdueOnb} em atraso</span>}
           </p>
         </div>
-        <button onClick={onAddClient} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
+        <button onClick={onAddClient} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           <Plus size={15} /> Novo Cliente
         </button>
       </div>
@@ -199,7 +199,7 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
               style={{ display: 'flex', alignItems: 'center', gap: 5, background: prodSubTab === key ? 'var(--neon-dim)' : 'var(--surface)', border: `1px solid ${prodSubTab === key ? 'var(--neon-border)' : 'var(--border)'}`, borderRadius: 8, padding: '6px 13px', color: prodSubTab === key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' }}>
               <Layers size={11} color={prodSubTab === key ? 'var(--neon)' : 'var(--muted)'} />
               {label}
-              {prodCounts[key] > 0 && <span style={{ background: prodSubTab === key ? 'var(--neon-dim)' : 'rgba(255,255,255,.06)', borderRadius: 8, padding: '1px 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>{prodCounts[key]}</span>}
+              {prodCounts[key] > 0 && <span style={{ background: prodSubTab === key ? 'var(--neon-dim)' : 'var(--soft)', borderRadius: 8, padding: '1px 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>{prodCounts[key]}</span>}
             </button>
           ))}
         </div>
@@ -231,19 +231,19 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
 }
 
 const S = {
-  card: { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, marginBottom: 0, transition: 'border-color .2s', backdropFilter: 'blur(12px)' },
+  card: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, marginBottom: 0, transition: 'border-color .2s', backdropFilter: 'blur(12px)' },
   hd: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
   hdLeft: { flex: 1, minWidth: 0 },
   hdRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   tag: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 5, padding: '2px 8px', fontSize: 10, color: 'var(--neon)', fontWeight: 600, marginBottom: 5 },
-  name: { fontSize: 15, fontWeight: 700, color: '#f0f0ff', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  name: { fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   resp: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap' },
   recBadge: { background: 'var(--purple-dim)', border: '1px solid var(--purple-b)', borderRadius: 4, padding: '1px 6px', fontSize: 10, color: 'var(--purple)', marginLeft: 4 },
   xbtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 },
   secLbl: { fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--fm)' },
   moveProdBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,rgba(238,51,99,.18),rgba(238,51,99,.08))', border: '1px solid var(--neon-border)', borderRadius: 9, padding: 10, color: 'var(--neon)', fontSize: 13, fontWeight: 600, width: '100%', marginBottom: 10, cursor: 'pointer', transition: 'all .2s' },
-  backBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, width: '100%', marginBottom: 12, cursor: 'pointer' },
+  backBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, width: '100%', marginBottom: 12, cursor: 'pointer' },
   ci: { display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'var(--surface)', transition: 'background .15s' },
   ta: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', color: 'var(--text)', fontSize: 13, fontFamily: 'var(--f)', resize: 'vertical', minHeight: 72, outline: 'none' },
   doneBox: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 14, marginBottom: 14 },
@@ -251,11 +251,11 @@ const S = {
   btnRec: { flex: 1, background: 'var(--purple-dim)', border: '1px solid var(--purple-b)', borderRadius: 8, padding: 8, color: 'var(--purple)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   arow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' },
   asec: { display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' },
-  delBtn: { background: 'rgba(238,51,99,.07)', border: '1px solid rgba(238,51,99,.18)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
-  confDel: { background: 'var(--neon)', border: 'none', borderRadius: 6, padding: '5px 12px', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  delBtn: { background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  confDel: { background: 'var(--neon)', border: 'none', borderRadius: 6, padding: '5px 12px', color: 'var(--on)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   cancDel: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 },
-  recModal: { background: '#0f0f1e', border: '1px solid var(--neon-border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 24px 80px rgba(0,0,0,.7)' },
+  recModal: { background: 'var(--bg2)', border: '1px solid var(--neon-border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 420, boxShadow: '0 24px 80px rgba(0,0,0,.7)' },
   recOpt: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 13px', color: 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' },
   recOptSel: { background: 'var(--purple-dim)', border: '1px solid var(--purple-b)', color: 'var(--purple)' },
 };
