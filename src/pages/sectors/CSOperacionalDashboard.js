@@ -10,7 +10,7 @@ import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import AgendaView from '../../components/shared/AgendaView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
@@ -27,8 +27,8 @@ import {
   CARD, GRID, MODAL, LBL, INP, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
 } from '../../components/commercial/ui';
 
-const COLOR = SECTORS.cs.color;
-const KICKOFF_COLOR = '#a78bfa';
+const COLOR = 'var(--c)';
+const KICKOFF_COLOR = 'var(--purple)';
 
 /*
  * CS OPERACIONAL:
@@ -202,15 +202,13 @@ export default function CSOperacionalDashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId="cs" navItems={NAV} activeKey={page} onNav={setPage} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 28, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId="cs" navItems={NAV} activeKey={page} onNav={setPage}>
         {loading ? <Spinner /> : (
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, gap: 12 }}>
               <div>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CS OPERACIONAL</span>
-                <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
+                <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
                 {HEAD[page][1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
               </div>
               {['ops', 'client', 'overview'].includes(page) && (
@@ -226,7 +224,7 @@ export default function CSOperacionalDashboard() {
             {page === 'overview' && (
               <div className="fade-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
                 <Stat label="Clientes ativos" value={liveClients.length} color={COLOR} />
-                <Stat label="Saúde crítica" value={criticalCount} color={criticalCount > 0 ? '#ef4444' : 'var(--muted)'} hint="Vermelho no farol operacional ou no farol do cliente" />
+                <Stat label="Saúde crítica" value={criticalCount} color={criticalCount > 0 ? 'var(--red)' : 'var(--muted)'} hint="Vermelho no farol operacional ou no farol do cliente" />
                 <Stat label="Em onboarding" value={onboardingClients.length + kickoffTotal} color="var(--amber)" />
                 <Stat label="Em dia (operacional)" value={opsCounts.green} color="var(--green)" />
               </div>
@@ -241,7 +239,7 @@ export default function CSOperacionalDashboard() {
                       <div style={{ marginBottom: 30 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <span style={{ width: 3, height: 15, background: 'var(--amber)', borderRadius: 2 }} />
-                          <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Aguardando responsáveis</h2>
+                          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Aguardando responsáveis</h2>
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
                           Cadastrados pela CS Comercial. Destravam quando o líder de cada setor indicar quem fica com o cliente.
@@ -268,7 +266,7 @@ export default function CSOperacionalDashboard() {
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                           <span style={{ width: 3, height: 15, background: KICKOFF_COLOR, borderRadius: 2 }} />
-                          <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>Aguardando Kick Off</h2>
+                          <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>Aguardando Kick Off</h2>
                         </div>
                         <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
                           Quadro de responsáveis completo. A CS Comercial agenda e realiza a call de Kick Off — você participa dela.
@@ -392,7 +390,6 @@ export default function CSOperacionalDashboard() {
             {page === 'agenda' && <AgendaView />}
           </>
         )}
-      </main>
 
       {openClient && ReactDOM.createPortal(
         <ClientDrawer
@@ -462,7 +459,7 @@ export default function CSOperacionalDashboard() {
             setHealthTarget(null);
           }}
         />, document.body)}
-    </div>
+    </AppShell>
   );
 }
 
@@ -477,7 +474,7 @@ function LockedCard({ client, pendentes, meus = [], onStaff }) {
   return (
     <div style={{ ...CARD, border: `1px solid ${atrasado ? 'var(--neon-border)' : 'var(--border)'}`, opacity: .82 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         <Tag text="BLOQUEADO" color={atrasado ? 'var(--neon)' : 'var(--muted)'} />
       </div>
 
@@ -538,7 +535,7 @@ function KickoffWatchCard({ client, onOpen }) {
       style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         {agendada
           ? <Tag text={passou ? 'CALL PASSOU' : 'KICK OFF AGENDADO'} color={passou ? 'var(--amber)' : KICKOFF_COLOR} />
           : <Tag text="AGUARDANDO AGENDAMENTO DE KICK OFF" color="var(--muted)" />}
@@ -583,7 +580,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
     <div style={{ ...CARD, border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `${COLOR}40`) : 'var(--amber-b)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
           {at
             ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : COLOR} />
             : <Tag text="SEM AGENDA" color="var(--amber)" />}
@@ -617,7 +614,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
       </button>
 
       {client.kickoff?.meetLink && (
-        <a href={client.kickoff.meetLink} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, padding: '9px', borderRadius: 9, background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+        <a href={client.kickoff.meetLink} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 12, padding: '9px', borderRadius: 9, background: 'var(--green)', color: 'var(--text)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
           <Video size={14} /> Abrir call
         </a>
       )}
@@ -643,7 +640,7 @@ function OpsCard({ client, health, onClick }) {
     <button onClick={onClick} style={{ ...CARD, textAlign: 'left', cursor: 'pointer', width: '100%', border: `1px solid ${lv.color}44`, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: lv.color }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingLeft: 6 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{client.name}</p>
         <Tag text={`${lv.emoji} ${lv.label.toUpperCase()}`} color={lv.color} />
       </div>
       <div style={{ display: 'flex', gap: 14, marginTop: 12, paddingLeft: 6 }}>
@@ -660,7 +657,7 @@ function Mini({ label, value, color }) {
   return (
     <div>
       <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{label.toUpperCase()}</p>
-      <p style={{ fontSize: 20, fontWeight: 800, color }}>{value}</p>
+      <p style={{ fontSize: 20, fontWeight: 600, color }}>{value}</p>
     </div>
   );
 }
@@ -671,18 +668,18 @@ function ClientHealthCard({ client, health, onSet }) {
   return (
     <div style={{ ...CARD, border: `1px solid ${lv ? `${lv.color}44` : 'var(--border)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{client.name}</p>
         {lv
           ? <Tag text={`${lv.emoji} ${lv.label.toUpperCase()}`} color={lv.color} />
           : <Tag text="SEM AVALIAÇÃO" color="var(--muted)" />}
       </div>
       {health.note && (
-        <p style={{ fontSize: 12, color: '#ddd', background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        <p style={{ fontSize: 12, color: '#ddd', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
           {health.note}
         </p>
       )}
       {health.set && (
-        <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 8 }}>
+        <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 8 }}>
           {health.by || '—'} · {fmtDate(health.at)}
         </p>
       )}
@@ -758,11 +755,11 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div style={{ background: `${lv.color}12`, border: `1px solid ${lv.color}40`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>SAÚDE OPERACIONAL</p>
-            <p style={{ fontSize: 15, fontWeight: 800, color: lv.color, marginTop: 4 }}>{lv.emoji} {lv.label}</p>
+            <p style={{ fontSize: 15, fontWeight: 600, color: lv.color, marginTop: 4 }}>{lv.emoji} {lv.label}</p>
           </div>
           <div style={{ background: mlv ? `${mlv.color}12` : 'var(--surface)', border: `1px solid ${mlv ? `${mlv.color}40` : 'var(--border)'}`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>SAÚDE DO CLIENTE</p>
-            <p style={{ fontSize: 15, fontWeight: 800, color: mlv ? mlv.color : 'var(--muted)', marginTop: 4 }}>
+            <p style={{ fontSize: 15, fontWeight: 600, color: mlv ? mlv.color : 'var(--muted)', marginTop: 4 }}>
               {mlv ? `${mlv.emoji} ${mlv.label}` : '— sem avaliação'}
             </p>
           </div>

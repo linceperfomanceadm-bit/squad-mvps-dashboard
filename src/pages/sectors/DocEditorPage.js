@@ -393,7 +393,7 @@ const S = {
   },
   topo: {
     display: 'flex', alignItems: 'center', gap: 12, padding: '14px 22px',
-    borderBottom: '1px solid var(--border)', background: 'rgba(12,12,24,.88)',
+    borderBottom: '1px solid var(--border)', background: 'var(--bg2)',
     flexShrink: 0, zIndex: 10,
   },
   voltar: {
@@ -401,7 +401,7 @@ const S = {
     width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   tituloTopo: {
-    fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: '-.2px',
+    fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px',
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
   },
   subTopo: { fontSize: 11.5, color: 'var(--muted)', marginTop: 2 },
@@ -417,10 +417,10 @@ const S = {
   btn: {
     display: 'flex', alignItems: 'center', gap: 7, background: 'var(--neon)',
     border: 'none', borderRadius: 9, padding: '9px 16px',
-    fontSize: 12.5, fontWeight: 600, color: '#fff', flexShrink: 0,
+    fontSize: 12.5, fontWeight: 600, color: 'var(--text)', flexShrink: 0,
   },
   input: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '8px 12px', fontSize: 13, color: 'var(--text)', outline: 'none',
   },
   avisoMarca: {
@@ -449,5 +449,5 @@ const S = {
   navOff: { fontSize: 10, color: 'var(--muted)', fontStyle: 'italic', flexShrink: 0 },
   navExtras: { marginTop: 10, borderTop: '1px solid var(--border)', borderRadius: 0, paddingTop: 14 },
   meio: { padding: '26px 26px 60px', overflowY: 'auto', borderRight: '1px solid var(--border)' },
-  direita: { padding: 22, overflowY: 'auto', background: '#050509' },
+  direita: { padding: 22, overflowY: 'auto', background: 'var(--bg)' },
 };

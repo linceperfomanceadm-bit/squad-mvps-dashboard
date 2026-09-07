@@ -10,7 +10,7 @@ import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import AgendaView from '../../components/shared/AgendaView';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
@@ -23,8 +23,8 @@ import {
   CARD, GRID, MODAL, BTN_PRIMARY, BTN_CANCEL,
 } from '../../components/commercial/ui';
 
-const COLOR = SECTORS.cs.color;
-const KICKOFF_COLOR = '#a78bfa';
+const COLOR = 'var(--c)';
+const KICKOFF_COLOR = 'var(--purple)';
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
 /*
@@ -147,14 +147,12 @@ export default function CSComercialDashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId="cs" navItems={NAV} activeKey={page} onNav={setPage} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 28, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId="cs" navItems={NAV} activeKey={page} onNav={setPage}>
         {loading ? <Spinner /> : (
           <>
             <div style={{ marginBottom: 22 }}>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CS COMERCIAL</span>
-              <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
+              <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
               {HEAD[page][1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
             </div>
 
@@ -168,10 +166,10 @@ export default function CSComercialDashboard() {
                 </div>
                 <div style={CARD}>
                   <p style={{ fontSize: 11, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>VALOR EM CONTRATOS ENTRANDO</p>
-                  <p style={{ fontSize: 30, fontWeight: 800, color: 'var(--green)', marginTop: 8 }}>
+                  <p style={{ fontSize: 30, fontWeight: 600, color: 'var(--green)', marginTop: 8 }}>
                     {money([...emStaffing, ...emKickoff, ...emOnboarding].reduce((sum, c) => sum + (Number(c.contrato?.saleTotal ?? c.saleTotal) || 0), 0))}
                   </p>
-                  <p style={{ fontSize: 11, color: '#666', marginTop: 6 }}>
+                  <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6 }}>
                     Soma dos clientes que ainda não concluíram a call de onboarding.
                   </p>
                 </div>
@@ -180,7 +178,7 @@ export default function CSComercialDashboard() {
 
             {page === 'register' && (
               <div className="fade-up" style={{ ...CARD, maxWidth: 560 }}>
-                <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', marginBottom: 8 }}>Novo cliente</p>
+                <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 8 }}>Novo cliente</p>
                 <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.65, marginBottom: 16 }}>
                   Preencha os dados do contrato fechado, escolha o CS Operacional responsável e marque
                   os setores envolvidos. O cliente entra invisível para os times até que o líder de
@@ -299,7 +297,6 @@ export default function CSComercialDashboard() {
             {page === 'agenda' && <AgendaView />}
           </>
         )}
-      </main>
 
       {/* Cadastro de cliente */}
       {showForm && ReactDOM.createPortal(
@@ -385,7 +382,7 @@ export default function CSComercialDashboard() {
           }}
         />, document.body)}
 
-    </div>
+    </AppShell>
   );
 }
 
@@ -394,7 +391,7 @@ function Bloco({ title, sub, color, children }) {
     <div style={{ marginBottom: 30 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ width: 3, height: 15, background: color, borderRadius: 2 }} />
-        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{title}</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</h2>
       </div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>{sub}</p>
       {children}
@@ -417,7 +414,7 @@ function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
     <div style={{ ...CARD, border: `1px solid ${atrasado ? 'var(--neon-border)' : 'var(--amber-b)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
           <Tag text={`${prontos.length}/${exigidos.length} SETORES`} color={atrasado ? 'var(--neon)' : 'var(--amber)'} />
         </div>
 
@@ -481,7 +478,7 @@ function KickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
     <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
           {agendada
             ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : KICKOFF_COLOR} />
             : <Tag text="AGUARDANDO AGENDAMENTO" color="var(--muted)" />}
@@ -514,7 +511,7 @@ function KickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
             <button style={{ ...BTN_CANCEL, flex: 1 }} onClick={onSchedule}>Reagendar</button>
             <button style={BTN_CANCEL} onClick={onCancel}>Desmarcar</button>
             <button
-              style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', border: 'none', borderRadius: 10, padding: '11px 16px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%' }}
+              style={{ background: 'var(--green)', border: 'none', borderRadius: 10, padding: '11px 16px', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer', width: '100%' }}
               onClick={onConfirm}
             >
               ✓ Call realizada
@@ -535,7 +532,7 @@ function OnboardingWatchCard({ client, onOpen }) {
   return (
     <button onClick={onOpen} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? `${COLOR}40` : 'var(--border)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         <Tag text={agendada ? 'ONBOARDING AGENDADO' : 'AGUARDANDO CS OPERACIONAL'} color={agendada ? COLOR : 'var(--muted)'} />
       </div>
 
@@ -551,7 +548,7 @@ function OnboardingWatchCard({ client, onOpen }) {
 
       {contrato.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>👤 {contrato.contactName}</p>}
       {client.kickoffCall?.confirmedAt && (
-        <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 8 }}>
+        <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 8 }}>
           Kick Off realizado em {fmtDate(client.kickoffCall.confirmedAt)}
         </p>
       )}

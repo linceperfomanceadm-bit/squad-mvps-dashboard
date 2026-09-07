@@ -6,7 +6,7 @@ import { useTasks } from '../../hooks/useTasks';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useRequests } from '../../hooks/useRequests';
 import { useToast } from '../../components/shared/Toast';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import CreativeOverview from '../../components/sectors/creative/CreativeOverview';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import HallOfFame from '../../components/sectors/creative/HallOfFame';
@@ -108,9 +108,7 @@ export default function CreativeDashboard({ sectorId }) {
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId={sectorId} navItems={navItems} activeKey={page} onNav={setPage} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 32, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId={sectorId} navItems={navItems} activeKey={page} onNav={setPage}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -173,7 +171,6 @@ export default function CreativeDashboard({ sectorId }) {
         ) : (
           <HallOfFame tasks={hallTasks} />
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 }

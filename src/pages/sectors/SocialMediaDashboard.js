@@ -10,7 +10,7 @@ import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
 import { useDocuments } from '../../hooks/useDocuments';
 import { useToast } from '../../components/shared/Toast';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import SMOverview from '../../components/sectors/socialMedia/SMOverview';
 import SMMural from '../../components/sectors/socialMedia/SMMural';
 import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
@@ -118,9 +118,7 @@ export default function SocialMediaDashboard() {
   }));
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId="socialmedia" navItems={navItems} activeKey={page} onNav={setPage} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 32, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId="socialmedia" navItems={navItems} activeKey={page} onNav={setPage}>
         {loading || loadingTasks ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -191,7 +189,6 @@ export default function SocialMediaDashboard() {
             onDelete={deleteTask}
           />
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 }

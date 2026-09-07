@@ -6,7 +6,7 @@ import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import WDOverview from '../../components/sectors/webdesign/WDOverview';
 import WDClientList from '../../components/sectors/webdesign/WDClientList';
 import WDAddClientModal from '../../components/sectors/webdesign/WDAddClientModal';
@@ -94,9 +94,7 @@ export default function WebDesignDashboard() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId="webdesign" navItems={navItems} activeKey={page} onNav={setPage} onAddClient={() => setShowAddModal(true)} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 32, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId="webdesign" navItems={navItems} activeKey={page} onNav={setPage} onAddClient={() => setShowAddModal(true)}>
         {loading || loadingTasks ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -153,10 +151,9 @@ export default function WebDesignDashboard() {
             onAddClient={() => setShowAddModal(true)}
           />
         )}
-      </main>
       {showAddModal && (
         <WDAddClientModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} collaborators={collaborators.filter(c => c.sector === 'webdesign')} />
       )}
-    </div>
+    </AppShell>
   );
 }

@@ -8,7 +8,7 @@ import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
 import { useToast } from '../../components/shared/Toast';
-import Sidebar from '../../components/shared/Sidebar';
+import AppShell from '../../components/shared/AppShell';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import { SECTORS, TASK_PRIORITIES } from '../../lib/firebase';
@@ -28,29 +28,29 @@ function GenericOverview({ myTasks, sectorId }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           Visão Geral
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>{SECTORS[sectorId]?.label}</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 14, marginBottom: 14 }}>
         {[
           { label: 'Tasks Ativas',       value: active.length,          color },
           { label: 'Aguard. Aprovação',   value: pendingApproval.length, color: pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)' },
           { label: 'Concluídas',         value: done.length,            color: 'var(--green)' },
           { label: 'Em Ajuste',          value: rework.length,          color: rework.length > 0 ? 'var(--amber)' : 'var(--muted)' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '18px 20px', position: 'relative', overflow: 'hidden' }}>
+          <div key={s.label} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${s.color},transparent)` }} />
             <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{s.label}</p>
-            <p style={{ fontSize: 32, fontWeight: 800, color: s.color }}>{s.value}</p>
+            <p style={{ fontSize: 30, fontWeight: 500, letterSpacing: '-.02em', color: s.color }}>{s.value}</p>
           </div>
         ))}
       </div>
 
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' }}>
+        <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
         {active.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
             Nenhuma task ativa. 🎉
@@ -147,9 +147,7 @@ export default function GenericSectorDashboard({ sectorId }) {
   ];
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Sidebar sectorId={sectorId} navItems={NAV} activeKey={page} onNav={setPage} />
-      <main style={{ flex: 1, marginLeft: 224, padding: 32, minHeight: '100vh', overflow: 'auto' }}>
+    <AppShell sectorId={sectorId} navItems={NAV} activeKey={page} onNav={setPage}>
         {loadingTasks ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -191,7 +189,6 @@ export default function GenericSectorDashboard({ sectorId }) {
         ) : (
           <GenericOverview myTasks={myTasks} sectorId={sectorId} />
         )}
-      </main>
-    </div>
+    </AppShell>
   );
 }
