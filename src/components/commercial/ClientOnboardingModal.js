@@ -154,12 +154,12 @@ export default function ClientOnboardingModal({
         {(contrato.wdService || contrato.hasIdVisual) && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
             {contrato.wdService && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `${SECTORS.webdesign.color}18`, color: SECTORS.webdesign.color, fontFamily: 'var(--fm)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `color-mix(in srgb, ${SECTORS.webdesign.color} 9%, transparent)`, color: SECTORS.webdesign.color, fontFamily: 'var(--fm)' }}>
                 {WD_SERVICE_CONFIG[contrato.wdService]?.label || contrato.wdService}
               </span>
             )}
             {contrato.hasIdVisual && (
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `${SECTORS.design.color}18`, color: SECTORS.design.color, fontFamily: 'var(--fm)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `color-mix(in srgb, ${SECTORS.design.color} 9%, transparent)`, color: SECTORS.design.color, fontFamily: 'var(--fm)' }}>
                 ID Visual{client.idv?.responsible ? ` · ${client.idv.responsible}` : ''}
               </span>
             )}
@@ -226,7 +226,7 @@ function CallBlock({ label, sublabel, color, call, client, kind, participants, w
     : null;
 
   return (
-    <div style={{ background: agendada ? `${color}12` : 'var(--surface)', border: `1px solid ${agendada ? `${color}40` : 'var(--border)'}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+    <div style={{ background: agendada ? `color-mix(in srgb, ${color} 7%, transparent)` : 'var(--surface)', border: `1px solid ${agendada ? `color-mix(in srgb, ${color} 25%, transparent)` : 'var(--border)'}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
       <p style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{label}</p>
       <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{sublabel}</p>
 

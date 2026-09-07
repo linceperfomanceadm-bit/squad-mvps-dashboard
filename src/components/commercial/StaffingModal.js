@@ -79,12 +79,12 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
             {(temIdVisual || contrato.wdService) && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                 {contrato.wdService && (
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `${SECTORS.webdesign.color}18`, color: SECTORS.webdesign.color, fontFamily: 'var(--fm)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `color-mix(in srgb, ${SECTORS.webdesign.color} 9%, transparent)`, color: SECTORS.webdesign.color, fontFamily: 'var(--fm)' }}>
                     {WD_SERVICE_CONFIG[contrato.wdService]?.label || contrato.wdService}
                   </span>
                 )}
                 {temIdVisual && (
-                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `${SECTORS.design.color}18`, color: SECTORS.design.color, fontFamily: 'var(--fm)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 8, background: `color-mix(in srgb, ${SECTORS.design.color} 9%, transparent)`, color: SECTORS.design.color, fontFamily: 'var(--fm)' }}>
                     ID Visual
                   </span>
                 )}
@@ -136,7 +136,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                             key={c.id}
                             type="button"
                             onClick={() => toggle(sid, c.name)}
-                            style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 14, cursor: 'pointer', background: active ? `${s.color}22` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `${s.color}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 4 }}
+                            style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 14, cursor: 'pointer', background: active ? `color-mix(in srgb, ${s.color} 13%, transparent)` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `color-mix(in srgb, ${s.color} 40%, transparent)` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 4 }}
                           >
                             {active && <Check size={11} />} {c.name}
                           </button>
@@ -157,7 +157,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                                 key={nome}
                                 type="button"
                                 onClick={() => setIdvOwner(nome)}
-                                style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 14, cursor: 'pointer', background: on ? `${s.color}22` : 'var(--surface)', color: on ? s.color : 'var(--muted)', border: `1px solid ${on ? `${s.color}66` : 'var(--border)'}` }}
+                                style={{ fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 14, cursor: 'pointer', background: on ? `color-mix(in srgb, ${s.color} 13%, transparent)` : 'var(--surface)', color: on ? s.color : 'var(--muted)', border: `1px solid ${on ? `color-mix(in srgb, ${s.color} 40%, transparent)` : 'var(--border)'}` }}
                               >
                                 {on ? '◉' : '○'} {nome}
                               </button>

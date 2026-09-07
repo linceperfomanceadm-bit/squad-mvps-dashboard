@@ -294,7 +294,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           <button
             key={t}
             onClick={() => setStep(i + 1)}
-            style={{ flex: 1, padding: '8px 12px', borderRadius: 9, textAlign: 'center', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: step === i + 1 ? `${COLOR}22` : 'var(--surface)', color: step === i + 1 ? COLOR : 'var(--muted)', border: `1px solid ${step === i + 1 ? `${COLOR}55` : 'var(--border)'}` }}
+            style={{ flex: 1, padding: '8px 12px', borderRadius: 9, textAlign: 'center', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: step === i + 1 ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)', color: step === i + 1 ? COLOR : 'var(--muted)', border: `1px solid ${step === i + 1 ? `color-mix(in srgb, ${COLOR} 33%, transparent)` : 'var(--border)'}` }}
           >
             {i + 1}. {t}
           </button>
@@ -309,7 +309,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
             <p style={LBL}>TIPO DE CONTRATANTE *</p>
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               {[{ id: 'pj', label: 'Pessoa Jurídica' }, { id: 'pf', label: 'Pessoa Física' }].map(o => (
-                <button key={o.id} type="button" onClick={() => set('personType', o.id)} style={{ flex: 1, padding: '9px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: data.personType === o.id ? `${COLOR}22` : 'var(--surface)', color: data.personType === o.id ? '#fff' : 'var(--muted)', border: `1px solid ${data.personType === o.id ? `${COLOR}66` : 'var(--border)'}` }}>
+                <button key={o.id} type="button" onClick={() => set('personType', o.id)} style={{ flex: 1, padding: '9px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: data.personType === o.id ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)', color: data.personType === o.id ? '#fff' : 'var(--muted)', border: `1px solid ${data.personType === o.id ? `color-mix(in srgb, ${COLOR} 40%, transparent)` : 'var(--border)'}` }}>
                   {o.label}
                 </button>
               ))}
@@ -377,7 +377,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
               {SALE_SERVICES.map(s => {
                 const active = data.services.includes(s.id);
                 return (
-                  <button key={s.id} type="button" onClick={() => toggleService(s.id)} style={{ fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 14, cursor: 'pointer', background: active ? `${COLOR}22` : 'var(--surface)', color: active ? '#fff' : 'var(--muted)', border: `1px solid ${active ? `${COLOR}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button key={s.id} type="button" onClick={() => toggleService(s.id)} style={{ fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 14, cursor: 'pointer', background: active ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)', color: active ? '#fff' : 'var(--muted)', border: `1px solid ${active ? `color-mix(in srgb, ${COLOR} 40%, transparent)` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 5 }}>
                     {active && <Check size={11} />} {s.label}
                   </button>
                 );
@@ -412,7 +412,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
               {Object.values(SECTORS).filter(s => s.id !== 'cs').map(s => {
                 const active = data.sectors.includes(s.id);
                 return (
-                  <button key={s.id} type="button" onClick={() => toggleSector(s.id)} style={{ fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 14, cursor: 'pointer', background: active ? `${s.color}22` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `${s.color}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <button key={s.id} type="button" onClick={() => toggleSector(s.id)} style={{ fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 14, cursor: 'pointer', background: active ? `color-mix(in srgb, ${s.color} 13%, transparent)` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `color-mix(in srgb, ${s.color} 40%, transparent)` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 5 }}>
                     {active && <Check size={11} />} {s.emoji} {s.label}
                   </button>
                 );
@@ -438,7 +438,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
             <button
               type="button"
               onClick={toggleIdVisual}
-              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 13px', borderRadius: 9, cursor: 'pointer', textAlign: 'left', background: data.hasIdVisual ? `${SECTORS.design.color}18` : 'var(--surface)', color: data.hasIdVisual ? SECTORS.design.color : 'var(--muted)', border: `1px solid ${data.hasIdVisual ? `${SECTORS.design.color}55` : 'var(--border)'}`, fontSize: 13, fontWeight: 600 }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 13px', borderRadius: 9, cursor: 'pointer', textAlign: 'left', background: data.hasIdVisual ? `color-mix(in srgb, ${SECTORS.design.color} 9%, transparent)` : 'var(--surface)', color: data.hasIdVisual ? SECTORS.design.color : 'var(--muted)', border: `1px solid ${data.hasIdVisual ? `color-mix(in srgb, ${SECTORS.design.color} 33%, transparent)` : 'var(--border)'}`, fontSize: 13, fontWeight: 600 }}
             >
               {data.hasIdVisual ? <Check size={14} /> : <span style={{ width: 14 }} />}
               ID Visual — criação de marca completa
@@ -504,7 +504,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
 
           <div style={{ display: 'flex', gap: 8 }}>
             {[{ id: 'avista', label: 'À vista' }, { id: 'prazo', label: 'Parcelado' }].map(o => (
-              <button key={o.id} type="button" onClick={() => set('paymentType', o.id)} style={{ flex: 1, padding: '9px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: data.paymentType === o.id ? `${COLOR}22` : 'var(--surface)', color: data.paymentType === o.id ? '#fff' : 'var(--muted)', border: `1px solid ${data.paymentType === o.id ? `${COLOR}66` : 'var(--border)'}` }}>
+              <button key={o.id} type="button" onClick={() => set('paymentType', o.id)} style={{ flex: 1, padding: '9px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: data.paymentType === o.id ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)', color: data.paymentType === o.id ? '#fff' : 'var(--muted)', border: `1px solid ${data.paymentType === o.id ? `color-mix(in srgb, ${COLOR} 40%, transparent)` : 'var(--border)'}` }}>
                 {o.label}
               </button>
             ))}

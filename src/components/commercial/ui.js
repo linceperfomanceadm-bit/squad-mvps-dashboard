@@ -111,7 +111,7 @@ export function Stat({ label, value, color, hint }) {
 export function Tag({ text, color }) {
   const muted = color === 'var(--muted)';
   return (
-    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: muted ? 'var(--soft)' : `${color}1a`, color, fontFamily: 'var(--fm)', border: `1px solid ${muted ? 'var(--border)' : `${color}40`}`, whiteSpace: 'nowrap' }}>
+    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: muted ? 'var(--soft)' : `color-mix(in srgb, ${color} 10%, transparent)`, color, fontFamily: 'var(--fm)', border: `1px solid ${muted ? 'var(--border)' : `color-mix(in srgb, ${color} 25%, transparent)`}`, whiteSpace: 'nowrap' }}>
       {text}
     </span>
   );

@@ -275,7 +275,7 @@ function AdminKickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
   const passou = agendada && new Date(call.at) < new Date();
 
   return (
-    <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}>
+    <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `color-mix(in srgb, ${KICKOFF_COLOR} 25%, transparent)`) : 'var(--border)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -371,7 +371,7 @@ function OnboardingCard({ client, color, onOpen }) {
   return (
     <button
       onClick={onOpen}
-      style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `${color}40`) : 'var(--border)'}` }}
+      style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `color-mix(in srgb, ${color} 25%, transparent)`) : 'var(--border)'}` }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>

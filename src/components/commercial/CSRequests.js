@@ -186,9 +186,9 @@ export default function CSRequests({
               onClick={() => toggleStatus(s.id)}
               style={{
                 padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: on ? `${s.color}20` : 'var(--surface)',
+                background: on ? `color-mix(in srgb, ${s.color} 13%, transparent)` : 'var(--surface)',
                 color: on ? s.color : 'var(--muted)',
-                border: `1px solid ${on ? `${s.color}55` : 'var(--border)'}`,
+                border: `1px solid ${on ? `color-mix(in srgb, ${s.color} 33%, transparent)` : 'var(--border)'}`,
               }}
             >
               {on ? '✓ ' : ''}{s.label} ({counts[s.id]})
@@ -338,7 +338,7 @@ function RequestCard({ request, onClick }) {
   const aging = agingOf(request);
 
   return (
-    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${aging?.estourou ? 'var(--neon-border)' : `${st.color}33`}` }}>
+    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${aging?.estourou ? 'var(--neon-border)' : `color-mix(in srgb, ${st.color} 20%, transparent)`}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
         <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.35 }}>{request.subject}</p>
         <Tag text={u.label.toUpperCase()} color={u.color} />
@@ -595,9 +595,9 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
               onClick={() => set('urgency', p.id)}
               style={{
                 flex: '1 1 45%', padding: '10px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                background: form.urgency === p.id ? `${p.color}22` : 'var(--surface)',
+                background: form.urgency === p.id ? `color-mix(in srgb, ${p.color} 13%, transparent)` : 'var(--surface)',
                 color: form.urgency === p.id ? p.color : 'var(--muted)',
-                border: `1px solid ${form.urgency === p.id ? `${p.color}66` : 'var(--border)'}`,
+                border: `1px solid ${form.urgency === p.id ? `color-mix(in srgb, ${p.color} 40%, transparent)` : 'var(--border)'}`,
               }}
             >
               {p.label}

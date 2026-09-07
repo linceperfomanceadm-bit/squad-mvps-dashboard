@@ -44,7 +44,7 @@ export default function CSHealth({ clients, tasks, onUpdateClient, toast }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 20 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CUSTOMER SUCCESS</span>
+        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>🎧 CUSTOMER SUCCESS</span>
         <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>Saúde dos Clientes</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Farol automático por tarefas, ajustável pelo CS · {activeClients.length} clientes ativos</p>
       </div>
@@ -82,13 +82,13 @@ export default function CSHealth({ clients, tasks, onUpdateClient, toast }) {
 function HealthCard({ client, health, onClick }) {
   const lvl = HEALTH_LEVELS[health.level];
   return (
-    <button onClick={onClick} style={{ textAlign: 'left', cursor: 'pointer', background: 'var(--bg2)', border: `1px solid ${lvl.color}30`, borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <button onClick={onClick} style={{ textAlign: 'left', cursor: 'pointer', background: 'var(--bg2)', border: `1px solid color-mix(in srgb, ${lvl.color} 19%, transparent)`, borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: lvl.color }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</span>
         <span style={{ fontSize: 18, lineHeight: 1 }}>{lvl.emoji}</span>
       </div>
-      <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: `${lvl.color}1a`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 8 }}>
+      <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: `color-mix(in srgb, ${lvl.color} 10%, transparent)`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 8 }}>
         {lvl.label}{health.overridden ? ' · manual' : ''}
       </span>
       <div style={{ display: 'flex', gap: 12, marginTop: 10, fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
@@ -114,7 +114,7 @@ function HealthDrawer({ client, health, tasks, onClose, onSetRisk }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
             <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>{client.name}</h2>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: `${lvl.color}1a`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 6 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: `color-mix(in srgb, ${lvl.color} 10%, transparent)`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 6 }}>
               {lvl.emoji} {lvl.label}{health.overridden ? ' (manual)' : ' (automático)'}
             </span>
           </div>
@@ -177,9 +177,9 @@ function HealthDrawer({ client, health, tasks, onClose, onSetRisk }) {
             {Object.entries(HEALTH_LEVELS).map(([key, v]) => (
               <button key={key} onClick={() => onSetRisk(key, note)} style={{
                 flex: 1, padding: '10px 6px', borderRadius: 10, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                background: health.override?.level === key ? `${v.color}1f` : 'var(--surface)',
+                background: health.override?.level === key ? `color-mix(in srgb, ${v.color} 12%, transparent)` : 'var(--surface)',
                 color: health.override?.level === key ? v.color : 'var(--text)',
-                border: `1px solid ${health.override?.level === key ? `${v.color}60` : 'var(--border)'}`,
+                border: `1px solid ${health.override?.level === key ? `color-mix(in srgb, ${v.color} 38%, transparent)` : 'var(--border)'}`,
               }}>{v.emoji} {v.label}</button>
             ))}
           </div>
@@ -215,9 +215,9 @@ function Chip({ active, onClick, label, color }) {
   return (
     <button onClick={onClick} style={{
       fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 20, cursor: 'pointer',
-      background: active ? (color ? `${color}1a` : 'var(--neon-dim)') : 'var(--surface)',
+      background: active ? (color ? `color-mix(in srgb, ${color} 10%, transparent)` : 'var(--neon-dim)') : 'var(--surface)',
       color: active ? (color || 'var(--neon)') : 'var(--muted)',
-      border: `1px solid ${active ? (color ? `${color}40` : 'var(--neon-border)') : 'var(--border)'}`,
+      border: `1px solid ${active ? (color ? `color-mix(in srgb, ${color} 25%, transparent)` : 'var(--neon-border)') : 'var(--border)'}`,
       fontFamily: 'var(--fm)',
     }}>{label}</button>
   );
