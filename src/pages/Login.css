@@ -5,17 +5,30 @@
    está em style objects como o resto do app. */
 
 .lg-page { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; position: relative; overflow: hidden; background: var(--bg); }
-.lg-grid { position: fixed; inset: 0; pointer-events: none; background-image: linear-gradient(var(--soft) 1px, transparent 1px), linear-gradient(90deg, var(--soft) 1px, transparent 1px); background-size: 32px 32px; opacity: .35; }
-.lg-glow { position: fixed; width: 800px; height: 800px; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); pointer-events: none; background: radial-gradient(circle, color-mix(in srgb, var(--c) 10%, transparent) 0%, transparent 65%); transition: background .6s ease; }
+/* Fundo: só um halo largo e baixo na cor do setor. Sem grade, sem
+   segundo brilho — o card já é o ponto de atenção da tela. */
+.lg-glow {
+  position: fixed; inset: 0; pointer-events: none;
+  background: radial-gradient(58% 44% at 50% 42%, color-mix(in srgb, var(--c) 7%, transparent), transparent 72%);
+  transition: background .6s ease;
+}
 .lg-wrap { position: relative; z-index: 1; width: 100%; max-width: 940px; display: flex; flex-direction: column; gap: 14px; }
-.lg-back { align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--muted); font-size: 13px; padding: 4px 0; }
+.lg-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 26px; }
+.lg-brand { height: 20px; object-fit: contain; opacity: .75; }
+.lg-theme {
+  position: absolute; top: 20px; right: 20px; z-index: 2;
+  width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--muted); cursor: pointer;
+}
+.lg-theme:hover { color: var(--text); }
+.lg-back { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--muted); font-size: 13px; padding: 4px 0; }
 .lg-back:hover { color: var(--text); }
 
 .lg-card {
   --dur: .72s; --e: cubic-bezier(.76, 0, .24, 1);
   position: relative; overflow: hidden; height: 520px; border-radius: 24px;
-  background: var(--bg2); border: 1px solid color-mix(in srgb, var(--c) 18%, var(--border));
-  box-shadow: 0 0 60px color-mix(in srgb, var(--c) 6%, transparent), 0 24px 64px rgba(0,0,0,.35);
+  background: var(--bg2); border: 1px solid var(--border);
+  box-shadow: 0 24px 64px -24px rgba(0,0,0,.45);
 }
 
 /* painel colorido que desliza — usa a cor calibrada (--deep) */
@@ -41,7 +54,9 @@
 .lg-hero.login.active { transform: translateX(0); }
 .lg-hero img { width: 150px; height: 150px; object-fit: contain; margin-bottom: 18px; filter: drop-shadow(0 0 24px color-mix(in srgb, var(--c) 45%, transparent)); }
 .lg-hero h2 { font-size: 26px; font-weight: 800; color: #fff; }
-.lg-hero h2 i { color: var(--c); font-style: normal; }
+/* O painel colorido é escuro nos dois temas, então o acento precisa
+   ser uma versão clara da cor — no light, var(--c) sozinha some ali. */
+.lg-hero h2 i { color: color-mix(in srgb, var(--c) 45%, #fff); font-style: normal; }
 .lg-hero .tag { font-size: 11px; color: rgba(255,255,255,.58); letter-spacing: .1em; font-family: var(--fm); margin-top: 5px; }
 .lg-hero p { margin-top: 20px; font-size: 13.5px; line-height: 1.6; color: rgba(255,255,255,.80); max-width: 32ch; }
 

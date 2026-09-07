@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Sun, Moon } from 'lucide-react';
+import { useTheme, useBrandLogo } from '../contexts/ThemeContext';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Sector config ─────────────────────────────────────────────
@@ -14,6 +16,8 @@ const SECTORS = [
 ];
 
 export default function HomePage() {
+  const brand = useBrandLogo();
+  const { theme, toggle } = useTheme();
   const navigate = useNavigate();
   const [hovered, setHovered] = useState(null);
 
@@ -63,8 +67,8 @@ export default function HomePage() {
           )}
         </div>
         <span style={{
-          fontSize: 15, fontWeight: 700,
-          color: isHov ? '#fff' : 'rgba(255,255,255,0.7)',
+          fontSize: 15, fontWeight: 600,
+          color: isHov ? 'var(--text)' : 'var(--muted)',
           transition: 'color .2s',
         }}>
           {sector.label}
@@ -78,9 +82,18 @@ export default function HomePage() {
       <div style={S.grid} />
       <div style={S.glow} />
 
+      {/* Tema: aqui e no login, porque quem entra já escolhe como quer ver o app */}
+      <button
+        onClick={toggle}
+        title={theme === 'light' ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'}
+        style={{ position: 'absolute', top: 20, right: 20, width: 38, height: 38, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg2)', border: '1px solid var(--border)', color: 'var(--muted)', cursor: 'pointer', zIndex: 2 }}
+      >
+        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+      </button>
+
       <div style={S.content}>
         <div style={{ textAlign: 'center' }}>
-          <img src="/agencia.png" alt="Logo" style={{ width: 180, objectFit: 'contain', marginBottom: 8 }} />
+          <img src={brand} alt="Lince Performance" style={{ width: 180, objectFit: 'contain', marginBottom: 8 }} />
           <p style={S.sub}>Selecione seu setor para acessar o dashboard</p>
         </div>
 
@@ -104,10 +117,11 @@ export default function HomePage() {
 
 const S = {
   page: { minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
-  grid: { position: 'fixed', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(var(--soft) 1px,transparent 1px),linear-gradient(90deg,var(--soft) 1px,transparent 1px)', opacity: .35, backgroundSize: '32px 32px' },
-  glow: { position: 'fixed', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(circle,rgba(238,51,99,.06) 0%,transparent 65%)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' },
+  // Mesmo fundo do login: um halo largo, sem grade.
+  grid: { display: 'none' },
+  glow: { position: 'fixed', inset: 0, pointerEvents: 'none', background: 'radial-gradient(58% 44% at 50% 42%, var(--neon-dim), transparent 72%)' },
   content: { position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, padding: '40px 32px', width: '100%' },
-  title: { fontSize: 40, fontWeight: 800, color: '#fff', letterSpacing: '-1px', marginBottom: 10 },
+  title: { fontSize: 40, fontWeight: 600, color: 'var(--text)', letterSpacing: '-1px', marginBottom: 10 },
   sub: { fontSize: 14, color: 'var(--muted)' },
   adminLink: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: 11, letterSpacing: '.1em', fontFamily: 'var(--fm)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3, transition: 'color .2s' },
 };

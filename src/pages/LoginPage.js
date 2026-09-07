@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Sun, Moon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useSectorTheme } from '../contexts/ThemeContext';
+import { useSectorTheme, useTheme, useBrandLogo } from '../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../lib/firebase';
 import './Login.css';
 
@@ -30,6 +30,8 @@ export default function LoginPage({ forceFirst = false }) {
   const { user, loginCollaborator, loginAdmin, changePassword } = useAuth();
   const navigate = useNavigate();
 
+  const { theme, toggle } = useTheme();
+  const brand = useBrandLogo();
   const sectorId = params.sectorId || user?.sector || 'admin';
   const isAdmin = sectorId === 'admin';
   const sector = SECTOR_CONFIG[sectorId] || SECTOR_CONFIG.admin;
@@ -79,13 +81,23 @@ export default function LoginPage({ forceFirst = false }) {
 
   return (
     <div className="lg-page">
-      <div className="lg-grid" />
       <div className="lg-glow" />
 
+      <button
+        className="lg-theme"
+        onClick={toggle}
+        title={theme === 'light' ? 'Mudar para o tema escuro' : 'Mudar para o tema claro'}
+      >
+        {theme === 'light' ? <Moon size={16} /> : <Sun size={16} />}
+      </button>
+
       <div className="lg-wrap">
-        {view === 'login' && (
-          <button className="lg-back" onClick={() => navigate('/')}><ArrowLeft size={14} /> Voltar</button>
-        )}
+        <div className="lg-head">
+          {view === 'login'
+            ? <button className="lg-back" onClick={() => navigate('/')}><ArrowLeft size={14} /> Voltar</button>
+            : <span />}
+          <img className="lg-brand" src={brand} alt="Lince Performance" />
+        </div>
 
         <div className="lg-card">
           <div className={`lg-bg${view === 'login' ? ' login' : ''}`} />
