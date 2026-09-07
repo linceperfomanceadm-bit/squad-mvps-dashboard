@@ -24,10 +24,10 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
 
   return (
     <div style={S.overlay} onClick={onClose}>
-      <div style={{ ...S.modal, border: `1px solid ${colorRaw}35` }} onClick={e => e.stopPropagation()} className="fade-up">
+      <div style={{ ...S.modal, border: `1px solid color-mix(in srgb, ${colorRaw} 21%, transparent)` }} onClick={e => e.stopPropagation()} className="fade-up">
         <div style={S.header}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ ...S.icon, background: `${colorRaw}18`, border: `1px solid ${colorRaw}35` }}>
+            <div style={{ ...S.icon, background: `color-mix(in srgb, ${colorRaw} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${colorRaw} 21%, transparent)` }}>
               <PlusCircle size={18} color={color} />
             </div>
             <h2 style={S.title}>Cadastrar Entrega</h2>
@@ -54,7 +54,7 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
             <div style={S.optGroup}>
               {REQUESTING_SECTORS.map(s => (
                 <button type="button" key={s}
-                  style={{ ...S.opt, ...(form.requestingSector === s ? { background: `${colorRaw}18`, border: `1px solid ${colorRaw}40`, color } : {}) }}
+                  style={{ ...S.opt, ...(form.requestingSector === s ? { background: `color-mix(in srgb, ${colorRaw} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${colorRaw} 25%, transparent)`, color } : {}) }}
                   onClick={() => set('requestingSector', s)}
                 >
                   {s}
@@ -79,7 +79,7 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
             <div style={S.optGroup}>
               {APPROVAL_STATUS.map(s => (
                 <button type="button" key={s.id}
-                  style={{ ...S.opt, ...(form.approvalStatus === s.id ? { background: `${s.color}18`, border: `1px solid ${s.color}40`, color: s.color } : {}) }}
+                  style={{ ...S.opt, ...(form.approvalStatus === s.id ? { background: `color-mix(in srgb, ${s.color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${s.color} 25%, transparent)`, color: s.color } : {}) }}
                   onClick={() => set('approvalStatus', s.id)}
                 >
                   {s.label}
@@ -97,7 +97,7 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={S.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button type="submit" style={{ ...S.submitBtn, background: `linear-gradient(135deg,${colorRaw},${colorRaw}99)`, boxShadow: `0 4px 16px ${colorRaw}35` }} disabled={loading}>
+            <button type="submit" style={{ ...S.submitBtn, background: `linear-gradient(135deg,${colorRaw},color-mix(in srgb, ${colorRaw} 60%, transparent))`, boxShadow: `0 4px 16px color-mix(in srgb, ${colorRaw} 21%, transparent)` }} disabled={loading}>
               {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar'}
             </button>
           </div>
