@@ -43,7 +43,7 @@ export default function TaskCard({ task, onClick }) {
       {/* Rework flag */}
       {task.isRework && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <RefreshCw size={10} color="var(--amber)" />
+          <RefreshCw size={10} color="var(--amber)" style={{ animation: 'pulse 2.6s ease-in-out infinite' }} />
           <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.08em', fontFamily: 'var(--fm)' }}>
             AJUSTE #{task.reworkCount}
           </span>
@@ -84,7 +84,7 @@ export default function TaskCard({ task, onClick }) {
             {isFrozen
               ? <PauseCircle size={11} color={state.color} />
               : isLate
-                ? <AlertTriangle size={11} color="var(--neon)" />
+                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'pulse 2.6s ease-in-out infinite' }} />
                 : <Clock size={11} color={state.kind === 'warn' ? 'var(--amber)' : 'var(--muted)'} />}
             <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: state.color }}>
               {isFrozen
@@ -100,7 +100,7 @@ export default function TaskCard({ task, onClick }) {
           {/* Envelhecimento na aprovação: o prazo parou, mas a espera
               fica visível para ninguém se esconder atrás do congelamento. */}
           {isFrozen && waitingMs > 0 && (
-            <p style={{ fontSize: 10, color: '#777', fontFamily: 'var(--fm)', marginTop: 4 }}>
+            <p style={{ fontSize: 10, color: 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 4 }}>
               aguardando {task.responsibleName || 'aprovação'} há {formatBusinessDuration(waitingMs)}
             </p>
           )}

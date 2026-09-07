@@ -129,7 +129,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                     background: form.priority === p.id ? `${p.color}22` : 'var(--surface)',
                     border: `1px solid ${form.priority === p.id ? p.color : 'var(--border-h)'}`,
                     borderRadius: 8, padding: '8px 6px',
-                    color: form.priority === p.id ? p.color : '#888',
+                    color: form.priority === p.id ? p.color : 'var(--muted)',
                     fontSize: 12, fontWeight: form.priority === p.id ? 700 : 500,
                     cursor: 'pointer', transition: 'all .15s',
                   }}
@@ -207,7 +207,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               </div>
             ))}
             <button type="button"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px dashed rgba(255,255,255,.12)', borderRadius: 7, padding: '7px 12px', color: '#777', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px dashed rgba(255,255,255,.12)', borderRadius: 7, padding: '7px 12px', color: 'var(--dim)', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }}
               onClick={addLink}
             >
               <Plus size={13} /> Adicionar link
@@ -229,7 +229,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
             <button type="button"
-              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 18px', color: '#888', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
+              style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onClick={onClose}
             >
               Cancelar
@@ -254,6 +254,6 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
 const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
 };

@@ -29,7 +29,7 @@ function CompletionPopup({ task, onClose }) {
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--green-b)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, textAlign: 'center', boxShadow: '0 0 60px rgba(34,197,94,0.15), 0 24px 64px rgba(0,0,0,0.7)', animation: 'fadeUp .4s ease' }}>
         <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
         <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--green)', marginBottom: 6 }}>Task Concluída!</h2>
-        <p style={{ fontSize: 14, color: '#ccc', marginBottom: 24 }}>{task.name}</p>
+        <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>{task.name}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           {[
@@ -38,7 +38,7 @@ function CompletionPopup({ task, onClose }) {
             { label: 'Concluída', value: completed?.at ? format(new Date(completed.at), "dd/MM HH:mm") : '—' },
           ].map(item => (
             <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 10, padding: '12px 8px' }}>
-              <p style={{ fontSize: 10, color: '#888', marginBottom: 4, fontFamily: 'var(--fm)' }}>{item.label.toUpperCase()}</p>
+              <p style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--fm)' }}>{item.label.toUpperCase()}</p>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{item.value}</p>
             </div>
           ))}
@@ -63,18 +63,18 @@ function CompletionPopup({ task, onClose }) {
           <p style={{ fontSize: 12, fontWeight: 700, color: onTime ? 'var(--green)' : 'var(--neon)', fontFamily: 'var(--fm)' }}>
             {onTime ? '✓ ENTREGUE DENTRO DO PRAZO' : '⚠ ENTREGUE FORA DO PRAZO'}
           </p>
-          <p style={{ fontSize: 11, color: '#888', marginTop: 4, lineHeight: 1.5 }}>
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
             O que vale para o KPI é o momento do envio para aprovação — o tempo de espera do aprovador não conta contra quem executou.
           </p>
         </div>
 
         {collabTimes.length > 0 && (
           <div style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'left' }}>
-            <p style={{ fontSize: 10, color: '#888', fontFamily: 'var(--fm)', marginBottom: 10 }}>TEMPO POR COLABORADOR</p>
+            <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginBottom: 10 }}>TEMPO POR COLABORADOR</p>
             {collabTimes.map((c, i) => (
               <div key={c.name || i} style={{ padding: '6px 0', borderBottom: i < collabTimes.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, color: '#ddd', fontWeight: 500 }}>{c.name}</span>
+                  <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{c.name}</span>
                   <span style={{ fontSize: 13, color: 'var(--blue)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{formatBusinessDuration(c.totalMs)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
@@ -115,6 +115,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const [respBusy, setRespBusy] = useState(false);
   const [respError, setRespError] = useState('');
   const chatEndRef = useRef(null);
+  const commentRef = useRef(null);
 
   const respNames = (Array.isArray(task.responsibleNames) && task.responsibleNames.length) ? task.responsibleNames : (task.responsibleName ? [task.responsibleName] : []);
   const isResponsible = respNames.includes(currentUser) || task.responsibleName === currentUser;
@@ -147,6 +148,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
     if (!comment.trim()) return;
     const text = comment;
     setComment(''); // clear immediately for instant feedback
+    if (commentRef.current) commentRef.current.style.height = 'auto';
     await onAddComment(task.id, currentUser, currentUserSector, text);
   };
 
@@ -241,7 +243,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   {priority.label.toUpperCase()}
                 </span>
               )}
-              <span style={{ fontSize: 11, color: TASK_COLUMNS.find(c => c.id === task.status)?.color || '#aaa', fontFamily: 'var(--fm)', fontWeight: 600 }}>
+              <span style={{ fontSize: 11, color: TASK_COLUMNS.find(c => c.id === task.status)?.color || 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600 }}>
                 {TASK_COLUMNS.find(c => c.id === task.status)?.label}
               </span>
               {readOnly && (
@@ -251,8 +253,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               )}
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{task.name}</h2>
-            <p style={{ fontSize: 12, color: '#888' }}>
-              👤 {task.clientName} · Solicitado por <strong style={{ color: '#ccc' }}>{task.requestedBy}</strong>
+            <p style={{ fontSize: 12, color: 'var(--muted)' }}>
+              👤 {task.clientName} · Solicitado por <strong style={{ color: 'var(--muted)' }}>{task.requestedBy}</strong>
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -261,7 +263,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 <Trash2 size={14} />
               </button>
             )}
-            <button style={{ background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '6px 8px', color: '#aaa', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
+            <button style={{ background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '6px 8px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
               <X size={16} />
             </button>
           </div>
@@ -275,12 +277,12 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               {[
                 { label: 'RESPONSÁVEL', value: `${responsibleSector?.emoji || ''} ${principalName || '—'}`, color: responsibleSector?.color },
                 { label: 'SETOR',       value: responsibleSector?.label, color: responsibleSector?.color },
-                task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: dlState?.color || '#ddd', deadline: true, hint: dlState?.badge } : null,
-                { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : '#888' },
+                task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: dlState?.color || 'var(--text)', deadline: true, hint: dlState?.badge } : null,
+                { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--muted)' },
               ].filter(Boolean).map(item => (
                 <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
                   <span style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
-                  <span style={{ fontSize: 13, color: item.color || '#ddd', fontWeight: 600 }}>{item.value}</span>
+                  <span style={{ fontSize: 13, color: item.color || 'var(--text)', fontWeight: 600 }}>{item.value}</span>
                   {item.hint && (
                     <span style={{ fontSize: 9, letterSpacing: '.08em', color: item.color, fontFamily: 'var(--fm)', fontWeight: 700 }}>{item.hint}</span>
                   )}
@@ -295,7 +297,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {dlState?.frozen && (
               <div style={{ background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.3)', borderRadius: 10, padding: '10px 12px', marginBottom: 18 }}>
                 <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--purple)', fontFamily: 'var(--fm)' }}>PRAZO CONGELADO</p>
-                <p style={{ fontSize: 11, color: '#999', marginTop: 4, lineHeight: 1.55 }}>
+                <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.55 }}>
                   A task saiu da produção {dlState.label}. Enquanto estiver em aprovação ela não acumula atraso.
                   {waitingMs > 0 && ` Parada com ${task.responsibleName || 'o aprovador'} há ${formatBusinessDuration(waitingMs)}.`}
                   {' '}Se voltar para ajuste, esse tempo é devolvido ao prazo.
@@ -318,8 +320,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   {timeStats.byPerson.map((p, i) => (
                     <div key={p.name || i} style={{ padding: '5px 0', borderBottom: i < timeStats.byPerson.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span style={{ fontSize: 12, color: '#ddd', fontWeight: 600 }}>{p.name}</span>
-                        <span style={{ fontSize: 12, color: '#bbb', fontFamily: 'var(--fm)' }}>{formatBusinessDuration(p.totalMs)}</span>
+                        <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{p.name}</span>
+                        <span style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{formatBusinessDuration(p.totalMs)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
                         {p.workMs > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(p.workMs)}</span>}
@@ -363,7 +365,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                     >
                       {sec?.emoji} {name}
                       {isPrincipal && (
-                        <span style={{ fontSize: 9, fontFamily: 'var(--fm)', color: '#888', fontWeight: 700, letterSpacing: '.06em' }}>PRINCIPAL</span>
+                        <span style={{ fontSize: 9, fontFamily: 'var(--fm)', color: 'var(--muted)', fontWeight: 700, letterSpacing: '.06em' }}>PRINCIPAL</span>
                       )}
                       {!isPrincipal && canEditResponsibles && (
                         <button
@@ -430,10 +432,10 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {showDeadlineForm && (
               <div style={{ background: 'var(--surface)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Alterar data de entrega</p>
-                <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>NOVA DATA</label>
-                <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, colorScheme: 'dark' }} />
-                <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>JUSTIFICATIVA *</label>
-                <textarea value={deadlineReason} onChange={e => setDeadlineReason(e.target.value)} rows={2} placeholder="Por que a data está mudando?" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, resize: 'vertical', fontFamily: 'var(--f)' }} />
+                <label style={{ fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>NOVA DATA</label>
+                <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, marginTop: 5, marginBottom: 10, colorScheme: 'dark' }} />
+                <label style={{ fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>JUSTIFICATIVA *</label>
+                <textarea value={deadlineReason} onChange={e => setDeadlineReason(e.target.value)} rows={2} placeholder="Por que a data está mudando?" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, marginTop: 5, marginBottom: 10, resize: 'vertical', fontFamily: 'var(--f)' }} />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={async () => {
                     if (!newDeadline) return;
@@ -463,7 +465,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 return (
                   <div key={i} style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '9px 12px', marginBottom: 7 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600, color: '#ccc' }}>{name}</span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>{name}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                         {addedBy && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{addedBy}</span>}
                         {canDelete && (
@@ -549,7 +551,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14 }}>
                     <p style={{ fontSize: 12, color: 'var(--neon)', marginBottom: 10, fontWeight: 600 }}>Descreva o que precisa ser ajustado *</p>
                     <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical', marginBottom: 10 }} value={reworkNote} onChange={e => setReworkNote(e.target.value)} placeholder="Explique detalhadamente o que precisa ser alterado..." />
-                    <p style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Quem vai fazer o ajuste?</p>
+                    <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Quem vai fazer o ajuste?</p>
                     <select style={{ ...S.select, marginBottom: 8 }} value={newResponsible.sector} onChange={e => setNewResponsible({ sector: e.target.value, name: '' })}>
                       <option value="">Selecionar setor</option>
                       {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
@@ -571,7 +573,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
             {showDeleteConfirm && (
               <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 12 }}>
-                <p style={{ fontSize: 13, color: '#ddd', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
+                <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
                   <button style={S.cancelBtn} onClick={() => setShowDeleteConfirm(false)}>Não</button>
@@ -595,13 +597,30 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                       {c.createdAt ? format(new Date(c.createdAt), "dd/MM HH:mm", { locale: ptBR }) : ''}
                     </span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.5 }}>{c.text}</p>
+                  {/* pre-wrap: o comentário é texto livre — quebras de linha e
+                      parágrafos do autor precisam sobreviver à exibição. */}
+                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{c.text}</p>
                 </div>
               ))}
               <div ref={chatEndRef} />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <input style={{ ...S.input, flex: 1 }} value={comment} onChange={e => setComment(e.target.value)} placeholder="Escreva um comentário..." onKeyDown={e => e.key === 'Enter' && !e.shiftKey && handleSendComment()} />
+              <textarea
+                ref={commentRef}
+                rows={1}
+                style={{ ...S.input, flex: 1, resize: 'none', maxHeight: 160, overflowY: 'auto', lineHeight: 1.5, fontFamily: 'var(--f)' }}
+                value={comment}
+                onChange={e => {
+                  setComment(e.target.value);
+                  // Cresce junto com o texto, até o teto do maxHeight.
+                  e.target.style.height = 'auto';
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 160)}px`;
+                }}
+                placeholder="Escreva um comentário...    (Shift + Enter quebra a linha)"
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendComment(); }
+                }}
+              />
               <button style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 8, padding: '9px 12px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }} onClick={handleSendComment} disabled={!comment.trim()}>
                 <Send size={15} />
               </button>
@@ -624,8 +643,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 }
 
 const S = {
-  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   actionBtn: (color) => ({ background: `${color}15`, border: `1px solid ${color}35`, borderRadius: 9, padding: '10px 14px', color, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'all .15s' }),
-  cancelBtn: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 14px', color: '#aaa', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
+  cancelBtn: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 14px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
 };
