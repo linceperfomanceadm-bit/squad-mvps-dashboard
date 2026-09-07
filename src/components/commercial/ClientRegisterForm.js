@@ -2,16 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { Check, Paperclip, X } from 'lucide-react';
 import { SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE_CONFIG, WD_WEB_SERVICES } from '../../lib/firebase';
 
-const COLOR = SECTORS.cs.color;
-const MIN_SERVICE_DESC = 350;
-const MIN_BRIEFING = 200;
+const COLOR = 'var(--c)';
 
 /*
  * CADASTRO DE CLIENTE — CS Comercial (e admin, na ausência dela).
  *
  * É o ponto de entrada do cliente no app. Ao salvar, o cliente nasce
- * em `stage: 'staffing'` e fica invisível para os setores até que os
- * líderes dos setores contratados indiquem os responsáveis.
+ * em `stage: 'kickoff'` — a call de Kick Off é a primeira etapa. Ele
+ * fica invisível para os setores até que, depois do Kick Off, os
+ * líderes indiquem os responsáveis e a call de onboarding seja
+ * agendada pela CS Operacional.
  *
  * Etapa 1 — Cliente (nome na base + qualificação do contrato:
  *           empresa, representante legal e endereço destrinchado)
@@ -158,7 +158,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
   // responsáveis, senão nasce sem ninguém para tocar.
   const step2Valid = (
     data.services.length > 0 &&
-    data.services.every(id => (data.serviceDescs[id] || '').trim().length >= MIN_SERVICE_DESC) &&
+    data.services.every(id => (data.serviceDescs[id] || '').trim().length > 0) &&
     data.sectors.length > 0 &&
     data.csResponsible &&
     (!data.wdService || data.sectors.includes('webdesign')) &&
@@ -177,7 +177,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
     totalNum > 0 &&
     data.contractMonths &&
     data.paymentMethod &&
-    (data.briefing || '').trim().length >= MIN_BRIEFING &&
+    (data.briefing || '').trim().length > 0 &&
     (data.paymentType === 'avista' ||
       (data.customInstallment ? data.customPlan.trim() : (instCount > 0 && instValue > 0 && sumMatches)))
   );
@@ -213,7 +213,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
 
     const clientData = {
       name: data.clientName.trim(),
-      stage: 'staffing',
+      stage: 'kickoff',
       // A CS Operacional já entra definida. Os demais setores ficam
       // em branco até o líder de cada um indicar quem assume.
       responsibles: { cs: [data.csResponsible] },
@@ -451,12 +451,12 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           {data.services.map(id => {
             const label = SALE_SERVICES.find(s => s.id === id)?.label || id;
             const len = (data.serviceDescs[id] || '').trim().length;
-            const ok = len >= MIN_SERVICE_DESC;
+            const ok = len > 0;
             return (
               <div key={id}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <p style={LBL}>O QUE FOI VENDIDO — {label.toUpperCase()} *</p>
-                  <span style={{ fontSize: 10, fontFamily: 'var(--fm)', color: ok ? 'var(--green)' : 'var(--amber)' }}>{len}/{MIN_SERVICE_DESC}</span>
+                  <span style={{ fontSize: 10, fontFamily: 'var(--fm)', color: ok ? 'var(--green)' : 'var(--amber)' }}>{len}</span>
                 </div>
                 <textarea
                   value={data.serviceDescs[id] || ''}
@@ -481,7 +481,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
                   ? 'O serviço de WebDesign exige o setor WebDesign marcado.'
                   : data.hasIdVisual && !data.sectors.includes('design')
                     ? 'O ID Visual exige o setor Design marcado.'
-                    : `Marque ao menos um serviço, descreva cada um com no mínimo ${MIN_SERVICE_DESC} caracteres e escolha ao menos um setor.`
+                    : 'Marque ao menos um serviço, descreva cada um e escolha ao menos um setor.'
             } />
           )}
         </div>
@@ -535,8 +535,8 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <p style={LBL}>BRIEFING *</p>
-              <span style={{ fontSize: 10, fontFamily: 'var(--fm)', color: (data.briefing || '').trim().length >= MIN_BRIEFING ? 'var(--green)' : 'var(--amber)' }}>
-                {(data.briefing || '').trim().length}/{MIN_BRIEFING}
+              <span style={{ fontSize: 10, fontFamily: 'var(--fm)', color: (data.briefing || '').trim().length > 0 ? 'var(--green)' : 'var(--amber)' }}>
+                {(data.briefing || '').trim().length}
               </span>
             </div>
             <textarea value={data.briefing} onChange={e => set('briefing', e.target.value)} rows={5} placeholder="Contexto do cliente para o time: o que ele faz, público, concorrentes, referências, tom de voz, expectativas, prazos combinados..." style={{ ...INP, marginTop: 6, resize: 'vertical' }} />
@@ -578,7 +578,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
               {submitting ? 'Cadastrando...' : '✓ Cadastrar Cliente'}
             </button>
           </div>
-          {!step3Valid && <Hint text={`Valor, duração, forma de pagamento e briefing (mín. ${MIN_BRIEFING} caracteres) são obrigatórios.`} />}
+          {!step3Valid && <Hint text="Valor, duração, forma de pagamento e briefing são obrigatórios." />}
         </div>
       )}
 
