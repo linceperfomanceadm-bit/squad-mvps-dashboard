@@ -34,6 +34,14 @@ export function ThemeProvider({ children }) {
 
 export const useTheme = () => useContext(ThemeContext);
 
+// A logomarca da Lince é clara sobre fundo escuro e escura sobre fundo
+// claro. Duas imagens, uma decisão só — use em qualquer lugar que
+// mostre a marca da agência.
+export const useBrandLogo = () => {
+  const { theme } = useTheme();
+  return theme === 'light' ? '/agencia-light.png' : '/agencia.png';
+};
+
 // ─── Cor do painel ────────────────────────────────────────────
 // Pinta --c / --c2 / --on no <html> conforme o setor e o tema.
 // É o que faz o item ativo da sidebar, os botões primários e os
