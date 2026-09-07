@@ -517,7 +517,7 @@ function LockedCard({ client, pendentes, meus = [], onStaff, onNudge }) {
               <span style={{ fontSize: 12, color: ok ? (SECTORS[sid]?.color || 'var(--text)') : 'var(--muted)' }}>
                 {ok ? '✓' : '○'} {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
               </span>
-              <span style={{ fontSize: 11, color: ok ? '#bbb' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
+              <span style={{ fontSize: 11, color: ok ? 'var(--muted)' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
                 {ok ? lista.join(', ') : 'pendente'}
               </span>
             </div>
@@ -655,7 +655,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
             {sectors.map(([sid, v]) => (
               <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
                 <span style={{ fontSize: 12, color: SECTORS[sid]?.color || 'var(--text)' }}>{SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}</span>
-                <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'var(--fm)', textAlign: 'right' }}>{Array.isArray(v) ? v.join(', ') : v}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>{Array.isArray(v) ? v.join(', ') : v}</span>
               </div>
             ))}
           </div>
@@ -697,7 +697,7 @@ function OpsCard({ client, health, onClick }) {
         <Mini label="Atrasadas" value={health.stats.overdue} color={health.stats.overdue > 0 ? lv.color : 'var(--muted)'} />
         <Mini label="Ajustes" value={health.stats.reworks} color={health.stats.reworks > 0 ? 'var(--amber)' : 'var(--muted)'} />
       </div>
-      <p style={{ fontSize: 11, color: '#777', marginTop: 10, paddingLeft: 6, lineHeight: 1.5 }}>{health.reasons.join(' · ')}</p>
+      <p style={{ fontSize: 11, color: 'var(--dim)', marginTop: 10, paddingLeft: 6, lineHeight: 1.5 }}>{health.reasons.join(' · ')}</p>
     </button>
   );
 }
@@ -723,7 +723,7 @@ function ClientHealthCard({ client, health, onSet }) {
           : <Tag text="SEM AVALIAÇÃO" color="var(--muted)" />}
       </div>
       {health.note && (
-        <p style={{ fontSize: 12, color: '#ddd', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        <p style={{ fontSize: 12, color: 'var(--text)', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 10px', marginTop: 10, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
           {health.note}
         </p>
       )}
@@ -836,7 +836,7 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth }) {
             {sectors.map(([sid, v]) => (
               <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
                 <span style={{ fontSize: 12, color: SECTORS[sid]?.color || 'var(--text)' }}>{SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}</span>
-                <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'var(--fm)', textAlign: 'right' }}>{Array.isArray(v) ? v.join(', ') : v}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>{Array.isArray(v) ? v.join(', ') : v}</span>
               </div>
             ))}
           </Section>

@@ -439,7 +439,7 @@ function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
                 <span style={{ fontSize: 12, color: ok ? (SECTORS[sid]?.color || 'var(--text)') : 'var(--muted)' }}>
                   {ok ? '✓' : '○'} {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
                 </span>
-                <span style={{ fontSize: 11, color: ok ? '#bbb' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
+                <span style={{ fontSize: 11, color: ok ? 'var(--muted)' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
                   {ok ? nomes.join(', ') : 'pendente'}
                 </span>
               </div>
@@ -448,13 +448,13 @@ function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
           {asArray(client.responsibles?.cs).length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginTop: 6, paddingTop: 6, borderTop: '1px solid var(--border)' }}>
               <span style={{ fontSize: 12, color: COLOR }}>🎧 CS Operacional</span>
-              <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'var(--fm)' }}>{asArray(client.responsibles.cs).join(', ')}</span>
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{asArray(client.responsibles.cs).join(', ')}</span>
             </div>
           )}
         </div>
 
         {dias != null && (
-          <p style={{ fontSize: 11, color: atrasado ? 'var(--neon)' : '#666', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+          <p style={{ fontSize: 11, color: atrasado ? 'var(--neon)' : 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Clock size={11} /> cadastrado há {dias} dia{dias !== 1 ? 's' : ''}
             {client.staffing?.startedAt ? ` · ${fmtDate(client.staffing.startedAt)}` : ''}
           </p>
