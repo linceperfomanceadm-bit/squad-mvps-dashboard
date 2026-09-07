@@ -28,7 +28,7 @@ export default function TaskCard({ task, onClick }) {
     <div
       onClick={onClick}
       style={{
-        background: 'rgba(12,12,24,.92)',
+        background: 'var(--bg2)',
         border: `1px solid ${task.isRework ? 'rgba(245,158,11,0.4)' : isLate ? 'rgba(238,51,99,0.35)' : 'rgba(255,255,255,0.07)'}`,
         borderRadius: 10,
         padding: '12px 13px',
@@ -68,7 +68,7 @@ export default function TaskCard({ task, onClick }) {
       </div>
 
       {/* Task name */}
-      <p style={{ fontSize: 13, fontWeight: 600, color: '#f0f0ff', marginBottom: 4, lineHeight: 1.4 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4, lineHeight: 1.4 }}>
         {task.name}
       </p>
 

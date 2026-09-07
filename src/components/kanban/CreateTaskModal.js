@@ -70,7 +70,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
     >
       <div
         style={{
-          background: '#0e0e1c', border: '1px solid var(--neon-border)',
+          background: 'var(--bg2)', border: '1px solid var(--neon-border)',
           borderRadius: 18, width: '100%', maxWidth: 580,
           boxShadow: '0 24px 80px rgba(0,0,0,.8)',
           height: 'fit-content', flexShrink: 0,
@@ -84,9 +84,9 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={18} color="var(--neon)" />
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>Nova Task</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Nova Task</h2>
           </div>
-          <button style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
+          <button style={{ background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
             <X size={16} color="#aaa" />
           </button>
         </div>
@@ -126,8 +126,8 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                 <button type="button" key={p.id}
                   style={{
                     flex: 1,
-                    background: form.priority === p.id ? `${p.color}22` : 'rgba(255,255,255,.04)',
-                    border: `1px solid ${form.priority === p.id ? p.color : 'rgba(255,255,255,.1)'}`,
+                    background: form.priority === p.id ? `${p.color}22` : 'var(--surface)',
+                    border: `1px solid ${form.priority === p.id ? p.color : 'var(--border-h)'}`,
                     borderRadius: 8, padding: '8px 6px',
                     color: form.priority === p.id ? p.color : '#888',
                     fontSize: 12, fontWeight: form.priority === p.id ? 700 : 500,
@@ -163,9 +163,9 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                           return (
                             <button key={c.id} type="button" onClick={() => set('responsibleNames', active ? form.responsibleNames.filter(n => n !== c.name) : [...form.responsibleNames, c.name])} style={{
                               fontSize: 12, fontWeight: 600, padding: '6px 12px', borderRadius: 16, cursor: 'pointer',
-                              background: active ? 'var(--neon-dim)' : '#12121f',
+                              background: active ? 'var(--neon-dim)' : 'var(--bg3)',
                               color: active ? 'var(--neon)' : 'var(--muted)',
-                              border: `1px solid ${active ? 'var(--neon-border)' : 'rgba(255,255,255,.1)'}`,
+                              border: `1px solid ${active ? 'var(--neon-border)' : 'var(--border-h)'}`,
                             }}>
                               {active ? '✓ ' : ''}{c.name}
                             </button>
@@ -179,9 +179,9 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
           {/* Links with name */}
           <div style={S.field}>
             <label style={S.label}>LINKS DO MATERIAL (OPCIONAL)</label>
-            <p style={{ fontSize: 11, color: '#555', marginBottom: 8 }}>Adicione uma descrição para cada link, para facilitar a identificação</p>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Adicione uma descrição para cada link, para facilitar a identificação</p>
             {links.map((link, i) => (
-              <div key={i} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
+              <div key={i} style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px', marginBottom: 8 }}>
                 <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
                   <input
                     style={{ ...S.input, flex: 1 }}
@@ -191,7 +191,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                   />
                   {links.length > 1 && (
                     <button type="button"
-                      style={{ background: 'rgba(238,51,99,.08)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
+                      style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 7, padding: '6px 8px', color: 'var(--neon)', cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0 }}
                       onClick={() => removeLink(i)}
                     >
                       <Trash2 size={13} />
@@ -207,7 +207,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               </div>
             ))}
             <button type="button"
-              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(255,255,255,.03)', border: '1px dashed rgba(255,255,255,.12)', borderRadius: 7, padding: '7px 12px', color: '#777', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface)', border: '1px dashed rgba(255,255,255,.12)', borderRadius: 7, padding: '7px 12px', color: '#777', fontSize: 12, cursor: 'pointer', width: '100%', justifyContent: 'center' }}
               onClick={addLink}
             >
               <Plus size={13} /> Adicionar link
@@ -235,11 +235,11 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               Cancelar
             </button>
             <button type="submit"
-              style={{ background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 }}
+              style={{ background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '10px 22px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 }}
               disabled={loading}
             >
               {loading
-                ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} />
+                ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} />
                 : 'Criar Task'}
             </button>
           </div>
@@ -253,7 +253,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
 
 const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
-  label: { fontSize: 10, letterSpacing: '.14em', color: '#666', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
+  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
 };

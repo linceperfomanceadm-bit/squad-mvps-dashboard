@@ -195,7 +195,7 @@ export default function TaskKanban({
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
             {title}
           </h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -213,7 +213,7 @@ export default function TaskKanban({
         {!readOnly && (
           <button
             onClick={() => setShowCreate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
           >
             <Plus size={15} /> Nova Task
           </button>
@@ -286,7 +286,7 @@ export default function TaskKanban({
             <div
               key={col.id}
               style={{
-                background: isDragTarget ? `${col.color}08` : 'rgba(12,12,24,.6)',
+                background: isDragTarget ? `${col.color}08` : 'var(--bg2)',
                 border: `1px solid ${isDragTarget ? `${col.color}40` : `${col.color}18`}`,
                 borderRadius: 12, padding: '12px 10px', minHeight: 200,
                 transition: 'all .15s ease',
@@ -382,12 +382,12 @@ export default function TaskKanban({
 
 const S = {
   filter: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none',
     cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 180,
   },
   filterActive: {
-    borderColor: 'var(--neon-border)', background: 'rgba(238,51,99,.08)', color: 'var(--neon)',
+    borderColor: 'var(--neon-border)', background: 'var(--neon-dim)', color: 'var(--neon)',
   },
   clearBtn: {
     display: 'flex', alignItems: 'center', gap: 6, background: 'transparent',

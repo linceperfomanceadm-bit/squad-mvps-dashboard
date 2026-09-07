@@ -26,9 +26,9 @@ function CompletionPopup({ task, onClose }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
-      <div style={{ background: '#0e0e1c', border: '1px solid var(--green-b)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, textAlign: 'center', boxShadow: '0 0 60px rgba(34,197,94,0.15), 0 24px 64px rgba(0,0,0,0.7)', animation: 'fadeUp .4s ease' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--green-b)', borderRadius: 20, padding: 32, width: '100%', maxWidth: 460, textAlign: 'center', boxShadow: '0 0 60px rgba(34,197,94,0.15), 0 24px 64px rgba(0,0,0,0.7)', animation: 'fadeUp .4s ease' }}>
         <div style={{ fontSize: 56, marginBottom: 12 }}>🎉</div>
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'var(--green)', marginBottom: 6 }}>Task Concluída!</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--green)', marginBottom: 6 }}>Task Concluída!</h2>
         <p style={{ fontSize: 14, color: '#ccc', marginBottom: 24 }}>{task.name}</p>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
@@ -37,9 +37,9 @@ function CompletionPopup({ task, onClose }) {
             { label: 'Iniciada',  value: started?.at   ? format(new Date(started.at),   "dd/MM HH:mm") : '—' },
             { label: 'Concluída', value: completed?.at ? format(new Date(completed.at), "dd/MM HH:mm") : '—' },
           ].map(item => (
-            <div key={item.label} style={{ background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, padding: '12px 8px' }}>
+            <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 10, padding: '12px 8px' }}>
               <p style={{ fontSize: 10, color: '#888', marginBottom: 4, fontFamily: 'var(--fm)' }}>{item.label.toUpperCase()}</p>
-              <p style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{item.value}</p>
+              <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{item.value}</p>
             </div>
           ))}
         </div>
@@ -47,19 +47,19 @@ function CompletionPopup({ task, onClose }) {
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
           <div style={{ background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 10, color: 'var(--green)', marginBottom: 4, fontFamily: 'var(--fm)' }}>TEMPO ÚTIL</p>
-            <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--green)' }}>{totalTime}</p>
+            <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--green)' }}>{totalTime}</p>
           </div>
           <div style={{ background: 'rgba(56,189,248,.08)', border: '1px solid rgba(56,189,248,.25)', borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 10, color: 'var(--blue)', marginBottom: 4, fontFamily: 'var(--fm)' }}>EM APROVAÇÃO</p>
-            <p style={{ fontSize: 18, fontWeight: 800, color: 'var(--blue)' }}>{formatBusinessDuration(stats.approvalMs)}</p>
+            <p style={{ fontSize: 18, fontWeight: 600, color: 'var(--blue)' }}>{formatBusinessDuration(stats.approvalMs)}</p>
           </div>
           <div style={{ background: task.reworkCount > 0 ? 'var(--amber-dim)' : 'var(--green-dim)', border: `1px solid ${task.reworkCount > 0 ? 'var(--amber-b)' : 'var(--green-b)'}`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 10, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)', marginBottom: 4, fontFamily: 'var(--fm)' }}>AJUSTES</p>
-            <p style={{ fontSize: 18, fontWeight: 800, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)' }}>{task.reworkCount || 0}</p>
+            <p style={{ fontSize: 18, fontWeight: 600, color: task.reworkCount > 0 ? 'var(--amber)' : 'var(--green)' }}>{task.reworkCount || 0}</p>
           </div>
         </div>
 
-        <div style={{ background: onTime ? 'var(--green-dim)' : 'rgba(238,51,99,.08)', border: `1px solid ${onTime ? 'var(--green-b)' : 'var(--neon-border)'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
+        <div style={{ background: onTime ? 'var(--green-dim)' : 'var(--neon-dim)', border: `1px solid ${onTime ? 'var(--green-b)' : 'var(--neon-border)'}`, borderRadius: 10, padding: '10px 12px', marginBottom: 16 }}>
           <p style={{ fontSize: 12, fontWeight: 700, color: onTime ? 'var(--green)' : 'var(--neon)', fontFamily: 'var(--fm)' }}>
             {onTime ? '✓ ENTREGUE DENTRO DO PRAZO' : '⚠ ENTREGUE FORA DO PRAZO'}
           </p>
@@ -69,25 +69,25 @@ function CompletionPopup({ task, onClose }) {
         </div>
 
         {collabTimes.length > 0 && (
-          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'left' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 10, padding: '12px 16px', marginBottom: 20, textAlign: 'left' }}>
             <p style={{ fontSize: 10, color: '#888', fontFamily: 'var(--fm)', marginBottom: 10 }}>TEMPO POR COLABORADOR</p>
             {collabTimes.map((c, i) => (
-              <div key={c.name || i} style={{ padding: '6px 0', borderBottom: i < collabTimes.length - 1 ? '1px solid rgba(255,255,255,.06)' : 'none' }}>
+              <div key={c.name || i} style={{ padding: '6px 0', borderBottom: i < collabTimes.length - 1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 13, color: '#ddd', fontWeight: 500 }}>{c.name}</span>
                   <span style={{ fontSize: 13, color: 'var(--blue)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{formatBusinessDuration(c.totalMs)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 3 }}>
-                  {c.workMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(c.workMs)}</span>}
+                  {c.workMs > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(c.workMs)}</span>}
                   {c.reworkMs > 0 && <span style={{ fontSize: 10, color: 'var(--amber)', fontFamily: 'var(--fm)' }}>retrabalho {formatBusinessDuration(c.reworkMs)}</span>}
-                  {c.approvalMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(c.approvalMs)}</span>}
+                  {c.approvalMs > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(c.approvalMs)}</span>}
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        <button onClick={onClose} style={{ background: 'linear-gradient(135deg,var(--green),#16a34a)', border: 'none', borderRadius: 10, padding: '12px 32px', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
+        <button onClick={onClose} style={{ background: 'linear-gradient(135deg,var(--green),#16a34a)', border: 'none', borderRadius: 10, padding: '12px 32px', color: 'var(--on)', fontSize: 14, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
           Fechar
         </button>
       </div>
@@ -223,7 +223,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
       onClick={onClose}
     >
       <div
-        style={{ background: '#0c0c1e', border: '1px solid rgba(255,255,255,.1)', borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,.8)', flexShrink: 0 }}
+        style={{ background: 'var(--bg2)', border: '1px solid var(--border-h)', borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,.8)', flexShrink: 0 }}
         onClick={e => e.stopPropagation()}
         className="fade-up"
       >
@@ -245,23 +245,23 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 {TASK_COLUMNS.find(c => c.id === task.status)?.label}
               </span>
               {readOnly && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'rgba(255,255,255,.06)', color: '#8F97A0', border: '1px solid rgba(255,255,255,.12)', fontFamily: 'var(--fm)' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: 'var(--soft)', color: '#8F97A0', border: '1px solid rgba(255,255,255,.12)', fontFamily: 'var(--fm)' }}>
                   ACOMPANHAMENTO
                 </span>
               )}
             </div>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: '#fff', marginBottom: 4 }}>{task.name}</h2>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{task.name}</h2>
             <p style={{ fontSize: 12, color: '#888' }}>
               👤 {task.clientName} · Solicitado por <strong style={{ color: '#ccc' }}>{task.requestedBy}</strong>
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {(isAdmin || isRequester) && !readOnly && (
-              <button style={{ background: 'rgba(238,51,99,.1)', border: '1px solid rgba(238,51,99,.25)', borderRadius: 8, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(true)}>
+              <button style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 8, padding: '6px 8px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => setShowDeleteConfirm(true)}>
                 <Trash2 size={14} />
               </button>
             )}
-            <button style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 8px', color: '#aaa', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
+            <button style={{ background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '6px 8px', color: '#aaa', display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={onClose}>
               <X size={16} />
             </button>
           </div>
@@ -269,7 +269,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {/* Left */}
-          <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', borderRight: '1px solid rgba(255,255,255,.06)' }}>
+          <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', borderRight: '1px solid var(--border)' }}>
             {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
               {[
@@ -278,14 +278,14 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 task.deadline ? { label: 'PRAZO', value: format(parseLocalDate(task.deadline), "dd/MM/yyyy", { locale: ptBR }), color: dlState?.color || '#ddd', deadline: true, hint: dlState?.badge } : null,
                 { label: 'AJUSTES',     value: task.reworkCount || 0,   color: task.reworkCount > 0 ? 'var(--amber)' : '#888' },
               ].filter(Boolean).map(item => (
-                <div key={item.label} style={{ background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
-                  <span style={{ fontSize: 9, letterSpacing: '.1em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
+                <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.08)', borderRadius: 8, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 4, position: 'relative' }}>
+                  <span style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{item.label}</span>
                   <span style={{ fontSize: 13, color: item.color || '#ddd', fontWeight: 600 }}>{item.value}</span>
                   {item.hint && (
                     <span style={{ fontSize: 9, letterSpacing: '.08em', color: item.color, fontFamily: 'var(--fm)', fontWeight: 700 }}>{item.hint}</span>
                   )}
                   {item.deadline && (isResponsible || isAdmin) && !readOnly && onChangeDeadline && (
-                    <button onClick={() => { setNewDeadline(task.deadline || ''); setDeadlineReason(''); setShowDeadlineForm(true); }} style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>alterar</button>
+                    <button onClick={() => { setNewDeadline(task.deadline || ''); setDeadlineReason(''); setShowDeadlineForm(true); }} style={{ position: 'absolute', top: 8, right: 8, background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 6, padding: '3px 8px', color: 'var(--muted)', fontSize: 10, cursor: 'pointer', fontWeight: 600 }}>alterar</button>
                   )}
                 </div>
               ))}
@@ -294,7 +294,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {/* Aviso de congelamento do prazo */}
             {dlState?.frozen && (
               <div style={{ background: 'rgba(167,139,250,.08)', border: '1px solid rgba(167,139,250,.3)', borderRadius: 10, padding: '10px 12px', marginBottom: 18 }}>
-                <p style={{ fontSize: 12, fontWeight: 700, color: '#a78bfa', fontFamily: 'var(--fm)' }}>PRAZO CONGELADO</p>
+                <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--purple)', fontFamily: 'var(--fm)' }}>PRAZO CONGELADO</p>
                 <p style={{ fontSize: 11, color: '#999', marginTop: 4, lineHeight: 1.55 }}>
                   A task saiu da produção {dlState.label}. Enquanto estiver em aprovação ela não acumula atraso.
                   {waitingMs > 0 && ` Parada com ${task.responsibleName || 'o aprovador'} há ${formatBusinessDuration(waitingMs)}.`}
@@ -307,29 +307,29 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {(timeStats.byPerson || []).length > 0 && (
               <div style={{ marginBottom: 18 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
+                  <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
                     TEMPO ÚTIL {timeStats.running ? '(em andamento)' : ''}
                   </p>
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--blue)', fontFamily: 'var(--fm)' }}>
                     {formatBusinessDuration(timeStats.totalMs)}
                   </span>
                 </div>
-                <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px' }}>
+                <div style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '10px 12px' }}>
                   {timeStats.byPerson.map((p, i) => (
-                    <div key={p.name || i} style={{ padding: '5px 0', borderBottom: i < timeStats.byPerson.length - 1 ? '1px solid rgba(255,255,255,.05)' : 'none' }}>
+                    <div key={p.name || i} style={{ padding: '5px 0', borderBottom: i < timeStats.byPerson.length - 1 ? '1px solid var(--border)' : 'none' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 12, color: '#ddd', fontWeight: 600 }}>{p.name}</span>
                         <span style={{ fontSize: 12, color: '#bbb', fontFamily: 'var(--fm)' }}>{formatBusinessDuration(p.totalMs)}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 10, marginTop: 2, flexWrap: 'wrap' }}>
-                        {p.workMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(p.workMs)}</span>}
+                        {p.workMs > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>execução {formatBusinessDuration(p.workMs)}</span>}
                         {p.reworkMs > 0 && <span style={{ fontSize: 10, color: 'var(--amber)', fontFamily: 'var(--fm)' }}>retrabalho {formatBusinessDuration(p.reworkMs)}</span>}
-                        {p.approvalMs > 0 && <span style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(p.approvalMs)}</span>}
+                        {p.approvalMs > 0 && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>aprovação {formatBusinessDuration(p.approvalMs)}</span>}
                       </div>
                     </div>
                   ))}
                 </div>
-                <p style={{ fontSize: 10, color: '#555', marginTop: 6, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
                   Conta apenas expediente: seg a sex, 09h às 18h48. Um "d" equivale a um dia útil inteiro.
                 </p>
               </div>
@@ -338,7 +338,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {/* Responsáveis (principal + extras) */}
             <div style={{ marginBottom: 18 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
+                <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase' }}>
                   RESPONSÁVEIS ({respNames.length})
                 </p>
                 {canEditResponsibles && !showRespForm && (
@@ -381,7 +381,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               </div>
 
               {showRespForm && (
-                <div style={{ background: 'rgba(238,51,99,.05)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginTop: 10 }}>
+                <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginTop: 10 }}>
                   <p style={{ fontSize: 12, color: 'var(--neon)', fontWeight: 600, marginBottom: 10 }}>Adicionar responsável</p>
                   <select
                     style={{ ...S.select, marginBottom: 8 }}
@@ -420,7 +420,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 <p style={{ fontSize: 11, color: 'var(--neon)', marginTop: 8 }}>⚠ {respError}</p>
               )}
               {canEditResponsibles && respNames.length > 1 && !showRespForm && (
-                <p style={{ fontSize: 10, color: '#555', marginTop: 8, lineHeight: 1.5 }}>
+                <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
                   O responsável principal é quem entrega a task e conta nas métricas. Os demais enxergam a task no kanban e participam do chat.
                 </p>
               )}
@@ -428,29 +428,29 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
             {/* Form de alteração de data */}
             {showDeadlineForm && (
-              <div style={{ background: 'rgba(255,255,255,.04)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
-                <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 10 }}>Alterar data de entrega</p>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14, marginBottom: 18 }}>
+                <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 10 }}>Alterar data de entrega</p>
                 <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>NOVA DATA</label>
-                <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ width: '100%', background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, colorScheme: 'dark' }} />
+                <input type="date" value={newDeadline} onChange={e => setNewDeadline(e.target.value)} style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, colorScheme: 'dark' }} />
                 <label style={{ fontSize: 10, letterSpacing: '.1em', color: '#888', fontFamily: 'var(--fm)' }}>JUSTIFICATIVA *</label>
-                <textarea value={deadlineReason} onChange={e => setDeadlineReason(e.target.value)} rows={2} placeholder="Por que a data está mudando?" style={{ width: '100%', background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, resize: 'vertical', fontFamily: 'var(--f)' }} />
+                <textarea value={deadlineReason} onChange={e => setDeadlineReason(e.target.value)} rows={2} placeholder="Por que a data está mudando?" style={{ width: '100%', background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, marginTop: 5, marginBottom: 10, resize: 'vertical', fontFamily: 'var(--f)' }} />
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button onClick={async () => {
                     if (!newDeadline) return;
                     if (!deadlineReason.trim()) return;
                     const r = await onChangeDeadline(task.id, newDeadline, deadlineReason, currentUser, currentUserSector);
                     if (r?.success) setShowDeadlineForm(false);
-                  }} style={{ flex: 1, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '10px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Salvar nova data</button>
-                  <button onClick={() => setShowDeadlineForm(false)} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '10px 16px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
+                  }} style={{ flex: 1, background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '10px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Salvar nova data</button>
+                  <button onClick={() => setShowDeadlineForm(false)} style={{ background: 'var(--soft)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '10px 16px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
                 </div>
               </div>
             )}
 
             {/* Links */}
             <div style={{ marginBottom: 18 }}>
-              <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase' }}>LINKS</p>
+              <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase' }}>LINKS</p>
               {(task.links || []).length === 0 && (
-                <p style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>Nenhum link adicionado ainda.</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Nenhum link adicionado ainda.</p>
               )}
               {(task.links || []).map((link, i) => {
                 // Support both old format (string) and new format (object)
@@ -461,11 +461,11 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 const canDelete = !readOnly && (isAdmin || !addedBy || addedBy === currentUser);
 
                 return (
-                  <div key={i} style={{ background: 'rgba(255,255,255,.03)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '9px 12px', marginBottom: 7 }}>
+                  <div key={i} style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,.07)', borderRadius: 8, padding: '9px 12px', marginBottom: 7 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                       <span style={{ fontSize: 12, fontWeight: 600, color: '#ccc' }}>{name}</span>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {addedBy && <span style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)' }}>{addedBy}</span>}
+                        {addedBy && <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{addedBy}</span>}
                         {canDelete && (
                           <button style={{ background: 'none', border: 'none', color: '#EE3363', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', opacity: .7 }} onClick={() => handleRemoveLink(i)}>
                             <X size={12} />
@@ -497,18 +497,18 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             {/* Actions */}
             {task.status !== 'done' && !readOnly && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>AÇÕES</p>
+                <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>AÇÕES</p>
 
                 {/* todo → doing */}
                 {task.status === 'todo' && (isAdmin || isResponsible) && (
-                  <button style={S.actionBtn('#38bdf8')} onClick={() => onMoveToProduction(task.id, task.links)}>
+                  <button style={S.actionBtn('var(--blue)')} onClick={() => onMoveToProduction(task.id, task.links)}>
                     ▶ Iniciar — Mover para Em Produção
                   </button>
                 )}
 
                 {/* doing → approval */}
                 {task.status === 'doing' && (isAdmin || isResponsible) && !showApprovalForm && (
-                  <button style={S.actionBtn('#f59e0b')} onClick={() => setShowApprovalForm(true)}>
+                  <button style={S.actionBtn('var(--amber)')} onClick={() => setShowApprovalForm(true)}>
                     ✓ Concluí — Enviar para Aprovação
                   </button>
                 )}
@@ -528,7 +528,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                         </select>
                       )}
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button style={{ ...S.actionBtn('#f59e0b'), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>Confirmar Envio</button>
+                        <button style={{ ...S.actionBtn('var(--amber)'), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>Confirmar Envio</button>
                         <button style={S.cancelBtn} onClick={() => setShowApprovalForm(false)}>Cancelar</button>
                       </div>
                     </div>
@@ -538,7 +538,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 {/* approval → done or back */}
                 {task.status === 'approval' && (isAdmin || isResponsible) && (
                   <>
-                    <button style={S.actionBtn('#22c55e')} onClick={handleApprove}>✓ Aprovar e Concluir Task</button>
+                    <button style={S.actionBtn('var(--green)')} onClick={handleApprove}>✓ Aprovar e Concluir Task</button>
                     {!showRejectForm && (
                       <button style={S.actionBtn('#EE3363')} onClick={() => setShowRejectForm(true)}>✕ Reprovar — Solicitar Ajuste</button>
                     )}
@@ -546,7 +546,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 )}
 
                 {showRejectForm && (
-                  <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14 }}>
+                  <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 14 }}>
                     <p style={{ fontSize: 12, color: 'var(--neon)', marginBottom: 10, fontWeight: 600 }}>Descreva o que precisa ser ajustado *</p>
                     <textarea style={{ ...S.input, minHeight: 80, resize: 'vertical', marginBottom: 10 }} value={reworkNote} onChange={e => setReworkNote(e.target.value)} placeholder="Explique detalhadamente o que precisa ser alterado..." />
                     <p style={{ fontSize: 12, color: '#888', marginBottom: 8 }}>Quem vai fazer o ajuste?</p>
@@ -570,7 +570,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             )}
 
             {showDeleteConfirm && (
-              <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 12 }}>
+              <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 12 }}>
                 <p style={{ fontSize: 13, color: '#ddd', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
@@ -582,16 +582,16 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
           {/* Right — Chat */}
           <div style={{ width: 300, padding: '18px 16px', display: 'flex', flexDirection: 'column' }}>
-            <p style={{ fontSize: 10, letterSpacing: '.12em', color: '#666', fontFamily: 'var(--fm)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase' }}>COMENTÁRIOS</p>
+            <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, marginBottom: 10, textTransform: 'uppercase' }}>COMENTÁRIOS</p>
             <div style={{ flex: 1, overflowY: 'auto', marginBottom: 10 }}>
               {(task.comments || []).length === 0 && (
-                <p style={{ fontSize: 12, color: '#555', textAlign: 'center', padding: '20px 0' }}>Nenhum comentário ainda.</p>
+                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Nenhum comentário ainda.</p>
               )}
               {(task.comments || []).map(c => (
-                <div key={c.id} style={{ marginBottom: 10, background: c.isRework ? 'rgba(245,158,11,.07)' : 'rgba(255,255,255,.03)', border: `1px solid ${c.isRework ? 'var(--amber-b)' : 'rgba(255,255,255,.07)'}`, borderRadius: 8, padding: '9px 12px' }}>
+                <div key={c.id} style={{ marginBottom: 10, background: c.isRework ? 'rgba(245,158,11,.07)' : 'var(--surface)', border: `1px solid ${c.isRework ? 'var(--amber-b)' : 'var(--soft)'}`, borderRadius: 8, padding: '9px 12px' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 600, color: c.isRework ? 'var(--amber)' : 'var(--neon)' }}>{c.author}</span>
-                    <span style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)' }}>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
                       {c.createdAt ? format(new Date(c.createdAt), "dd/MM HH:mm", { locale: ptBR }) : ''}
                     </span>
                   </div>
@@ -624,8 +624,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 }
 
 const S = {
-  input: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: '#12121f', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: '#eee', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   actionBtn: (color) => ({ background: `${color}15`, border: `1px solid ${color}35`, borderRadius: 9, padding: '10px 14px', color, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'all .15s' }),
-  cancelBtn: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '9px 14px', color: '#aaa', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
+  cancelBtn: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 14px', color: '#aaa', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
 };
