@@ -17,7 +17,7 @@ function Ring({ checked, total }) {
         <circle cx="18" cy="18" r={r} fill="none" stroke="rgba(255,255,255,.06)" strokeWidth="3" />
         <circle cx="18" cy="18" r={r} fill="none" stroke={color} strokeWidth="3"
           strokeDasharray={`${dash.toFixed(2)} ${circ.toFixed(2)}`} strokeLinecap="round"
-          transform="rotate(-90 18 18)" style={{ filter: `drop-shadow(0 0 4px ${color}60)`, transition: 'stroke-dasharray .4s' }} />
+          transform="rotate(-90 18 18)" style={{ filter: `drop-shadow(0 0 4px color-mix(in srgb, ${color} 38%, transparent))`, transition: 'stroke-dasharray .4s' }} />
       </svg>
     </div>
   );
