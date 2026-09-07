@@ -145,7 +145,7 @@ export default function ClientOnboardingModal({
                 <span style={{ fontSize: 12, color: SECTORS[sid]?.color || 'var(--text)' }}>
                   {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
                 </span>
-                <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'var(--fm)', textAlign: 'right' }}>{asArray(v).join(', ')}</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>{asArray(v).join(', ')}</span>
               </div>
             ))}
           </Section>

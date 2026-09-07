@@ -306,11 +306,11 @@ function RequestRow({ request, last, onClick }) {
       <span style={{ width: 3, height: 30, borderRadius: 2, background: u.color, flexShrink: 0 }} />
 
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 600, color: '#eee', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {request.subject}
         </p>
         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-          {request.clientName} · para <strong style={{ color: sec?.color || '#bbb' }}>{request.toName}</strong> · por {request.createdBy}
+          {request.clientName} · para <strong style={{ color: sec?.color || 'var(--muted)' }}>{request.toName}</strong> · por {request.createdBy}
         </p>
       </div>
 
@@ -321,7 +321,7 @@ function RequestRow({ request, last, onClick }) {
             : <EyeOff size={13} color="var(--muted)" />
         )}
         {aging && (
-          <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : '#777', minWidth: 58, textAlign: 'right' }}>
+          <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : 'var(--dim)', minWidth: 58, textAlign: 'right' }}>
             {formatBusinessDuration(aging.ms)}
           </span>
         )}
@@ -350,13 +350,13 @@ function RequestCard({ request, onClick }) {
       </p>
 
       {aging && (
-        <p style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : '#777', marginTop: 6 }}>
+        <p style={{ fontSize: 11, fontFamily: 'var(--fm)', color: aging.estourou ? 'var(--neon)' : 'var(--dim)', marginTop: 6 }}>
           {aging.estourou ? '⚠ ' : ''}em aberto há {formatBusinessDuration(aging.ms)}
           {aging.estourou ? ' · fora do SLA' : ''}
         </p>
       )}
 
-      <p style={{ fontSize: 12, color: '#999', marginTop: 10, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {request.description}
       </p>
 
@@ -444,7 +444,7 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
                   <span style={{ fontSize: 12, fontWeight: 700, color: rep.role === 'cs' ? 'var(--neon)' : 'var(--blue)' }}>{rep.author}</span>
                   <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
                 </div>
-                <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
+                <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
                 {rep.role === 'collab' && (
                   <p style={{ fontSize: 11, color: rep.done ? 'var(--green)' : 'var(--amber)', fontFamily: 'var(--fm)', marginTop: 6 }}>
                     {rep.done ? '✓ marcou como resolvida' : '• ainda em andamento'}

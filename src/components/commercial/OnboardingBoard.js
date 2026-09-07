@@ -345,7 +345,7 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
       )}
 
       {dias != null && (
-        <p style={{ fontSize: 11, color: atrasado ? 'var(--neon)' : '#666', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <p style={{ fontSize: 11, color: atrasado ? 'var(--neon)' : 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
           <Clock size={11} /> cadastrado há {dias} dia{dias !== 1 ? 's' : ''}
         </p>
       )}

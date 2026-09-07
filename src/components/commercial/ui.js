@@ -50,7 +50,7 @@ export function ConfirmModal({ title, text, onClose, onConfirm, confirmLabel = '
     <Overlay onClose={onClose}>
       <div style={{ ...MODAL, maxWidth: 400 }}>
         <ModalHeader title={title} onClose={onClose} />
-        <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.6, marginBottom: 16 }}>{text}</p>
+        <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, marginBottom: 16 }}>{text}</p>
         <div style={{ display: 'flex', gap: 8 }}>
           <button style={{ ...BTN_PRIMARY, flex: 1 }} onClick={onConfirm}>{confirmLabel}</button>
           <button style={BTN_CANCEL} onClick={onClose}>Cancelar</button>
