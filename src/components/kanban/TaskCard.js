@@ -43,7 +43,7 @@ export default function TaskCard({ task, onClick }) {
       {/* Rework flag */}
       {task.isRework && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <RefreshCw size={10} color="var(--amber)" style={{ animation: 'pulse 2.6s ease-in-out infinite' }} />
+          <RefreshCw size={10} color="var(--amber)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
           <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.08em', fontFamily: 'var(--fm)' }}>
             AJUSTE #{task.reworkCount}
           </span>
@@ -84,7 +84,7 @@ export default function TaskCard({ task, onClick }) {
             {isFrozen
               ? <PauseCircle size={11} color={state.color} />
               : isLate
-                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'pulse 2.6s ease-in-out infinite' }} />
+                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
                 : <Clock size={11} color={state.kind === 'warn' ? 'var(--amber)' : 'var(--muted)'} />}
             <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: state.color }}>
               {isFrozen
