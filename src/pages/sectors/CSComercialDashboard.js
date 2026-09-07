@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, UserPlus, ClipboardList, Kanban, MessageSquare,
-  Calendar, Clock, Trash2, Rocket, Lock,
+  Calendar, Clock, Trash2, Rocket, Lock, ListTodo,
 } from 'lucide-react';
+import DayTasks from '../../components/shared/DayTasks';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../components/shared/Toast';
 import { useClients } from '../../hooks/useClients';
@@ -76,7 +77,8 @@ export default function CSComercialDashboard() {
     .sort((a, b) => new Date(a.staffing?.startedAt || 0) - new Date(b.staffing?.startedAt || 0)),
     [clients]);
 
-  // Quadro fechado: a call de Kick Off é responsabilidade desta tela.
+  // Recém-cadastrados: a call de Kick Off é a primeira etapa do ciclo
+  // e é responsabilidade desta tela — não depende de responsáveis.
   const emKickoff = useMemo(() => clients
     .filter(c => stageOf(c) === 'kickoff')
     .sort((a, b) => {
@@ -86,8 +88,9 @@ export default function CSComercialDashboard() {
     }),
     [clients]);
 
-  // Kick Off já feito: a CS Comercial acompanha em leitura até o
-  // cliente entrar definitivamente na base.
+  // Quadro de responsáveis fechado: a CS Operacional agenda a call de
+  // onboarding. Esta tela acompanha em leitura até o cliente entrar
+  // definitivamente na base.
   const emOnboarding = useMemo(() => clients
     .filter(c => stageOf(c) === 'onboarding')
     .sort((a, b) => {
@@ -119,9 +122,10 @@ export default function CSComercialDashboard() {
 
   const NAV = [
     { key: 'register',  label: 'Cadastrar Cliente', icon: UserPlus },
-    { key: 'staffing',  label: 'Acompanhamento',    icon: ClipboardList, badge: emStaffing.length, badgeDanger: staffingAtrasado > 0 },
     { key: 'kickoff',   label: 'Kick Off',          icon: Rocket, badge: emKickoff.length + emOnboarding.length, badgeDanger: kickoffSemAgenda > 0 },
+    { key: 'staffing',  label: 'Acompanhamento',    icon: ClipboardList, badge: emStaffing.length, badgeDanger: staffingAtrasado > 0 },
     { key: 'kanban',    label: 'Produção',          icon: Kanban },
+    { key: 'day',      label: 'Tarefas do Dia',   icon: ListTodo },
     { key: 'requests',  label: 'Solicitações',      icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
     { key: 'overview',  label: 'Visão Geral',       icon: LayoutDashboard },
     { key: 'agenda',    label: 'Agenda',            icon: Calendar },
@@ -159,8 +163,8 @@ export default function CSComercialDashboard() {
             {page === 'overview' && (
               <div className="fade-up">
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 16 }}>
-                  <Stat label="Aguardando responsáveis" value={emStaffing.length} color="var(--amber)" />
                   <Stat label="Aguardando Kick Off" value={emKickoff.length} color={KICKOFF_COLOR} />
+                  <Stat label="Aguardando responsáveis" value={emStaffing.length} color="var(--amber)" />
                   <Stat label="Em onboarding" value={emOnboarding.length} color="var(--blue)" />
                   <Stat label="Entraram no mês" value={ativadosNoMes} color="var(--green)" />
                 </div>
@@ -193,7 +197,7 @@ export default function CSComercialDashboard() {
 
             {page === 'staffing' && (
               emStaffing.length === 0
-                ? <Empty msg="Nenhum cliente aguardando indicação. ✨" />
+                ? <Empty msg="Nenhum cliente aguardando indicação de responsável. ✨" />
                 : (
                   <div style={GRID}>
                     {emStaffing.map(c => (
@@ -278,6 +282,8 @@ export default function CSComercialDashboard() {
                 onDelete={deleteTask}
               />
             )}
+
+            {page === 'day' && <DayTasks toast={toast} />}
 
             {page === 'requests' && (
               <CSRequests
