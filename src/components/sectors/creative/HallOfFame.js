@@ -38,7 +38,7 @@ export default function HallOfFame({ tasks }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           🏆 Hall da Fama
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -47,7 +47,7 @@ export default function HallOfFame({ tasks }) {
       </div>
 
       {/* Ranking */}
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px', marginBottom: 20 }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px', marginBottom: 20 }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 18 }}>Ranking Geral</h2>
 
         {ranking.length === 0 ? (
@@ -66,16 +66,16 @@ export default function HallOfFame({ tasks }) {
               return (
                 <div key={collab.name} style={{ display: 'flex', alignItems: 'center', gap: 14, background: isTop3 ? bgColors[rank] : 'var(--surface)', border: `1px solid ${isTop3 ? brdColors[rank] : 'var(--border)'}`, borderRadius: 10, padding: '12px 16px' }}>
                   <RankBadge rank={rank} />
-                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,var(--neon-dim),rgba(167,139,250,.1))', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: 'var(--neon)', flexShrink: 0 }}>
+                  <div style={{ width: 38, height: 38, borderRadius: 10, background: 'linear-gradient(135deg,var(--neon-dim),rgba(167,139,250,.1))', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 600, color: 'var(--neon)', flexShrink: 0 }}>
                     {collab.name.charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1 }}>
-                    <p style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{collab.name}</p>
+                    <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{collab.name}</p>
                     <p style={{ fontSize: 11, color: 'var(--muted)' }}>
                       {collab.count} entrega{collab.count !== 1 ? 's' : ''} aprovada{collab.count !== 1 ? 's' : ''} de primeira
                     </p>
                   </div>
-                  <p style={{ fontSize: 28, fontWeight: 800, color: isTop3 ? valColors[rank] : 'var(--text)' }}>
+                  <p style={{ fontSize: 28, fontWeight: 600, color: isTop3 ? valColors[rank] : 'var(--text)' }}>
                     {collab.count}
                   </p>
                 </div>
@@ -87,7 +87,7 @@ export default function HallOfFame({ tasks }) {
 
       {/* Recent first-approval grid */}
       {recentFirstApproval.length > 0 && (
-        <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px' }}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px' }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>
             Últimas Aprovações de Primeira ✨
           </h2>

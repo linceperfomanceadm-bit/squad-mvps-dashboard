@@ -15,7 +15,7 @@ function ColorSwatch({ hex }) {
   };
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }} onClick={handleCopy}>
-      <div style={{ width: 24, height: 24, borderRadius: 6, background: hex, border: '1px solid rgba(255,255,255,.1)', flexShrink: 0 }} />
+      <div style={{ width: 24, height: 24, borderRadius: 6, background: hex, border: '1px solid var(--border-h)', flexShrink: 0 }} />
       <span style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'var(--fm)' }}>{hex}</span>
       {copied
         ? <Check size={12} color="var(--green)" style={{ marginLeft: 'auto' }} />
@@ -64,7 +64,7 @@ function MaterialItem({ material, canDelete, onDelete }) {
             </a>
           )}
           {canDelete && (
-            <button onClick={() => onDelete(material)} title="Excluir" style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '6px 9px', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+            <button onClick={() => onDelete(material)} title="Excluir" style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 7, padding: '6px 9px', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}>
               <Trash2 size={12} />
             </button>
           )}
@@ -108,7 +108,7 @@ function AddMaterialModal({ onClose, onAdd }) {
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 24px 64px rgba(0,0,0,.7)', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Adicionar material</h3>
+          <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)' }}>Adicionar material</h3>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
         </div>
 
@@ -180,7 +180,7 @@ function AddMaterialModal({ onClose, onAdd }) {
 const LOG_LABEL = { add: 'ADICIONOU', remove: 'EXCLUIU', brandbook: 'EDITOU' };
 const LOG_TAG = {
   add:       { background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green-b)' },
-  remove:    { background: 'rgba(239,68,68,.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,.3)' },
+  remove:    { background: 'rgba(239,68,68,.1)', color: 'var(--red)', border: '1px solid rgba(239,68,68,.3)' },
   brandbook: { background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)' },
 };
 
@@ -208,7 +208,7 @@ function ClientVaultCard({ client, canEditBrandbook, canAddMaterial, currentUser
   };
 
   return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, marginBottom: 10, overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', cursor: 'pointer' }} onClick={() => setOpen(!open)}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: 'var(--neon)' }}>
@@ -351,7 +351,7 @@ export default function VaultPage({ clients, sectorId, onUpdateBrandbook, onAddM
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           ✨ Brand Hub
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -395,5 +395,5 @@ const S = {
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', display: 'block', marginBottom: 6 },
   input: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)', width: '100%' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 16px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'var(--f)' },
-  saveBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '8px 18px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)' },
+  saveBtn: { background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '8px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)' },
 };

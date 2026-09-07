@@ -22,7 +22,7 @@ function Ring({ checked, total }) {
   const r = 14, circ = 2 * Math.PI * r;
   const pct = total > 0 ? checked / total : 0;
   const dash = pct * circ;
-  const color = pct === 1 ? '#22c55e' : '#EE3363';
+  const color = pct === 1 ? 'var(--green)' : '#EE3363';
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
       <span style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{checked}/{total}</span>
@@ -152,7 +152,7 @@ export default function IdVisualBoard({
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           ID Visual
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -175,7 +175,7 @@ export default function IdVisualBoard({
           >
             {t.label}
             {counts[t.key] > 0 && (
-              <span style={{ background: tab === t.key ? 'var(--neon-dim)' : 'rgba(255,255,255,.06)', borderRadius: 8, padding: '1px 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>
+              <span style={{ background: tab === t.key ? 'var(--neon-dim)' : 'var(--soft)', borderRadius: 8, padding: '1px 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>
                 {counts[t.key]}
               </span>
             )}
@@ -211,18 +211,18 @@ export default function IdVisualBoard({
 }
 
 const S = {
-  card: { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, transition: 'border-color .2s', backdropFilter: 'blur(12px)' },
+  card: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, transition: 'border-color .2s', backdropFilter: 'blur(12px)' },
   hd: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
   hdLeft: { flex: 1, minWidth: 0 },
   hdRight: { display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 },
   tag: { display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 5, padding: '2px 8px', fontSize: 10, color: 'var(--neon)', fontWeight: 600, marginBottom: 5 },
-  name: { fontSize: 15, fontWeight: 700, color: '#f0f0ff', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  name: { fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   resp: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)', flexWrap: 'wrap' },
   xbtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 },
   secLbl: { fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--fm)' },
   moveProdBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,rgba(238,51,99,.18),rgba(238,51,99,.08))', border: '1px solid var(--neon-border)', borderRadius: 9, padding: 10, color: 'var(--neon)', fontSize: 13, fontWeight: 600, width: '100%', marginBottom: 10, cursor: 'pointer', transition: 'all .2s' },
-  backBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, width: '100%', marginBottom: 12, cursor: 'pointer' },
+  backBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, width: '100%', marginBottom: 12, cursor: 'pointer' },
   ci: { display: 'flex', alignItems: 'center', gap: 9, padding: '7px 9px', borderRadius: 7, cursor: 'pointer', marginBottom: 3, background: 'var(--surface)', transition: 'background .15s' },
   ta: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', color: 'var(--text)', fontSize: 13, fontFamily: 'var(--f)', resize: 'vertical', minHeight: 72, outline: 'none' },
   doneBox: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 14, marginBottom: 14 },

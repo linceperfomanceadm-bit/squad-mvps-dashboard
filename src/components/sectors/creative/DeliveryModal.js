@@ -20,7 +20,7 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
   };
 
   const color = sectorId === 'design' ? 'var(--purple)' : 'var(--orange)';
-  const colorRaw = sectorId === 'design' ? '#a78bfa' : '#fb923c';
+  const colorRaw = sectorId === 'design' ? 'var(--purple)' : 'var(--orange)';
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -98,7 +98,7 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={S.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" style={{ ...S.submitBtn, background: `linear-gradient(135deg,${colorRaw},${colorRaw}99)`, boxShadow: `0 4px 16px ${colorRaw}35` }} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Cadastrar'}
+              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar'}
             </button>
           </div>
         </form>
@@ -109,10 +109,10 @@ export default function DeliveryModal({ clients, sectorId, onClose, onSave }) {
 
 const S = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
-  modal: { background: '#0e0e1c', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 24px 80px rgba(0,0,0,.7)', maxHeight: '90vh', overflow: 'auto' },
+  modal: { background: 'var(--bg2)', borderRadius: 16, width: '100%', maxWidth: 500, boxShadow: '0 24px 80px rgba(0,0,0,.7)', maxHeight: '90vh', overflow: 'auto' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' },
   icon: { width: 40, height: 40, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 17, fontWeight: 700, color: '#fff' },
+  title: { fontSize: 17, fontWeight: 700, color: 'var(--text)' },
   closeBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { padding: 22, display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
@@ -121,5 +121,5 @@ const S = {
   optGroup: { display: 'flex', gap: 8, flexWrap: 'wrap' },
   opt: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 13px', color: 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', transition: 'all .15s' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
-  submitBtn: { border: 'none', borderRadius: 8, padding: '9px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 },
+  submitBtn: { border: 'none', borderRadius: 8, padding: '9px 22px', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 },
 };

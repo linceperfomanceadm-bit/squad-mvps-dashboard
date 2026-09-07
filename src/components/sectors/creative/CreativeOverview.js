@@ -1,24 +1,12 @@
 import React from 'react';
+import { Kpi } from '../../shared/ui';
 import { differenceInDays } from 'date-fns';
 import { Package, Clock, Star, Kanban } from 'lucide-react';
 import { SECTORS, TASK_PRIORITIES } from '../../../lib/firebase';
 
-function StatCard({ icon: Icon, label, value, sub, color }) {
-  return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color},transparent)` }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
-          <p style={{ fontSize: 32, fontWeight: 800, color }}>{value}</p>
-          {sub && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{sub}</p>}
-        </div>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={20} color={color} />
-        </div>
-      </div>
-    </div>
-  );
+function StatCard({ label, value, sub, color }) {
+  const tone = color === 'var(--green)' ? 'good' : color === 'var(--amber)' ? 'warn' : (color === 'var(--neon)' || color === 'var(--red)') ? 'bad' : undefined;
+  return <Kpi value={value} label={label} tone={tone}>{sub ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{sub}</span> : null}</Kpi>;
 }
 
 export default function CreativeOverview({ tasks, myTasks, sectorId }) {
@@ -59,7 +47,7 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Visão Geral</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Visão Geral</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>{SECTORS[sectorId]?.label} · mês atual</p>
       </div>
 
@@ -71,8 +59,8 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
       </div>
 
       {/* My active tasks */}
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' }}>
+        <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 16 }}>Minhas Tasks Ativas</h2>
         {myActiveTasks.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
             Nenhuma task ativa no momento. 🎉
