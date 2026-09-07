@@ -239,7 +239,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 </span>
               )}
               {priority && (
-                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: `${priority.color}20`, color: priority.color, border: `1px solid ${priority.color}40`, fontFamily: 'var(--fm)' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: `color-mix(in srgb, ${priority.color} 13%, transparent)`, color: priority.color, border: `1px solid color-mix(in srgb, ${priority.color} 25%, transparent)`, fontFamily: 'var(--fm)' }}>
                   {priority.label.toUpperCase()}
                 </span>
               )}
@@ -361,7 +361,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   return (
                     <span
                       key={name}
-                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: `${color}18`, border: `1px solid ${color}40`, borderRadius: 16, padding: '5px 10px', fontSize: 12, fontWeight: 600, color }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6, background: `color-mix(in srgb, ${color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${color} 25%, transparent)`, borderRadius: 16, padding: '5px 10px', fontSize: 12, fontWeight: 600, color }}
                     >
                       {sec?.emoji} {name}
                       {isPrincipal && (
@@ -407,7 +407,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                   )}
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...S.actionBtn('#EE3363'), flex: 1, opacity: (!respPick.name || respBusy) ? .5 : 1 }}
+                      style={{ ...S.actionBtn('var(--neon)', true), flex: 1, opacity: (!respPick.name || respBusy) ? .5 : 1 }}
                       onClick={handleAddResponsible}
                       disabled={!respPick.name || respBusy}
                     >
@@ -503,14 +503,14 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
                 {/* todo → doing */}
                 {task.status === 'todo' && (isAdmin || isResponsible) && (
-                  <button style={S.actionBtn('var(--blue)')} onClick={() => onMoveToProduction(task.id, task.links)}>
+                  <button style={S.actionBtn('var(--blue)', true)} onClick={() => onMoveToProduction(task.id, task.links)}>
                     ▶ Iniciar — Mover para Em Produção
                   </button>
                 )}
 
                 {/* doing → approval */}
                 {task.status === 'doing' && (isAdmin || isResponsible) && !showApprovalForm && (
-                  <button style={S.actionBtn('var(--amber)')} onClick={() => setShowApprovalForm(true)}>
+                  <button style={S.actionBtn('var(--amber)', true)} onClick={() => setShowApprovalForm(true)}>
                     ✓ Concluí — Enviar para Aprovação
                   </button>
                 )}
@@ -530,7 +530,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                         </select>
                       )}
                       <div style={{ display: 'flex', gap: 8 }}>
-                        <button style={{ ...S.actionBtn('var(--amber)'), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>Confirmar Envio</button>
+                        <button style={{ ...S.actionBtn('var(--amber)', true), flex: 1 }} onClick={handleMoveToApproval} disabled={!approver.name}>Confirmar Envio</button>
                         <button style={S.cancelBtn} onClick={() => setShowApprovalForm(false)}>Cancelar</button>
                       </div>
                     </div>
@@ -540,9 +540,9 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 {/* approval → done or back */}
                 {task.status === 'approval' && (isAdmin || isResponsible) && (
                   <>
-                    <button style={S.actionBtn('var(--green)')} onClick={handleApprove}>✓ Aprovar e Concluir Task</button>
+                    <button style={S.actionBtn('var(--green)', true)} onClick={handleApprove}>✓ Aprovar e Concluir Task</button>
                     {!showRejectForm && (
-                      <button style={S.actionBtn('#EE3363')} onClick={() => setShowRejectForm(true)}>✕ Reprovar — Solicitar Ajuste</button>
+                      <button style={S.actionBtn('var(--red)')} onClick={() => setShowRejectForm(true)}>✕ Reprovar — Solicitar Ajuste</button>
                     )}
                   </>
                 )}
@@ -563,7 +563,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                       </select>
                     )}
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={handleReject} disabled={!reworkNote.trim() || !newResponsible.name}>Enviar para Ajuste</button>
+                      <button style={{ ...S.actionBtn('var(--red)', true), flex: 1 }} onClick={handleReject} disabled={!reworkNote.trim() || !newResponsible.name}>Enviar para Ajuste</button>
                       <button style={S.cancelBtn} onClick={() => setShowRejectForm(false)}>Cancelar</button>
                     </div>
                   </div>
@@ -575,7 +575,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 12 }}>
                 <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <button style={{ ...S.actionBtn('#EE3363'), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
+                  <button style={{ ...S.actionBtn('var(--red)', true), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
                   <button style={S.cancelBtn} onClick={() => setShowDeleteConfirm(false)}>Não</button>
                 </div>
               </div>
@@ -642,9 +642,17 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   );
 }
 
+// Texto legível sobre cada cor de botão preenchido.
+const ON_COLOR = { 'var(--blue)': '#0d0d10', 'var(--amber)': '#0d0d10', 'var(--green)': '#0d0d10', '#EE3363': '#fff', 'var(--neon)': '#fff', 'var(--red)': '#fff' };
+
 const S = {
   input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
   select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
-  actionBtn: (color) => ({ background: `${color}15`, border: `1px solid ${color}35`, borderRadius: 9, padding: '10px 14px', color, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'all .15s' }),
+  // `color-mix(in srgb, ${color} 8%, transparent)` só funciona com hex — com var(--blue) o CSS descartava
+  // fundo e borda e sobrava texto solto. color-mix aceita os dois.
+  // solid = ação principal (preenchida); senão = tinta + borda forte.
+  actionBtn: (color, solid = false) => solid
+    ? { background: color, border: '1px solid transparent', borderRadius: 10, padding: '11px 14px', color: ON_COLOR[color] || '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'filter .15s', boxShadow: `0 8px 20px -10px color-mix(in srgb, ${color} 70%, transparent)` }
+    : { background: `color-mix(in srgb, ${color} 14%, var(--bg2))`, border: `1.5px solid color-mix(in srgb, ${color} 55%, transparent)`, borderRadius: 10, padding: '10px 14px', color, fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%', transition: 'all .15s' },
   cancelBtn: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 14px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer', flexShrink: 0 },
 };

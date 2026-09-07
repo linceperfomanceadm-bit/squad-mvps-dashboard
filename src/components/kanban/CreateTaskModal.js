@@ -126,7 +126,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                 <button type="button" key={p.id}
                   style={{
                     flex: 1,
-                    background: form.priority === p.id ? `${p.color}22` : 'var(--surface)',
+                    background: form.priority === p.id ? `color-mix(in srgb, ${p.color} 13%, transparent)` : 'var(--surface)',
                     border: `1px solid ${form.priority === p.id ? p.color : 'var(--border-h)'}`,
                     borderRadius: 8, padding: '8px 6px',
                     color: form.priority === p.id ? p.color : 'var(--muted)',

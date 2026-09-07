@@ -232,9 +232,9 @@ export default function TaskKanban({
               onClick={() => { setScope(o.id); setClientFilter(''); }}
               style={{
                 padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: scope === o.id ? 'var(--neon-dim)' : 'var(--surface)',
-                color: scope === o.id ? 'var(--neon)' : 'var(--muted)',
-                border: `1px solid ${scope === o.id ? 'var(--neon-border)' : 'var(--border)'}`,
+                background: scope === o.id ? 'var(--grad)' : 'var(--bg3)',
+                color: scope === o.id ? 'var(--on)' : 'var(--muted)',
+                border: `1px solid ${scope === o.id ? 'transparent' : 'var(--border-h)'}`,
               }}
             >
               {o.label}
@@ -286,8 +286,8 @@ export default function TaskKanban({
             <div
               key={col.id}
               style={{
-                background: isDragTarget ? `${col.color}08` : 'var(--bg2)',
-                border: `1px solid ${isDragTarget ? `${col.color}40` : `${col.color}18`}`,
+                background: isDragTarget ? `color-mix(in srgb, ${col.color} 3%, transparent)` : 'var(--bg2)',
+                border: `1px solid ${isDragTarget ? `color-mix(in srgb, ${col.color} 25%, transparent)` : `color-mix(in srgb, ${col.color} 9%, transparent)`}`,
                 borderRadius: 12, padding: '12px 10px', minHeight: 200,
                 transition: 'all .15s ease',
               }}
@@ -304,7 +304,7 @@ export default function TaskKanban({
                       🔄 {reworkCount}
                     </span>
                   )}
-                  <span style={{ background: `${col.color}20`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>
+                  <span style={{ background: `color-mix(in srgb, ${col.color} 13%, transparent)`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>
                     {colTasks.length}
                   </span>
                 </div>
@@ -312,7 +312,7 @@ export default function TaskKanban({
 
               {/* Drop hint */}
               {isDragTarget && draggingId && (
-                <div style={{ border: `2px dashed ${col.color}50`, borderRadius: 8, padding: '12px', marginBottom: 8, textAlign: 'center' }}>
+                <div style={{ border: `2px dashed color-mix(in srgb, ${col.color} 31%, transparent)`, borderRadius: 8, padding: '12px', marginBottom: 8, textAlign: 'center' }}>
                   <span style={{ fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>Soltar aqui</span>
                 </div>
               )}
@@ -386,8 +386,9 @@ const S = {
     padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none',
     cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 180,
   },
+  // Filtro com valor: borda na cor do painel, fundo tingido, texto forte.
   filterActive: {
-    borderColor: 'var(--neon-border)', background: 'var(--neon-dim)', color: 'var(--neon)',
+    borderColor: 'var(--c)', background: 'var(--c-dim)', color: 'var(--text)', fontWeight: 600,
   },
   clearBtn: {
     display: 'flex', alignItems: 'center', gap: 6, background: 'transparent',

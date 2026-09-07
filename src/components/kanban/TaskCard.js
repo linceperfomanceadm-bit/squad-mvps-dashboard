@@ -55,8 +55,8 @@ export default function TaskCard({ task, onClick }) {
         {priority && (
           <span style={{
             fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
-            background: `${priority.color}18`, color: priority.color,
-            border: `1px solid ${priority.color}35`, fontFamily: 'var(--fm)',
+            background: `color-mix(in srgb, ${priority.color} 9%, transparent)`, color: priority.color,
+            border: `1px solid color-mix(in srgb, ${priority.color} 21%, transparent)`, fontFamily: 'var(--fm)',
             letterSpacing: '.06em',
           }}>
             {priority.label.toUpperCase()}
@@ -118,8 +118,8 @@ export default function TaskCard({ task, onClick }) {
                 {shown.map((n, i) => (
                   <div key={i} title={n} style={{
                     width: 24, height: 24, borderRadius: 8,
-                    background: sector ? `${sector.color}20` : 'var(--surface)',
-                    border: `1px solid ${sector ? `${sector.color}35` : 'var(--border)'}`,
+                    background: sector ? `color-mix(in srgb, ${sector.color} 13%, transparent)` : 'var(--surface)',
+                    border: `1px solid ${sector ? `color-mix(in srgb, ${sector.color} 21%, transparent)` : 'var(--border)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontSize: 10, fontWeight: 700, color: sector?.color || 'var(--muted)',
                     marginLeft: i === 0 ? 0 : -6,
