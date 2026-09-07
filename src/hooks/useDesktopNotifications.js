@@ -20,10 +20,31 @@ import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../lib/firebase';
  *   · Task devolvida para ajuste na sua mão
  *   · Call de Kick Off ou Onboarding agendada em cliente seu
  *   · Cobrança de staffing parado (admin e líder do setor travado)
+ *
+ * HISTÓRICO: tudo que o hook detecta vai para um registro por pessoa
+ * (localStorage), mesmo com a notificação do navegador desligada. É o
+ * que o sino da barra superior mostra. A detecção roda numa instância
+ * só (NotificationCenter, no App); as outras instâncias — como a do
+ * sino — apenas leem o registro e são avisadas por evento quando ele
+ * muda. Fica por navegador: trocar de máquina zera a lista.
  */
 
 const STORAGE_KEY = 'squadmvps.notify.enabled';
 const ALERT_LOG_KEY = 'squadmvps.notify.staffingLog';
+const HISTORY_KEY = (id) => `squadmvps.notify.history.${id}`;
+const HISTORY_EVENT = 'squadmvps:notify-history';
+const HISTORY_MAX = 50;
+
+const readHistory = (id) => {
+  if (!id) return [];
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY(id)) || '[]'); }
+  catch { return []; }
+};
+const writeHistory = (id, list) => {
+  if (!id) return;
+  try { localStorage.setItem(HISTORY_KEY(id), JSON.stringify(list.slice(0, HISTORY_MAX))); } catch { /* quota */ }
+  try { window.dispatchEvent(new CustomEvent(HISTORY_EVENT, { detail: id })); } catch { /* ignora */ }
+};
 
 export const notificationsSupported = () =>
   typeof window !== 'undefined' && 'Notification' in window;
@@ -50,8 +71,34 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
   });
 
   const me = user?.name || null;
+  const meId = user?.loginId || user?.id || user?.name || null;
   const isAdmin = !!user?.isAdmin;
   const myLeaderSectors = asArray(user?.leaderOf);
+
+  // Histórico — lido do storage e sincronizado entre instâncias.
+  const [history, setHistory] = useState(() => readHistory(meId));
+  useEffect(() => {
+    setHistory(readHistory(meId));
+    const onChange = (e) => { if (!e.detail || e.detail === meId) setHistory(readHistory(meId)); };
+    window.addEventListener(HISTORY_EVENT, onChange);
+    window.addEventListener('storage', onChange);
+    return () => { window.removeEventListener(HISTORY_EVENT, onChange); window.removeEventListener('storage', onChange); };
+  }, [meId]);
+
+  const record = useCallback((title, body, tag) => {
+    if (!meId) return;
+    const list = readHistory(meId);
+    if (list.some(n => n.tag === tag)) return; // mesma novidade, não duplica
+    writeHistory(meId, [{ tag, title, body, at: new Date().toISOString(), read: false }, ...list]);
+  }, [meId]);
+
+  const markAllRead = useCallback(() => {
+    const list = readHistory(meId);
+    if (!list.some(n => !n.read)) return;
+    writeHistory(meId, list.map(n => ({ ...n, read: true })));
+  }, [meId]);
+
+  const clearHistory = useCallback(() => writeHistory(meId, []), [meId]);
 
   // Fotografias do estado anterior, por coleção.
   const baseTasks = useRef(null);
@@ -61,6 +108,7 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
   const canNotify = enabled && permission === 'granted' && !!me;
 
   const fire = useCallback((title, body, tag) => {
+    record(title, body, tag);
     if (!canNotify) return;
     try {
       const n = new Notification(title, {
@@ -71,7 +119,7 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
       });
       n.onclick = () => { window.focus(); n.close(); };
     } catch { /* navegador recusou, não trava o app */ }
-  }, [canNotify]);
+  }, [canNotify, record]);
 
   const request = useCallback(async () => {
     if (!notificationsSupported()) return 'unsupported';
@@ -106,7 +154,6 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     if (baseRequests.current === null) { baseRequests.current = snapshot; return; }
     const before = baseRequests.current;
     baseRequests.current = snapshot;
-    if (!canNotify) return;
 
     requests.forEach(r => {
       if (r.toName !== me) return;
@@ -118,7 +165,7 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
         `request-${r.id}`
       );
     });
-  }, [requests, me, canNotify, fire]);
+  }, [requests, me, fire]);
 
   // ── Tasks: atribuição e devolução para ajuste ────────────────
   useEffect(() => {
@@ -133,7 +180,6 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     if (baseTasks.current === null) { baseTasks.current = snapshot; return; }
     const before = baseTasks.current;
     baseTasks.current = snapshot;
-    if (!canNotify) return;
 
     tasks.forEach(t => {
       const now = snapshot.get(t.id);
@@ -163,7 +209,7 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
         );
       }
     });
-  }, [tasks, me, canNotify, fire]);
+  }, [tasks, me, fire]);
 
   // ── Calls agendadas e cobrança de staffing ───────────────────
   useEffect(() => {
@@ -176,7 +222,6 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     if (baseClients.current === null) { baseClients.current = snapshot; return; }
     const before = baseClients.current;
     baseClients.current = snapshot;
-    if (!canNotify) return;
 
     const souDoTime = (c) =>
       Object.values(c.responsibles || {}).some(v => asArray(v).includes(me));
@@ -239,7 +284,7 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     });
 
     if (mudou) writeAlertLog(log);
-  }, [clients, me, canNotify, fire, isAdmin, user, myLeaderSectors]);
+  }, [clients, me, fire, isAdmin, user, myLeaderSectors]);
 
   return {
     permission,
@@ -248,5 +293,9 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     active: canNotify,
     request,
     toggle,
+    history,
+    unread: history.filter(n => !n.read).length,
+    markAllRead,
+    clearHistory,
   };
 }
