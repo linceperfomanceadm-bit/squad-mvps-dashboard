@@ -35,7 +35,7 @@ function PostCard({ post, onStatusChange }) {
           <button
             key={col.id}
             onClick={() => onStatusChange(post.clientId, post.id, col.id)}
-            style={{ background: `${col.color}15`, border: `1px solid ${col.color}30`, borderRadius: 6, padding: '3px 9px', color: col.color, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--fm)' }}
+            style={{ background: `color-mix(in srgb, ${col.color} 8%, transparent)`, border: `1px solid color-mix(in srgb, ${col.color} 19%, transparent)`, borderRadius: 6, padding: '3px 9px', color: col.color, fontSize: 10, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--fm)' }}
           >
             → {col.label}
           </button>
@@ -57,10 +57,10 @@ export default function SMKanban({ myPosts, onStatusChange }) {
         {SM_COLUMNS.map(col => {
           const posts = myPosts.filter(p => p.status === col.id);
           return (
-            <div key={col.id} style={{ background: 'var(--bg2)', border: `1px solid ${col.color}20`, borderRadius: 12, padding: '12px 10px' }}>
+            <div key={col.id} style={{ background: 'var(--bg2)', border: `1px solid color-mix(in srgb, ${col.color} 13%, transparent)`, borderRadius: 12, padding: '12px 10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>{col.label}</span>
-                <span style={{ background: `${col.color}20`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>{posts.length}</span>
+                <span style={{ background: `color-mix(in srgb, ${col.color} 13%, transparent)`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>{posts.length}</span>
               </div>
               {posts.length === 0
                 ? <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '20px 0' }}>Vazio</p>

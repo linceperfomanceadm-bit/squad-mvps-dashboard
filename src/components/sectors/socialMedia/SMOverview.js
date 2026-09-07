@@ -60,7 +60,7 @@ export default function SMOverview({ myClients, myDocs, myTasks, onNavigate }) {
                     <p style={S.linhaTit}>{d.clientName || 'Sem cliente'}</p>
                     <p style={S.linhaSub}>{d.updatedByName ? `última edição por ${d.updatedByName}` : 'sem edições'}</p>
                   </div>
-                  <span style={{ ...S.chip, color: st.color, borderColor: `${st.color}45` }}>{st.label}</span>
+                  <span style={{ ...S.chip, color: st.color, borderColor: `color-mix(in srgb, ${st.color} 27%, transparent)` }}>{st.label}</span>
                 </div>
               );
             })}

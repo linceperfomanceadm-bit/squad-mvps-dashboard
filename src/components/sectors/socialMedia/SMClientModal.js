@@ -117,7 +117,7 @@ export default function SMClientModal({
                             {d.versionCount > 0 && ` · ${d.versionCount} ${d.versionCount === 1 ? 'versão' : 'versões'}`}
                           </span>
                         </span>
-                        <span style={{ ...S.chip, color: st.color, borderColor: `${st.color}45` }}>{st.label}</span>
+                        <span style={{ ...S.chip, color: st.color, borderColor: `color-mix(in srgb, ${st.color} 27%, transparent)` }}>{st.label}</span>
                         <ExternalLink size={12} color="var(--muted)" />
                       </button>
                     </li>
