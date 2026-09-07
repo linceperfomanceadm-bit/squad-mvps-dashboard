@@ -158,13 +158,13 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                           onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
                           onMouseLeave={e => e.currentTarget.style.background = t.isRework ? 'rgba(245,158,11,.03)' : 'transparent'}
                         >
-                          <td style={{ padding: '10px 12px', color: '#ddd', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                             {t.isRework && <span style={{ fontSize: 9, color: 'var(--amber)', fontFamily: 'var(--fm)', marginRight: 4 }}>🔄</span>}
                             {deliveredBy || '—'}
                           </td>
-                          <td style={{ padding: '10px 12px', color: '#999', fontSize: 12 }}>{t.requestedBy || '—'}</td>
-                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{t.clientName}</td>
-                          <td style={{ padding: '10px 12px', color: '#ddd', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 12 }}>{t.requestedBy || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{t.clientName}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                               {t.name}
                               {/* Clickable hint */}
@@ -190,7 +190,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                               </span>
                             )}
                           </td>
-                          <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : '#666', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
+                          <td style={{ padding: '10px 12px', color: t.reworkCount > 0 ? 'var(--amber)' : 'var(--dim)', fontWeight: t.reworkCount > 0 ? 700 : 400 }}>
                             {t.reworkCount || 0}
                           </td>
                         </tr>
@@ -218,10 +218,10 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                       const col = SM_COLUMNS.find(c => c.id === p.status);
                       return (
                         <tr key={p.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
-                          <td style={{ padding: '10px 12px', color: '#ddd', fontWeight: 500 }}>{p.responsible || '—'}</td>
-                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{p.clientName}</td>
-                          <td style={{ padding: '10px 12px', color: '#ddd' }}>{p.name}</td>
-                          <td style={{ padding: '10px 12px', color: '#888', fontSize: 11, fontFamily: 'var(--fm)' }}>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)', fontWeight: 500 }}>{p.responsible || '—'}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.clientName}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--text)' }}>{p.name}</td>
+                          <td style={{ padding: '10px 12px', color: 'var(--muted)', fontSize: 11, fontFamily: 'var(--fm)' }}>
                             {p.date ? format(new Date(p.date), 'dd/MM/yy', { locale: ptBR }) : '—'}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
