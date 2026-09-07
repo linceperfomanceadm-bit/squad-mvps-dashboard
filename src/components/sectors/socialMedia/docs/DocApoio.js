@@ -12,7 +12,7 @@ import { balancoFunil, checarGargalo, checarPeriodos, pendenciasDoTexto } from '
 
 function Caixa({ icone: Icone, titulo, cor, children }) {
   return (
-    <div style={{ ...S.caixa, borderColor: cor ? `${cor}35` : 'var(--border)' }}>
+    <div style={{ ...S.caixa, borderColor: cor ? `color-mix(in srgb, ${cor} 21%, transparent)` : 'var(--border)' }}>
       <div style={S.cab}>
         <Icone size={14} color={cor || 'var(--muted)'} />
         <span style={S.cabTxt}>{titulo}</span>

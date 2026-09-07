@@ -68,7 +68,7 @@ export default function DocsList({
                 <button type="button" style={S.cardBtn} onClick={() => onOpen(d.id)}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                     <span style={S.cliente}>{d.clientName || 'Sem cliente'}</span>
-                    <span style={{ ...S.chip, color: status.color, borderColor: `${status.color}45` }}>
+                    <span style={{ ...S.chip, color: status.color, borderColor: `color-mix(in srgb, ${status.color} 27%, transparent)` }}>
                       {status.label}
                     </span>
                   </div>
