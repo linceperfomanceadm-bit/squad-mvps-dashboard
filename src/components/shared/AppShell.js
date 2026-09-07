@@ -1,7 +1,7 @@
 import React from 'react';
 import { LogOut, Plus, Bell, BellOff, Sun, Moon, Calendar } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useTheme, useSectorTheme } from '../../contexts/ThemeContext';
+import { useTheme, useSectorTheme, useBrandLogo } from '../../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../../lib/firebase';
 import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
 
@@ -53,13 +53,14 @@ export default function AppShell({ sectorId, navItems, activeKey, onNav, onAddCl
 // ─── Sidebar ──────────────────────────────────────────────────
 export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addClientLabel = 'Novo Cliente', showUser = false }) {
   const { user, logout } = useAuth();
+  const brand = useBrandLogo();
   const sector = configOf(sectorId);
   const items = navItems.filter(n => n.key !== 'agenda');
 
   return (
     <aside style={S.aside}>
       <div style={S.brand}>
-        <img src="/agencia.png" alt="Lince" style={{ height: 22, objectFit: 'contain' }} />
+        <img src={brand} alt="Lince Performance" style={{ height: 22, objectFit: 'contain' }} />
       </div>
 
       {showUser && (
