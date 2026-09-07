@@ -103,11 +103,11 @@ export default function HomePage() {
 }
 
 const S = {
-  page: { minHeight: '100vh', background: '#07070e', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
-  grid: { position: 'fixed', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(238,51,99,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(238,51,99,.025) 1px,transparent 1px)', backgroundSize: '32px 32px' },
+  page: { minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
+  grid: { position: 'fixed', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(var(--soft) 1px,transparent 1px),linear-gradient(90deg,var(--soft) 1px,transparent 1px)', opacity: .35, backgroundSize: '32px 32px' },
   glow: { position: 'fixed', width: 800, height: 800, borderRadius: '50%', background: 'radial-gradient(circle,rgba(238,51,99,.06) 0%,transparent 65%)', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' },
   content: { position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 48, padding: '40px 32px', width: '100%' },
   title: { fontSize: 40, fontWeight: 800, color: '#fff', letterSpacing: '-1px', marginBottom: 10 },
   sub: { fontSize: 14, color: 'var(--muted)' },
-  adminLink: { background: 'none', border: 'none', color: 'rgba(255,255,255,.18)', fontSize: 11, letterSpacing: '.1em', fontFamily: 'var(--fm)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3, transition: 'color .2s' },
+  adminLink: { background: 'none', border: 'none', color: 'var(--muted)', fontSize: 11, letterSpacing: '.1em', fontFamily: 'var(--fm)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 3, transition: 'color .2s' },
 };

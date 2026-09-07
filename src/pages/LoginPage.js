@@ -1,30 +1,56 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSectorTheme } from '../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../lib/firebase';
+import './Login.css';
 
-// A identidade de cada setor (cor do emblema, emoji, logo) vem de
-// SECTORS em lib/firebase.js — fonte única, compartilhada com os
-// painéis. Para trocar a logo: PNG em /public/logos/ e ajuste o
-// campo `logo` lá.
+// ─── Login + Primeiro Acesso ──────────────────────────────────
+// Um card só, dois estados. A pessoa entra com ID e senha (a
+// temporária, se for o primeiro acesso); se o login devolver
+// firstAccess, o painel colorido desliza e o formulário de nova
+// senha entra no lugar. Não existe caminho manual para o primeiro
+// acesso — é o próprio login que decide.
+//
+// /first-access continua existindo (FirstAccessPage renderiza este
+// componente com forceFirst) para quem já está logado e recarregou.
+
 const SECTOR_CONFIG = { ...SECTORS, admin: ADMIN_CONFIG };
 
-export default function LoginPage() {
-  const { sectorId } = useParams();
-  const { loginCollaborator, loginAdmin } = useAuth();
+// Versão da cor do emblema calibrada para preencher o painel grande:
+// todos os setores na mesma claridade, texto branco sempre legível.
+const DEEP = {
+  webdesign: '#591421', design: '#2D2F3A', socialmedia: '#591232',
+  videomaker: '#222278', cs: '#14333D', trafego: '#382D15', admin: '#5C1428',
+};
+
+export default function LoginPage({ forceFirst = false }) {
+  const params = useParams();
+  const { user, loginCollaborator, loginAdmin, changePassword } = useAuth();
   const navigate = useNavigate();
 
+  const sectorId = params.sectorId || user?.sector || 'admin';
   const isAdmin = sectorId === 'admin';
   const sector = SECTOR_CONFIG[sectorId] || SECTOR_CONFIG.admin;
+  useSectorTheme(sectorId);
 
+  const [view, setView] = useState(forceFirst ? 'first' : 'login');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirm, setConfirm] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
+  useEffect(() => {
+    document.documentElement.style.setProperty('--deep', DEEP[sectorId] || DEEP.admin);
+  }, [sectorId]);
+
+  const home = () => navigate(user?.isAdmin || isAdmin ? '/admin' : `/${sectorId === 'cs' ? 'cs' : sectorId}`);
+
+  const handleLogin = async (e) => {
     e.preventDefault();
     if (!loginId.trim() || !password) { setError('Preencha todos os campos.'); return; }
     setLoading(true); setError('');
@@ -33,90 +59,100 @@ export default function LoginPage() {
       : await loginCollaborator(sectorId, loginId, password);
     setLoading(false);
     if (!res.success) { setError(res.error || 'Credenciais inválidas.'); return; }
-    if (res.firstAccess) { navigate('/first-access'); return; }
+    if (res.firstAccess) { setPassword(''); setView('first'); return; }
     navigate(isAdmin ? '/admin' : `/${sectorId}`);
   };
 
+  const handleFirst = async (e) => {
+    e.preventDefault();
+    if (newPass.length < 6) { setError('A senha deve ter pelo menos 6 caracteres.'); return; }
+    if (newPass !== confirm) { setError('As senhas não coincidem.'); return; }
+    setLoading(true); setError('');
+    const res = await changePassword(newPass);
+    setLoading(false);
+    if (!res.success) { setError(res.error); return; }
+    home();
+  };
+
+  const title = <>{sector.label}<i>.</i></>;
+  const Spinner = () => <span className="spinner" style={{ width: 16, height: 16, borderTopColor: 'var(--on)', borderColor: 'rgba(255,255,255,.3)' }} />;
+
   return (
-    <div style={S.page}>
-      <div style={S.grid} />
-      <div style={{ ...S.glow, background: `radial-gradient(circle,${sector.color}12 0%,transparent 65%)` }} />
+    <div className="lg-page">
+      <div className="lg-grid" />
+      <div className="lg-glow" />
 
-      <div style={S.wrap}>
-        <button style={S.backBtn} onClick={() => navigate('/')}>
-          <ArrowLeft size={14} /> Voltar
-        </button>
+      <div className="lg-wrap">
+        {view === 'login' && (
+          <button className="lg-back" onClick={() => navigate('/')}><ArrowLeft size={14} /> Voltar</button>
+        )}
 
-        <div style={{ ...S.card, border: `1px solid ${sector.color}28`, boxShadow: `0 0 60px ${sector.color}10,0 24px 64px rgba(0,0,0,0.6)` }}>
-          {/* Logo / placeholder */}
-          <div style={S.logoArea}>
-            {sector.logo ? (
-              <img
-                src={sector.logo}
-                alt={sector.label}
-                style={{ width: 130, height: 130, objectFit: 'contain', filter: `drop-shadow(0 0 20px ${sector.color}60)` }}
-              />
-            ) : (
-              <div style={{
-                width: 130, height: 130, borderRadius: 20,
-                background: `radial-gradient(circle at 40% 35%,${sector.color}25,${sector.color}08)`,
-                border: `2px solid ${sector.color}30`,
-                boxShadow: `0 0 28px ${sector.color}20`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48,
-              }}>
-                {sector.emoji}
-              </div>
-            )}
+        <div className="lg-card">
+          <div className={`lg-bg${view === 'login' ? ' login' : ''}`} />
+
+          {/* painel do modo LOGIN — direita */}
+          <div className={`lg-hero login${view === 'login' ? ' active' : ''}`}>
+            <img src={sector.logo} alt={sector.label} />
+            <h2>{title}</h2>
+            <div className="tag">ACESSO RESTRITO</div>
+            <p>Primeira vez entrando? Use aqui mesmo a senha temporária que o admin te passou — a senha nova a gente pede logo em seguida.</p>
           </div>
 
-          <div style={{ textAlign: 'center', marginBottom: 28 }}>
-            <h1 style={S.title}>{sector.label}<span style={{ color: 'var(--neon)' }}>.</span></h1>
-            <p style={S.sub}>Acesso Restrito</p>
+          {/* formulário do modo LOGIN — esquerda */}
+          <div className={`lg-form login${view === 'login' ? ' active' : ''}`}>
+            <h2>Entrar</h2>
+            <p className="sub">Use o ID cadastrado pelo administrador.</p>
+            <form onSubmit={handleLogin}>
+              <div className="lg-field">
+                <label htmlFor="lg-id">ID DE ACESSO</label>
+                <input id="lg-id" type="text" value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="Seu ID" autoComplete="username" autoFocus />
+              </div>
+              <div className="lg-field">
+                <label htmlFor="lg-pw">SENHA</label>
+                <div className="wrap">
+                  <input id="lg-pw" style={{ paddingRight: 44 }} type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" autoComplete="current-password" />
+                  <button type="button" className="lg-eye" onClick={() => setShow(!show)} aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>
+                    {show ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
+              </div>
+              {error && view === 'login' && <p className="lg-err">{error}</p>}
+              <button type="submit" className="lg-btn" disabled={loading}>{loading ? <Spinner /> : 'ENTRAR'}</button>
+            </form>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16, width: '100%' }}>
-            <div style={S.field}>
-              <label style={S.label}>ID DE ACESSO</label>
-              <input style={S.input} type="text" value={loginId} onChange={e => setLoginId(e.target.value)} placeholder="Seu ID" autoFocus />
-            </div>
-            <div style={S.field}>
-              <label style={S.label}>SENHA</label>
-              <div style={{ position: 'relative' }}>
-                <input style={{ ...S.input, paddingRight: 44 }} type={show ? 'text' : 'password'} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" />
-                <button type="button" style={S.eye} onClick={() => setShow(!show)}>
-                  {show ? <EyeOff size={15} color="var(--muted)" /> : <Eye size={15} color="var(--muted)" />}
-                </button>
+          {/* painel do modo PRIMEIRO ACESSO — esquerda */}
+          <div className={`lg-hero first${view === 'first' ? ' active' : ''}`}>
+            <img src={sector.logo} alt={sector.label} />
+            <h2>{title}</h2>
+            <div className="tag">PRIMEIRO ACESSO</div>
+            <p>Senha temporária conferida. Agora defina a sua senha pessoal para concluir o acesso.</p>
+          </div>
+
+          {/* formulário do modo PRIMEIRO ACESSO — direita */}
+          <div className={`lg-form first${view === 'first' ? ' active' : ''}`}>
+            <h2>Primeiro Acesso</h2>
+            <p className="sub">Crie sua senha pessoal para continuar. Ela não poderá ser recuperada, guarde-a bem.</p>
+            <form onSubmit={handleFirst}>
+              <div className="lg-field">
+                <label htmlFor="lg-new">NOVA SENHA</label>
+                <div className="wrap">
+                  <input id="lg-new" style={{ paddingRight: 44 }} type={show ? 'text' : 'password'} value={newPass} onChange={e => setNewPass(e.target.value)} placeholder="Mínimo 6 caracteres" autoComplete="new-password" />
+                  <button type="button" className="lg-eye" onClick={() => setShow(!show)} aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>
+                    {show ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </button>
+                </div>
               </div>
-            </div>
-            {error && <p style={{ fontSize: 12, color: 'var(--neon)', textAlign: 'center' }}>{error}</p>}
-            <button type="submit"
-              style={{ ...S.btn, background: `linear-gradient(135deg,${sector.color},${sector.color}99)`, boxShadow: `0 4px 20px ${sector.color}40` }}
-              disabled={loading}
-            >
-              {loading
-                ? <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} />
-                : 'ENTRAR'}
-            </button>
-          </form>
+              <div className="lg-field">
+                <label htmlFor="lg-conf">CONFIRMAR SENHA</label>
+                <input id="lg-conf" type="password" value={confirm} onChange={e => setConfirm(e.target.value)} placeholder="Repita a senha" autoComplete="new-password" />
+              </div>
+              {error && view === 'first' && <p className="lg-err">{error}</p>}
+              <button type="submit" className="lg-btn" disabled={loading}>{loading ? <Spinner /> : 'DEFINIR SENHA E ENTRAR'}</button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
-const S = {
-  page: { minHeight: '100vh', background: '#07070e', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
-  grid: { position: 'fixed', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(238,51,99,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(238,51,99,.025) 1px,transparent 1px)', backgroundSize: '32px 32px' },
-  glow: { position: 'fixed', width: 700, height: 700, borderRadius: '50%', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', pointerEvents: 'none' },
-  wrap: { position: 'relative', zIndex: 1, width: '100%', maxWidth: 400, padding: '0 20px' },
-  backBtn: { display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', color: 'var(--muted)', fontSize: 13, marginBottom: 16, cursor: 'pointer', padding: '4px 0', fontFamily: 'var(--f)' },
-  card: { background: 'rgba(14,14,28,.97)', borderRadius: 20, padding: '36px 36px 32px', backdropFilter: 'blur(20px)', display: 'flex', flexDirection: 'column', alignItems: 'center' },
-  logoArea: { marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 26, fontWeight: 800, color: '#fff', marginBottom: 4 },
-  sub: { fontSize: 11, color: 'var(--muted)', letterSpacing: '.1em', fontFamily: 'var(--fm)' },
-  field: { display: 'flex', flexDirection: 'column', gap: 7 },
-  label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'rgba(255,255,255,.05)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 10, padding: '12px 14px', color: '#fff', fontSize: 14, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  eye: { position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', display: 'flex', alignItems: 'center', cursor: 'pointer' },
-  btn: { border: 'none', borderRadius: 10, padding: '13px', color: '#fff', fontSize: 13, fontWeight: 700, letterSpacing: '.1em', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 4 },
-};
