@@ -68,7 +68,7 @@ function Pendencias({ pendencias, onChange }) {
   const alternar = (i) => onChange(pendencias.map((p, k) => (k === i ? { ...p, ok: !p.ok } : p)));
 
   return (
-    <Caixa icone={ClipboardList} titulo={`Pendências${abertas ? ` · ${abertas} em aberto` : ''}`} cor={abertas ? '#f59e0b' : null}>
+    <Caixa icone={ClipboardList} titulo={`Pendências${abertas ? ` · ${abertas} em aberto` : ''}`} cor={abertas ? 'var(--amber)' : null}>
       {colando ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <textarea
@@ -92,7 +92,7 @@ function Pendencias({ pendencias, onChange }) {
               {pendencias.map((p, i) => (
                 <li key={`${p.t}-${i}`} style={S.pend} onClick={() => alternar(i)}>
                   <span style={{ ...S.marca, ...(p.ok ? S.marcaOk : {}) }}>
-                    {p.ok && <Check size={10} color="#07070e" strokeWidth={3} />}
+                    {p.ok && <Check size={10} color="var(--bg)" strokeWidth={3} />}
                   </span>
                   <span style={{
                     fontSize: 12, lineHeight: 1.45,
@@ -155,7 +155,7 @@ export default function DocApoio({ doc, dados, documento, pendencias, onPendenci
 
 const S = {
   caixa: {
-    background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)',
+    background: 'var(--bg2)', border: '1px solid var(--border)',
     borderRadius: 12, padding: 14,
   },
   cab: { display: 'flex', alignItems: 'center', gap: 7, marginBottom: 10 },
@@ -176,13 +176,13 @@ const S = {
   },
   marcaOk: { background: 'var(--neon)', borderColor: 'var(--neon)' },
   area: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '10px 12px', fontSize: 12, color: 'var(--text)', outline: 'none',
     minHeight: 96, resize: 'vertical', lineHeight: 1.5, width: '100%',
   },
   btn: {
     background: 'var(--neon)', border: 'none', borderRadius: 8,
-    padding: '7px 14px', fontSize: 12, fontWeight: 600, color: '#fff',
+    padding: '7px 14px', fontSize: 12, fontWeight: 600, color: 'var(--text)',
   },
   btnGhost: {
     background: 'transparent', border: '1px solid var(--border-h)', borderRadius: 8,

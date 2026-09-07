@@ -186,13 +186,13 @@ export default function DocExtras({ doc, extras, onChange }) {
 }
 
 const S = {
-  titulo: { fontSize: 19, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' },
+  titulo: { fontSize: 19, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.3px' },
   sub: { fontSize: 12.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.5, maxWidth: '62ch' },
   vazio: {
     fontSize: 13, color: 'var(--muted)', background: 'var(--surface)',
     border: '1px dashed var(--border)', borderRadius: 10, padding: '18px 20px',
   },
-  card: { background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 12, padding: 13 },
+  card: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 13 },
   cardCab: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   cardBtn: {
     background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
@@ -205,7 +205,7 @@ const S = {
   campo: { display: 'flex', flexDirection: 'column', gap: 5 },
   label: { fontSize: 11, fontWeight: 600, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase' },
   input: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '9px 12px', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%',
   },
   btnAdd: {

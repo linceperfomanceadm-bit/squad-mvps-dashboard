@@ -185,14 +185,14 @@ export default function DocForm({
 }
 
 const S = {
-  titulo: { fontSize: 19, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' },
+  titulo: { fontSize: 19, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.3px' },
   campo: { display: 'flex', flexDirection: 'column', gap: 6 },
   label: {
     fontSize: 11, fontWeight: 600, color: 'var(--muted)',
     letterSpacing: '.1em', textTransform: 'uppercase',
   },
   input: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '10px 13px', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%',
   },
   dica: {

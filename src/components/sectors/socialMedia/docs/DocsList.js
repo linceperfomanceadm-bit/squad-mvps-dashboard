@@ -108,12 +108,12 @@ export default function DocsList({
 
 const S = {
   cab: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 26 },
-  titulo: { fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 },
+  titulo: { fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 },
   sub: { fontSize: 13, color: 'var(--muted)' },
   btn: {
     display: 'flex', alignItems: 'center', gap: 7, background: 'var(--neon)',
     border: 'none', borderRadius: 9, padding: '10px 17px',
-    fontSize: 13, fontWeight: 600, color: '#fff', flexShrink: 0,
+    fontSize: 13, fontWeight: 600, color: 'var(--text)', flexShrink: 0,
   },
   vazio: {
     background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 14,
@@ -121,7 +121,7 @@ const S = {
   },
   grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))', gap: 12 },
   card: {
-    background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14,
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14,
     padding: 16, position: 'relative', display: 'flex',
   },
   cardBtn: {
@@ -129,7 +129,7 @@ const S = {
     display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0,
   },
   cliente: {
-    fontSize: 14.5, fontWeight: 700, color: '#fff', letterSpacing: '-.2px',
+    fontSize: 14.5, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   chip: {

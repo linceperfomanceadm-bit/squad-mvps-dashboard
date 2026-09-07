@@ -37,7 +37,7 @@ export default function NovoDocumentoModal({ clients, onClose, onCreate }) {
         <div style={S.cab}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={S.icone}><FileText size={17} color="var(--neon)" /></div>
-            <h2 style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>Novo documento</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>Novo documento</h2>
           </div>
           <button type="button" style={S.fechar} onClick={onClose}>
             <X size={16} color="var(--muted)" />
@@ -133,14 +133,14 @@ const S = {
   meta: { fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--fm)', flexShrink: 0 },
   desc: { fontSize: 12, color: 'var(--muted)', lineHeight: 1.45 },
   input: {
-    background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '10px 13px', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%',
   },
   dica: { fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.45 },
   erro: { fontSize: 12.5, color: 'var(--neon)' },
   btn: {
     background: 'var(--neon)', border: 'none', borderRadius: 9,
-    padding: '10px 18px', fontSize: 13, fontWeight: 600, color: '#fff',
+    padding: '10px 18px', fontSize: 13, fontWeight: 600, color: 'var(--text)',
   },
   btnGhost: {
     background: 'transparent', border: '1px solid var(--border-h)', borderRadius: 9,
