@@ -70,7 +70,7 @@ function GenericOverview({ myTasks, sectorId }) {
                 </div>
                 <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                   {priority && (
-                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `${priority.color}15`, color: priority.color, fontFamily: 'var(--fm)' }}>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 10, background: `color-mix(in srgb, ${priority.color} 8%, transparent)`, color: priority.color, fontFamily: 'var(--fm)' }}>
                       {priority.label}
                     </span>
                   )}

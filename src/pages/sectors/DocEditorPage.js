@@ -265,7 +265,7 @@ export default function DocEditorPage() {
           </p>
         </div>
 
-        <span style={{ ...S.chip, color: status.color, borderColor: `${status.color}45` }}>{status.label}</span>
+        <span style={{ ...S.chip, color: status.color, borderColor: `color-mix(in srgb, ${status.color} 27%, transparent)` }}>{status.label}</span>
 
         <select
           style={{ ...S.input, width: 150, fontSize: 12 }}

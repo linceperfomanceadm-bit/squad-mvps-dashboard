@@ -212,14 +212,14 @@ export default function CSOperacionalDashboard() {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, gap: 12 }}>
               <div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CS OPERACIONAL</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>🎧 CS OPERACIONAL</span>
                 <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
                 {HEAD[page][1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
               </div>
               {['ops', 'client', 'overview'].includes(page) && (
                 <button
                   onClick={() => setOnlyMine(v => !v)}
-                  style={{ background: onlyMine ? `${COLOR}20` : 'var(--surface)', border: `1px solid ${onlyMine ? `${COLOR}55` : 'var(--border)'}`, borderRadius: 9, padding: '9px 14px', color: onlyMine ? COLOR : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                  style={{ background: onlyMine ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)', border: `1px solid ${onlyMine ? `color-mix(in srgb, ${COLOR} 33%, transparent)` : 'var(--border)'}`, borderRadius: 9, padding: '9px 14px', color: onlyMine ? COLOR : 'var(--muted)', fontSize: 12, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
                 >
                   {onlyMine ? '✓ Meus clientes' : 'Meus clientes'}
                 </button>
@@ -581,7 +581,7 @@ function KickoffWatchCard({ client, onOpen }) {
   return (
     <button
       onClick={onOpen}
-      style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}
+      style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `color-mix(in srgb, ${KICKOFF_COLOR} 25%, transparent)`) : 'var(--border)'}` }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -626,7 +626,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
   const sectors = Object.entries(client.responsibles || {}).filter(([, v]) => v && (Array.isArray(v) ? v.length : true));
 
   return (
-    <div style={{ ...CARD, border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `${COLOR}40`) : 'var(--amber-b)'}` }}>
+    <div style={{ ...CARD, border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `color-mix(in srgb, ${COLOR} 25%, transparent)`) : 'var(--amber-b)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -686,7 +686,7 @@ function KickoffCard({ client, onOpen, onSchedule, onConfirm }) {
 function OpsCard({ client, health, onClick }) {
   const lv = HEALTH_LEVELS_4[health.level];
   return (
-    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', cursor: 'pointer', width: '100%', border: `1px solid ${lv.color}44`, position: 'relative', overflow: 'hidden' }}>
+    <button onClick={onClick} style={{ ...CARD, textAlign: 'left', cursor: 'pointer', width: '100%', border: `1px solid color-mix(in srgb, ${lv.color} 27%, transparent)`, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: lv.color }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingLeft: 6 }}>
         <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{client.name}</p>
@@ -715,7 +715,7 @@ function Mini({ label, value, color }) {
 function ClientHealthCard({ client, health, onSet }) {
   const lv = health.level ? HEALTH_LEVELS_4[health.level] : null;
   return (
-    <div style={{ ...CARD, border: `1px solid ${lv ? `${lv.color}44` : 'var(--border)'}` }}>
+    <div style={{ ...CARD, border: `1px solid ${lv ? `color-mix(in srgb, ${lv.color} 27%, transparent)` : 'var(--border)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>{client.name}</p>
         {lv
@@ -759,7 +759,7 @@ function ClientHealthModal({ client, onClose, onSave }) {
             <button
               key={l.id}
               onClick={() => setLevel(l.id)}
-              style={{ flex: '1 1 45%', padding: '10px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: level === l.id ? `${l.color}22` : 'var(--surface)', color: level === l.id ? l.color : 'var(--muted)', border: `1px solid ${level === l.id ? `${l.color}66` : 'var(--border)'}` }}
+              style={{ flex: '1 1 45%', padding: '10px', borderRadius: 9, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: level === l.id ? `color-mix(in srgb, ${l.color} 13%, transparent)` : 'var(--surface)', color: level === l.id ? l.color : 'var(--muted)', border: `1px solid ${level === l.id ? `color-mix(in srgb, ${l.color} 40%, transparent)` : 'var(--border)'}` }}
             >
               {l.emoji} {l.label}
             </button>
@@ -802,11 +802,11 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth }) {
         <ModalHeader title={client.name} onClose={onClose} />
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-          <div style={{ background: `${lv.color}12`, border: `1px solid ${lv.color}40`, borderRadius: 10, padding: 12 }}>
+          <div style={{ background: `color-mix(in srgb, ${lv.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 25%, transparent)`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>SAÚDE OPERACIONAL</p>
             <p style={{ fontSize: 15, fontWeight: 600, color: lv.color, marginTop: 4 }}>{lv.emoji} {lv.label}</p>
           </div>
-          <div style={{ background: mlv ? `${mlv.color}12` : 'var(--surface)', border: `1px solid ${mlv ? `${mlv.color}40` : 'var(--border)'}`, borderRadius: 10, padding: 12 }}>
+          <div style={{ background: mlv ? `color-mix(in srgb, ${mlv.color} 7%, transparent)` : 'var(--surface)', border: `1px solid ${mlv ? `color-mix(in srgb, ${mlv.color} 25%, transparent)` : 'var(--border)'}`, borderRadius: 10, padding: 12 }}>
             <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>SAÚDE DO CLIENTE</p>
             <p style={{ fontSize: 15, fontWeight: 600, color: mlv ? mlv.color : 'var(--muted)', marginTop: 4 }}>
               {mlv ? `${mlv.emoji} ${mlv.label}` : '— sem avaliação'}
@@ -866,7 +866,7 @@ function Chip({ active, onClick, label, color = COLOR }) {
   return (
     <button
       onClick={onClick}
-      style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: active ? `${color}20` : 'var(--surface)', color: active ? color : 'var(--muted)', border: `1px solid ${active ? `${color}55` : 'var(--border)'}` }}
+      style={{ padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer', background: active ? `color-mix(in srgb, ${color} 13%, transparent)` : 'var(--surface)', color: active ? color : 'var(--muted)', border: `1px solid ${active ? `color-mix(in srgb, ${color} 33%, transparent)` : 'var(--border)'}` }}
     >
       {label}
     </button>

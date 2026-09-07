@@ -155,7 +155,7 @@ export default function CSComercialDashboard() {
         {loading ? <Spinner /> : (
           <>
             <div style={{ marginBottom: 22 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CS COMERCIAL</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>🎧 CS COMERCIAL</span>
               <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
               {HEAD[page][1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
             </div>
@@ -481,7 +481,7 @@ function KickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
   const passou = agendada && new Date(call.at) < new Date();
 
   return (
-    <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}>
+    <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `color-mix(in srgb, ${KICKOFF_COLOR} 25%, transparent)`) : 'var(--border)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -536,7 +536,7 @@ function OnboardingWatchCard({ client, onOpen }) {
   const agendada = !!call.at;
 
   return (
-    <button onClick={onOpen} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? `${COLOR}40` : 'var(--border)'}` }}>
+    <button onClick={onOpen} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${agendada ? `color-mix(in srgb, ${COLOR} 25%, transparent)` : 'var(--border)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         <Tag text={agendada ? 'ONBOARDING AGENDADO' : 'AGUARDANDO CS OPERACIONAL'} color={agendada ? COLOR : 'var(--muted)'} />
