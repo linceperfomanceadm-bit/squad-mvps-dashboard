@@ -5,7 +5,7 @@ import { usePortalClients } from '../../hooks/usePortalClients';
 import { usePortalProducts } from '../../hooks/usePortalProducts';
 import { ECOMMERCE_PLATFORMS, PORTAL_STATUS } from '../../lib/firebase';
  
-const ACCENT = '#EE3363';
+const ACCENT = 'var(--c)';
  
 /*
  * Gestão dos acessos ao Portal de Coleta (admin e WebDesign).
@@ -23,16 +23,16 @@ export default function AdminPortalClients({ clients = [], currentUser, toast })
     <div className="fade-up">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Portal de Produtos</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Portal de Produtos</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>Crie acessos para os clientes cadastrarem os próprios produtos.</p>
         </div>
-        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: `linear-gradient(135deg,${ACCENT},#c41f4a)`, border: 'none', borderRadius: 10, padding: '11px 18px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+        <button onClick={() => { setEditing(null); setShowForm(true); }} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '11px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
           <Plus size={16} /> Novo acesso
         </button>
       </div>
  
       {/* Link do portal */}
-      <div style={{ background: 'rgba(12,12,24,.6)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <ExternalLink size={15} color={ACCENT} />
         <span style={{ fontSize: 13, color: 'var(--text)' }}>Link de acesso do cliente:</span>
         <code style={{ fontSize: 12, color: ACCENT, fontFamily: 'var(--fm)', background: 'rgba(0,0,0,.3)', padding: '3px 8px', borderRadius: 6 }}>{typeof window !== 'undefined' ? window.location.origin : ''}/portal/login</code>
@@ -89,15 +89,15 @@ function PortalClientCard({ pc, onView, onEdit, onDelete }) {
   const done = count >= limit && limit > 0;
  
   return (
-    <div onClick={onView} style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, cursor: 'pointer', transition: 'border-color .2s, transform .15s' }}
+    <div onClick={onView} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, cursor: 'pointer', transition: 'border-color .2s, transform .15s' }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = `${ACCENT}66`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none'; }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>
-          <p style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{pc.clientName}</p>
+          <p style={{ fontSize: 15, fontWeight: 500, color: 'var(--text)' }}>{pc.clientName}</p>
           <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>@{pc.username}</p>
         </div>
-        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, fontFamily: 'var(--fm)', background: `${(done ? '#22c55e' : st.color)}1a`, color: done ? '#22c55e' : st.color, whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 8px', borderRadius: 8, fontFamily: 'var(--fm)', background: `${(done ? 'var(--green)' : st.color)}1a`, color: done ? 'var(--green)' : st.color, whiteSpace: 'nowrap' }}>
           {done ? 'COMPLETO' : st.label.toUpperCase()}
         </span>
       </div>
@@ -105,17 +105,17 @@ function PortalClientCard({ pc, onView, onEdit, onDelete }) {
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>{platformLabel}</span>
         {pc.crmClientId && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: `${ACCENT}1a`, color: ACCENT }}>CRM</span>}
-        {!pc.active && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: 'rgba(239,68,68,.15)', color: '#ef4444' }}>Desativado</span>}
+        {!pc.active && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: 'var(--red-dim)', color: 'var(--red)' }}>Desativado</span>}
       </div>
  
       {/* progresso */}
       <div style={{ marginTop: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
           <span style={{ fontSize: 11, color: 'var(--muted)' }}>Produtos</span>
-          <span style={{ fontSize: 12, fontWeight: 700, color: done ? '#22c55e' : 'var(--text)', fontFamily: 'var(--fm)' }}>{count} / {limit}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: done ? 'var(--green)' : 'var(--text)', fontFamily: 'var(--fm)' }}>{count} / {limit}</span>
         </div>
         <div style={{ height: 6, borderRadius: 4, background: 'var(--surface)', overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${pct}%`, background: done ? '#22c55e' : ACCENT, transition: 'width .4s' }} />
+          <div style={{ height: '100%', width: `${pct}%`, background: done ? 'var(--green)' : ACCENT, transition: 'width .4s' }} />
         </div>
       </div>
  
@@ -127,7 +127,7 @@ function PortalClientCard({ pc, onView, onEdit, onDelete }) {
         <button onClick={e => { e.stopPropagation(); onEdit(); }} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px', color: 'var(--text)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
           <Edit2 size={12} /> Editar
         </button>
-        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', color: '#ef4444', cursor: 'pointer', display: 'flex' }}>
+        <button onClick={e => { e.stopPropagation(); onDelete(); }} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 11px', color: 'var(--red)', cursor: 'pointer', display: 'flex' }}>
           <Trash2 size={12} />
         </button>
       </div>
@@ -182,10 +182,10 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
   };
  
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 480, maxHeight: '90vh', overflowY: 'auto', padding: 24, boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>{isEdit ? 'Editar acesso' : 'Novo acesso'}</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: 'var(--text)' }}>{isEdit ? 'Editar acesso' : 'Novo acesso'}</h2>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 7, cursor: 'pointer', display: 'flex' }}><X size={16} color="var(--muted)" /></button>
         </div>
  
@@ -232,8 +232,8 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
  
           {isEdit && (
             <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-              <button onClick={() => setActive(!active)} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: active ? '#22c55e' : 'rgba(40,40,60,.9)', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: 2, left: active ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: '#fff', transition: 'left .2s' }} />
+              <button onClick={() => setActive(!active)} style={{ width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer', background: active ? 'var(--green)' : 'var(--bg4)', position: 'relative' }}>
+                <span style={{ position: 'absolute', top: 2, left: active ? 22 : 2, width: 20, height: 20, borderRadius: '50%', background: active ? 'var(--on)' : 'var(--muted)', transition: 'left .2s' }} />
               </button>
               <span style={{ fontSize: 13, color: 'var(--text)' }}>Acesso ativo</span>
             </label>
@@ -241,7 +241,7 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
         </div>
  
         {error && <p style={{ fontSize: 12, color: ACCENT, marginTop: 14 }}>{error}</p>}
-        <button onClick={submit} disabled={busy} style={{ width: '100%', background: `linear-gradient(135deg,${ACCENT},#c41f4a)`, border: 'none', borderRadius: 10, padding: '13px', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 18, opacity: busy ? 0.7 : 1 }}>
+        <button onClick={submit} disabled={busy} style={{ width: '100%', background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '13px', color: 'var(--text)', fontSize: 14, fontWeight: 700, cursor: 'pointer', marginTop: 18, opacity: busy ? 0.7 : 1 }}>
           {busy ? 'Salvando...' : (isEdit ? 'Salvar' : 'Criar acesso')}
         </button>
       </div>
@@ -251,13 +251,13 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
  
 function ConfirmDelete({ pc, onClose, onConfirm }) {
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(16,16,30,.98)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 380, textAlign: 'center' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, maxWidth: 380, textAlign: 'center' }}>
         <Trash2 size={28} color="#ef4444" style={{ marginBottom: 12 }} />
-        <h3 style={{ fontSize: 17, fontWeight: 800, color: '#fff', marginBottom: 6 }}>Remover acesso?</h3>
+        <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Remover acesso?</h3>
         <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>O acesso de "{pc.clientName}" será removido. Os produtos cadastrados não são apagados automaticamente.</p>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onConfirm} style={{ flex: 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)', border: 'none', borderRadius: 10, padding: '11px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Remover</button>
+          <button onClick={onConfirm} style={{ flex: 1, background: 'linear-gradient(135deg,#ef4444,#dc2626)', border: 'none', borderRadius: 10, padding: '11px', color: 'var(--on)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Remover</button>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 18px', color: 'var(--muted)', fontSize: 13, cursor: 'pointer' }}>Cancelar</button>
         </div>
       </div>
@@ -300,16 +300,16 @@ function ProductViewerModal({ pc, onClose, toast }) {
   };
  
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 720, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 720, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
         {/* header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, padding: 22, borderBottom: '1px solid var(--border)' }}>
           <div>
-            <h2 style={{ fontSize: 19, fontWeight: 800, color: '#fff', marginBottom: 3 }}>{pc.clientName}</h2>
+            <h2 style={{ fontSize: 19, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{pc.clientName}</h2>
             <p style={{ fontSize: 12, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>@{pc.username} · {platformLabel} · {products.length} produto{products.length !== 1 ? 's' : ''}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 6, background: `linear-gradient(135deg,${ACCENT},#c41f4a)`, border: 'none', borderRadius: 9, padding: '9px 14px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+            <button onClick={downloadCsv} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--grad)', border: 'none', borderRadius: 9, padding: '9px 14px', color: 'var(--text)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
               <Download size={14} /> Baixar CSV
             </button>
             <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 9, cursor: 'pointer', display: 'flex' }}><X size={16} color="var(--muted)" /></button>
@@ -330,15 +330,15 @@ function ProductViewerModal({ pc, onClose, toast }) {
               {products.map(p => {
                 const cover = (p.images || [])[0];
                 return (
-                  <div key={p.id} onClick={() => setSelected(p)} style={{ background: 'rgba(12,12,24,.7)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color .2s' }}
+                  <div key={p.id} onClick={() => setSelected(p)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color .2s' }}
                     onMouseEnter={e => e.currentTarget.style.borderColor = `${ACCENT}66`}
                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
-                    <div style={{ height: 130, background: '#0c0c18', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <div style={{ height: 130, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                       {cover ? <img src={cover.url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={28} color="var(--muted)" />}
-                      {(p.images || []).length > 1 && <span style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 10, fontWeight: 700, background: 'rgba(0,0,0,.7)', color: '#fff', padding: '2px 7px', borderRadius: 6, fontFamily: 'var(--fm)' }}>{(p.images || []).length} fotos</span>}
+                      {(p.images || []).length > 1 && <span style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 10, fontWeight: 700, background: 'rgba(0,0,0,.55)', color: 'var(--text)', padding: '2px 7px', borderRadius: 6, fontFamily: 'var(--fm)' }}>{(p.images || []).length} fotos</span>}
                     </div>
                     <div style={{ padding: 11 }}>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Sem nome'}</p>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name || 'Sem nome'}</p>
                       <p style={{ fontSize: 13, fontWeight: 700, color: ACCENT, fontFamily: 'var(--fm)' }}>{p.price ? `R$ ${p.price}` : '—'}</p>
                     </div>
                   </div>
@@ -385,26 +385,26 @@ function ProductDetailModal({ product, onClose, toast }) {
   ) : null;
  
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>{product.name || 'Produto'}</h2>
+          <h2 style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)' }}>{product.name || 'Produto'}</h2>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 8, cursor: 'pointer', display: 'flex' }}><X size={16} color="var(--muted)" /></button>
         </div>
  
         <div style={{ overflowY: 'auto', padding: 20 }}>
           {imgs.length > 0 && (
             <div style={{ marginBottom: 18 }}>
-              <div style={{ position: 'relative', height: 260, background: '#0c0c18', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', height: 260, background: 'var(--bg)', borderRadius: 12, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img src={cur.url} alt={product.name} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
                 {imgs.length > 1 && (
                   <>
                     <button onClick={() => setIdx((idx - 1 + imgs.length) % imgs.length)} style={navBtn('left')}><ChevronLeft size={18} color="#fff" /></button>
                     <button onClick={() => setIdx((idx + 1) % imgs.length)} style={navBtn('right')}><ChevronRight size={18} color="#fff" /></button>
-                    <span style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, background: 'rgba(0,0,0,.7)', color: '#fff', padding: '3px 9px', borderRadius: 8, fontFamily: 'var(--fm)' }}>{idx + 1} / {imgs.length}</span>
+                    <span style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', fontSize: 11, fontWeight: 700, background: 'rgba(0,0,0,.55)', color: 'var(--text)', padding: '3px 9px', borderRadius: 8, fontFamily: 'var(--fm)' }}>{idx + 1} / {imgs.length}</span>
                   </>
                 )}
-                <button onClick={() => downloadImage(cur, idx)} style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,0,0,.7)', border: 'none', borderRadius: 8, padding: '6px 10px', color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
+                <button onClick={() => downloadImage(cur, idx)} style={{ position: 'absolute', top: 8, right: 8, display: 'flex', alignItems: 'center', gap: 5, background: 'rgba(0,0,0,.55)', border: 'none', borderRadius: 8, padding: '6px 10px', color: 'var(--text)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>
                   <Download size={12} /> Baixar
                 </button>
               </div>
@@ -440,7 +440,7 @@ function ProductDetailModal({ product, onClose, toast }) {
   );
 }
  
-const navBtn = (side) => ({ position: 'absolute', top: '50%', [side]: 8, transform: 'translateY(-50%)', background: 'rgba(0,0,0,.6)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' });
+const navBtn = (side) => ({ position: 'absolute', top: '50%', [side]: 8, transform: 'translateY(-50%)', background: 'rgba(0,0,0,.55)', border: 'none', borderRadius: '50%', width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' });
  
 function FieldA({ label, children }) {
   return (
