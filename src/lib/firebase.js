@@ -34,16 +34,27 @@ export const loginIdToEmail = (loginId) =>
 // do emblema de cada time.
 // Para trocar a logo: coloque o PNG em /public/logos/ e ajuste `logo`.
 export const SECTORS = {
-  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#FD2534', emoji: '🌐', logo: '/logos/webdesign.png' },
-  design:      { id: 'design',      label: 'Design',        color: '#8F97A0', emoji: '🎨', logo: '/logos/design.png' },
-  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#E91E63', emoji: '📱', logo: '/logos/socialmedia.png' },
-  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', emoji: '🎬', logo: '/logos/videomaker.png' },
-  cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', emoji: '🎧', logo: '/logos/cs.png' },
-  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', emoji: '📊', logo: '/logos/trafego.png' },
+  webdesign:   { id: 'webdesign',   label: 'WebDesign',     color: '#FD2534', c2: '#FF9A3D', on: '#ffffff', light: { color: '#D61C28', c2: '#D46A10' }, emoji: '🌐', logo: '/logos/webdesign.png' },
+  design:      { id: 'design',      label: 'Design',        color: '#8F97A0', c2: '#C7D1DA', on: '#0d0d10', light: { color: '#59636E', c2: '#76838F' }, emoji: '🎨', logo: '/logos/design.png' },
+  socialmedia: { id: 'socialmedia', label: 'Social Media',  color: '#E91E63', c2: '#B23DFF', on: '#ffffff', light: { color: '#CF1A57', c2: '#8A2BD9' }, emoji: '📱', logo: '/logos/socialmedia.png' },
+  videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', c2: '#7C5CFF', on: '#ffffff', light: { color: '#3232C4', c2: '#6247E3' }, emoji: '🎬', logo: '/logos/videomaker.png' },
+  cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', c2: '#4DA6FF', on: '#052226', light: { color: '#0A7588', c2: '#1E63C4' }, emoji: '🎧', logo: '/logos/cs.png' },
+  trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', c2: '#FF7A3D', on: '#1a1400', light: { color: '#9C6500', c2: '#C94A17' }, emoji: '📊', logo: '/logos/trafego.png' },
 };
 
 // Entrada do Admin (não é um "setor" comum, mas a tela de login usa).
-export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', emoji: '👑', logo: '/logos/admin.png' };
+export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', c2: '#FF7A3D', on: '#ffffff', light: { color: '#D4224F', c2: '#E0521F' }, emoji: '👑', logo: '/logos/admin.png' };
+
+// ─── Identidade por tema ──────────────────────────────────────
+// `color` é a cor do emblema; `c2` o fim do gradiente; `on` o texto
+// que passa em contraste sobre elas. No light, ciano e amarelo não
+// existem sobre branco (1,2:1 e 1,6:1), por isso cada setor tem uma
+// versão escurecida — e ali o texto sobre a cor é sempre branco.
+export function sectorTheme(sectorId, theme = 'dark') {
+  const s = SECTORS[sectorId] || ADMIN_CONFIG;
+  if (theme === 'light') return { c: s.light.color, c2: s.light.c2, on: '#ffffff', color: s.light.color };
+  return { c: s.color, c2: s.c2, on: s.on, color: s.color };
+}
 
 // ─── Subpapéis (funções dentro do setor) ──────────────────────
 // O login é o mesmo do setor; o que decide para qual painel a pessoa
