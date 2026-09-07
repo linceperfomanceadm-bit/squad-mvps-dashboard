@@ -128,7 +128,7 @@ function InboxCard({ request, onClick }) {
       </div>
 
       <p style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {request.clientName}</p>
-      <p style={{ fontSize: 12, color: '#999', marginTop: 10, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+      <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
         {request.description}
       </p>
 
@@ -187,7 +187,7 @@ function RequestDetail({ request, currentUser, currentUserSector, onClose, onRep
                     <span style={{ fontSize: 12, fontWeight: 700, color: rep.role === 'cs' ? 'var(--neon)' : 'var(--blue)' }}>{rep.author}</span>
                     <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
+                  <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
                 </div>
               ))}
             </div>
