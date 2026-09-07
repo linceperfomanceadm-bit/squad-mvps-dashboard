@@ -45,7 +45,7 @@ export default function NotificationCenter() {
           <Bell size={16} color="var(--neon)" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>Ativar notificações</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>Ativar notificações</p>
           <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55, marginTop: 4 }}>
             Avisamos quando a CS abrir uma solicitação para você, quando cair uma task
             nova ou um ajuste, e quando uma call for agendada.
@@ -61,7 +61,7 @@ export default function NotificationCenter() {
       <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
         <button
           onClick={async () => { await notify.request(); setDismissed(true); }}
-          style={{ flex: 1, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 9, padding: '9px', color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
+          style={{ flex: 1, background: 'var(--grad)', border: 'none', borderRadius: 9, padding: '9px', color: 'var(--on)', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
         >
           Ativar
         </button>

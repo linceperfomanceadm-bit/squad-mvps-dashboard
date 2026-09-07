@@ -26,7 +26,7 @@ export default function AgendaView() {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Agenda</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Agenda</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Calendário da agência, em tempo real.</p>
       </div>
 
@@ -35,7 +35,7 @@ export default function AgendaView() {
       ) : embedUrl ? (
         <div style={{
           borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)',
-          background: '#121826',
+          background: 'var(--bg3)',
           boxShadow: '0 8px 32px rgba(0,0,0,.4)',
         }}>
           <iframe
@@ -49,7 +49,7 @@ export default function AgendaView() {
           />
         </div>
       ) : (
-        <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 16, textAlign: 'center', padding: '48px 24px' }}>
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, textAlign: 'center', padding: '48px 24px' }}>
           <Calendar size={36} color="var(--muted)" style={{ marginBottom: 12 }} />
           <p style={{ fontSize: 14, color: 'var(--text)', fontWeight: 600, marginBottom: 6 }}>Agenda ainda não configurada</p>
           <p style={{ fontSize: 13, color: 'var(--muted)', maxWidth: 420, margin: '0 auto', lineHeight: 1.6 }}>

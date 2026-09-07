@@ -49,7 +49,7 @@ export default function RequestsInbox({
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           Reporte da CS
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -119,7 +119,7 @@ function InboxCard({ request, onClick }) {
       {nova && <div style={{ position: 'absolute', top: 14, right: 14, width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)', boxShadow: '0 0 8px var(--amber)' }} />}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14, marginBottom: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{request.subject}</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.35 }}>{request.subject}</p>
       </div>
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -132,7 +132,7 @@ function InboxCard({ request, onClick }) {
         {request.description}
       </p>
 
-      <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+      <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
         {request.createdBy} · {fmt(request.createdAt)}
       </p>
     </button>
@@ -168,7 +168,7 @@ function RequestDetail({ request, currentUser, currentUserSector, onClose, onRep
         <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, marginBottom: 16 }}>
           <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>👤 {request.clientName}</p>
           <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{request.description}</p>
-          <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 10 }}>
+          <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 10 }}>
             {request.createdBy} · {fmt(request.createdAt)}
           </p>
         </div>
@@ -179,13 +179,13 @@ function RequestDetail({ request, currentUser, currentUserSector, onClose, onRep
             <div style={{ marginTop: 8, marginBottom: 16 }}>
               {(request.replies || []).map(rep => (
                 <div key={rep.id} style={{
-                  background: rep.role === 'cs' ? 'rgba(238,51,99,.06)' : 'rgba(255,255,255,.03)',
+                  background: rep.role === 'cs' ? 'var(--neon-dim)' : 'var(--surface)',
                   border: `1px solid ${rep.role === 'cs' ? 'var(--neon-border)' : 'var(--border)'}`,
                   borderRadius: 9, padding: '10px 12px', marginBottom: 8,
                 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                     <span style={{ fontSize: 12, fontWeight: 700, color: rep.role === 'cs' ? 'var(--neon)' : 'var(--blue)' }}>{rep.author}</span>
-                    <span style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
+                    <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
                   </div>
                   <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
                 </div>

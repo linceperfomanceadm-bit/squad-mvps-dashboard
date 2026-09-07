@@ -68,11 +68,11 @@ export default function PatchNotesPopup({ user }) {
   return ReactDOM.createPortal(
     <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(18,18,32,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
-        <div style={{ background: 'linear-gradient(135deg,var(--neon),#c41f4a)', padding: '22px 24px', position: 'relative' }}>
+        <div style={{ background: 'var(--grad)', padding: '22px 24px', position: 'relative' }}>
           <Sparkles size={26} color="#fff" style={{ marginBottom: 8 }} />
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{PATCH_NOTES.title}</h2>
-          <p style={{ fontSize: 12, color: 'rgba(255,255,255,.85)', fontFamily: 'var(--fm)', marginTop: 2 }}>{PATCH_NOTES.date}</p>
-          <button onClick={close} style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(255,255,255,.2)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={16} color="#fff" /></button>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>{PATCH_NOTES.title}</h2>
+          <p style={{ fontSize: 12, color: 'var(--text)', fontFamily: 'var(--fm)', marginTop: 2 }}>{PATCH_NOTES.date}</p>
+          <button onClick={close} style={{ position: 'absolute', top: 16, right: 16, background: 'var(--border-s)', border: 'none', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={16} color="#fff" /></button>
         </div>
         <div style={{ padding: 22 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -83,7 +83,7 @@ export default function PatchNotesPopup({ user }) {
               </div>
             ))}
           </div>
-          <button onClick={close} style={{ width: '100%', marginTop: 22, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '13px', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+          <button onClick={close} style={{ width: '100%', marginTop: 22, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '13px', color: 'var(--on)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
             Entendi!
           </button>
         </div>
