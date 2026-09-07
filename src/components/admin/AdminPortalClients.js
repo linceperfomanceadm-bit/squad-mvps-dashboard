@@ -90,7 +90,7 @@ function PortalClientCard({ pc, onView, onEdit, onDelete }) {
  
   return (
     <div onClick={onView} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 16, cursor: 'pointer', transition: 'border-color .2s, transform .15s' }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = `${ACCENT}66`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = `color-mix(in srgb, ${ACCENT} 40%, transparent)`; e.currentTarget.style.transform = 'translateY(-2px)'; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none'; }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
         <div>
@@ -104,7 +104,7 @@ function PortalClientCard({ pc, onView, onEdit, onDelete }) {
  
       <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}>{platformLabel}</span>
-        {pc.crmClientId && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: `${ACCENT}1a`, color: ACCENT }}>CRM</span>}
+        {pc.crmClientId && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: `color-mix(in srgb, ${ACCENT} 10%, transparent)`, color: ACCENT }}>CRM</span>}
         {!pc.active && <span style={{ fontSize: 11, padding: '3px 9px', borderRadius: 8, background: 'var(--red-dim)', color: 'var(--red)' }}>Desativado</span>}
       </div>
  
@@ -192,8 +192,8 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
         {/* Tipo: CRM ou avulso */}
         {!isEdit && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button onClick={() => setMode('crm')} style={{ flex: 1, padding: '10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: mode === 'crm' ? `${ACCENT}1f` : 'var(--surface)', color: mode === 'crm' ? ACCENT : 'var(--muted)', border: `1px solid ${mode === 'crm' ? `${ACCENT}60` : 'var(--border)'}` }}>Cliente do CRM</button>
-            <button onClick={() => setMode('avulso')} style={{ flex: 1, padding: '10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: mode === 'avulso' ? `${ACCENT}1f` : 'var(--surface)', color: mode === 'avulso' ? ACCENT : 'var(--muted)', border: `1px solid ${mode === 'avulso' ? `${ACCENT}60` : 'var(--border)'}` }}>Cliente avulso</button>
+            <button onClick={() => setMode('crm')} style={{ flex: 1, padding: '10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: mode === 'crm' ? `color-mix(in srgb, ${ACCENT} 12%, transparent)` : 'var(--surface)', color: mode === 'crm' ? ACCENT : 'var(--muted)', border: `1px solid ${mode === 'crm' ? `color-mix(in srgb, ${ACCENT} 38%, transparent)` : 'var(--border)'}` }}>Cliente do CRM</button>
+            <button onClick={() => setMode('avulso')} style={{ flex: 1, padding: '10px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 700, background: mode === 'avulso' ? `color-mix(in srgb, ${ACCENT} 12%, transparent)` : 'var(--surface)', color: mode === 'avulso' ? ACCENT : 'var(--muted)', border: `1px solid ${mode === 'avulso' ? `color-mix(in srgb, ${ACCENT} 38%, transparent)` : 'var(--border)'}` }}>Cliente avulso</button>
           </div>
         )}
  
@@ -224,7 +224,7 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
           <FieldA label="PLATAFORMA *">
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {ECOMMERCE_PLATFORMS.map(p => (
-                <button key={p.id} onClick={() => setPlatform(p.id)} style={{ padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: platform === p.id ? `${p.color}22` : 'var(--surface)', color: platform === p.id ? p.color : 'var(--muted)', border: `1px solid ${platform === p.id ? `${p.color}60` : 'var(--border)'}` }}>{p.label}</button>
+                <button key={p.id} onClick={() => setPlatform(p.id)} style={{ padding: '8px 14px', borderRadius: 9, cursor: 'pointer', fontSize: 13, fontWeight: 600, background: platform === p.id ? `color-mix(in srgb, ${p.color} 13%, transparent)` : 'var(--surface)', color: platform === p.id ? p.color : 'var(--muted)', border: `1px solid ${platform === p.id ? `color-mix(in srgb, ${p.color} 38%, transparent)` : 'var(--border)'}` }}>{p.label}</button>
               ))}
             </div>
           </FieldA>
@@ -331,7 +331,7 @@ function ProductViewerModal({ pc, onClose, toast }) {
                 const cover = (p.images || [])[0];
                 return (
                   <div key={p.id} onClick={() => setSelected(p)} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color .2s' }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = `${ACCENT}66`}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = `color-mix(in srgb, ${ACCENT} 40%, transparent)`}
                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
                     <div style={{ height: 130, background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
                       {cover ? <img src={cover.url} alt={p.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <ImageIcon size={28} color="var(--muted)" />}

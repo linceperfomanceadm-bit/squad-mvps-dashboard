@@ -29,9 +29,9 @@ function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
               return (
                 <button key={c.id} type="button" onClick={() => toggle(c.name)} style={{
                   fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 16, cursor: 'pointer',
-                  background: active ? `${sector.color}22` : 'var(--surface)',
+                  background: active ? `color-mix(in srgb, ${sector.color} 13%, transparent)` : 'var(--surface)',
                   color: active ? sector.color : 'var(--muted)',
-                  border: `1px solid ${active ? `${sector.color}66` : 'var(--border)'}`,
+                  border: `1px solid ${active ? `color-mix(in srgb, ${sector.color} 40%, transparent)` : 'var(--border)'}`,
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}>
                   {active && <Check size={11} />} {c.name}

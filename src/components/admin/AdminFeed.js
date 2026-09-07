@@ -175,7 +175,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                             {sector && <span style={{ fontSize: 11, color: sector.color }}>{sector.emoji} {sector.label}</span>}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
-                            {priority && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `${priority.color}15`, color: priority.color }}>{priority.label}</span>}
+                            {priority && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `color-mix(in srgb, ${priority.color} 8%, transparent)`, color: priority.color }}>{priority.label}</span>}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
                             <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `${statusColors[t.status]}15`, color: statusColors[t.status] }}>
@@ -225,7 +225,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                             {p.date ? format(new Date(p.date), 'dd/MM/yy', { locale: ptBR }) : '—'}
                           </td>
                           <td style={{ padding: '10px 12px' }}>
-                            {col && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${col.color}15`, color: col.color }}>{col.label}</span>}
+                            {col && <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `color-mix(in srgb, ${col.color} 8%, transparent)`, color: col.color }}>{col.label}</span>}
                           </td>
                         </tr>
                       );

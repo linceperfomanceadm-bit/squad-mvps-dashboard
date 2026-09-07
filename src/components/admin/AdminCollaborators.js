@@ -191,7 +191,7 @@ function LeaderPicker({ value, onChange }) {
             key={s.id}
             type="button"
             onClick={() => toggle(s.id)}
-            style={{ fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', background: active ? `${s.color}22` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `${s.color}66` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', background: active ? `color-mix(in srgb, ${s.color} 13%, transparent)` : 'var(--surface)', color: active ? s.color : 'var(--muted)', border: `1px solid ${active ? `color-mix(in srgb, ${s.color} 40%, transparent)` : 'var(--border)'}`, display: 'flex', alignItems: 'center', gap: 4 }}
           >
             {active && <Check size={10} />} {s.emoji} {s.label}
           </button>
@@ -238,13 +238,13 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 40, height: 40, borderRadius: 12, background: `${sector.color}18`, border: `1px solid ${sector.color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: sector.color, flexShrink: 0 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 12, background: `color-mix(in srgb, ${sector.color} 9%, transparent)`, border: `1px solid color-mix(in srgb, ${sector.color} 19%, transparent)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 700, color: sector.color, flexShrink: 0 }}>
                 {collab.name.charAt(0).toUpperCase()}
               </div>
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{collab.name}
                   {collab.sector === 'cs' && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `${sector.color}20`, color: sector.color, verticalAlign: 'middle' }}>{(collab.csRole || 'operacional') === 'comercial' ? 'CS COMERCIAL' : 'CS OPERACIONAL'}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `color-mix(in srgb, ${sector.color} 13%, transparent)`, color: sector.color, verticalAlign: 'middle' }}>{(collab.csRole || 'operacional') === 'comercial' ? 'CS COMERCIAL' : 'CS OPERACIONAL'}</span>
                   )}
                 </p>
                 <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>ID: {collab.loginId}</p>

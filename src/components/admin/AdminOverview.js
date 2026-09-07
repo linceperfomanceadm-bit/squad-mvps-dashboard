@@ -58,7 +58,8 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
   const breakdown = [...top4.slice(0, 3).map(s => [s.label, s.value]), ['Outros', top4.slice(3).reduce((a, s) => a + s.value, 0)]];
 
   // ── clientes ──
-  const stages = ['staffing', 'kickoff', 'onboarding', 'live'].map(k => ({ k, n: active.filter(c => stageOf(c) === k).length }));
+  // Ordem real do ciclo desde o lote 2: Kick Off vem antes do staffing.
+  const stages = ['kickoff', 'staffing', 'onboarding', 'live'].map(k => ({ k, n: active.filter(c => stageOf(c) === k).length }));
   const newWeek = active.filter(c => { const d = toDate(c.createdAt); return d && differenceInDays(now, d) < 7; }).length;
   const newMonth = active.filter(c => sameMonth(toDate(c.createdAt), now)).length;
 
@@ -129,7 +130,7 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
             ))}
           </div>
         </Card>
-        <Card title="Ciclo de vida" sub="staffing → kickoff → onboarding → live">
+        <Card title="Ciclo de vida" sub="kick off → staffing → onboarding → live">
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', marginTop: 14 }}>
             {stages.map((s, i) => (
               <div key={s.k} style={{ padding: '6px 18px 4px 0', borderRight: i < 3 ? '1px solid var(--border)' : 'none', marginRight: i < 3 ? 18 : 0 }}>

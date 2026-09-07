@@ -121,16 +121,51 @@ const AreaTip = ({ active, payload, label }) => {
   );
 };
 
+const PERIODOS = [
+  ['mes', 'Este mês'], ['mes-1', 'Mês passado'], ['7', '7 dias'], ['30', '30 dias'], ['90', '90 dias'], ['tudo', 'Tudo'], ['custom', 'Período…'],
+];
+
+// Início/fim do período escolhido. `custom` usa as duas datas do usuário.
+function janelaDe(periodo, de, ate, now) {
+  const fimDia = (d) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+  if (periodo === 'mes') return [new Date(now.getFullYear(), now.getMonth(), 1), fimDia(now)];
+  if (periodo === 'mes-1') return [new Date(now.getFullYear(), now.getMonth() - 1, 1), fimDia(new Date(now.getFullYear(), now.getMonth(), 0))];
+  if (periodo === 'custom') return [de ? new Date(`${de}T00:00:00`) : null, ate ? fimDia(new Date(`${ate}T00:00:00`)) : fimDia(now)];
+  if (periodo === 'tudo') return [null, null];
+  const dias = Number(periodo);
+  const ini = new Date(now); ini.setDate(now.getDate() - dias + 1); ini.setHours(0, 0, 0, 0);
+  return [ini, fimDia(now)];
+}
+
+const SEL = { height: 34, borderRadius: 99, background: 'var(--bg3)', border: '1px solid var(--border-h)', padding: '0 32px 0 12px', fontSize: 12.5, color: 'var(--muted)', minWidth: 0 };
+const SEL_ON = { borderColor: 'var(--c)', background: 'var(--c-dim)', color: 'var(--text)', fontWeight: 600 };
+
 export default function AdminCharts({ clients, tasks = [] }) {
-  const [periodo, setPeriodo] = useState('mes'); // 'mes' | 'tudo'
+  const [periodo, setPeriodo] = useState('mes');
+  const [de, setDe] = useState('');
+  const [ate, setAte] = useState('');
+  const [setor, setSetor] = useState('');
+  const [pessoa, setPessoa] = useState('');
   const now = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  // Quem já entregou alguma coisa — alimenta o filtro de colaborador.
+  const pessoas = useMemo(() => {
+    const set = new Set();
+    tasks.forEach(t => entregadoresDe(t).forEach(n => set.add(n)));
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [tasks]);
+
   const d = useMemo(() => {
-    const done = tasks.filter(t => t.status === 'done');
-    const noPeriodo = periodo === 'mes'
-      ? done.filter(t => { const c = toDate(t.completedAt); return c && c >= inicioMes; })
-      : done;
+    const [ini, fim] = janelaDe(periodo, de, ate, now);
+    const dentro = (dt) => { const c = toDate(dt); return !!c && (!ini || c >= ini) && (!fim || c <= fim); };
+    const doSetor = (t) => !setor || (t.deliveredBySector || t.responsibleSector) === setor;
+    const daPessoa = (t) => !pessoa || entregadoresDe(t).includes(pessoa);
+    const filtro = (t) => doSetor(t) && daPessoa(t);
+
+    const done = tasks.filter(t => t.status === 'done' && filtro(t));
+    const noPeriodo = done.filter(t => dentro(t.completedAt));
+    const tudoFiltrado = tasks.filter(filtro);
 
     // anéis
     const dePrimeira = noPeriodo.filter(t => !t.reworkCount).length;
@@ -154,12 +189,31 @@ export default function AdminCharts({ clients, tasks = [] }) {
     // área do mês (sempre o mês corrente)
     const diasNoMes = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const porDia = Array.from({ length: diasNoMes }, (_, i) => ({ dia: i + 1, v: 0 }));
-    done.forEach(t => { const c = toDate(t.completedAt); if (c && c >= inicioMes) porDia[c.getDate() - 1].v++; });
+    done.forEach(t => { const c = toDate(t.completedAt); if (c && c >= inicioMes) porDia[c.getDate() - 1].v++; }); // `done` já vem filtrado por setor/pessoa
     const ateHoje = porDia.slice(0, now.getDate());
 
-    // demanda por setor
+    // tempo de produção por pessoa — o número que faltava: quantas
+    // entregas E quanto tempo cada uma leva, lado a lado.
+    const tempoPessoa = {};
+    noPeriodo.forEach(t => {
+      const a = toDate(t.startedAt), b = toDate(t.completedAt);
+      const dur = a && b ? b - a : null;
+      entregadoresDe(t).forEach(n => {
+        if (!tempoPessoa[n]) tempoPessoa[n] = { name: n, entregas: 0, durs: [] };
+        tempoPessoa[n].entregas++;
+        if (dur) tempoPessoa[n].durs.push(dur);
+      });
+    });
+    const tempoRows = Object.values(tempoPessoa).map(p => {
+      const ord = [...p.durs].sort((x, y) => x - y);
+      const mediana = ord.length ? ord[Math.floor(ord.length / 2)] : 0;
+      const med = ord.length ? ord.reduce((x, y) => x + y, 0) / ord.length : 0;
+      return { name: p.name, entregas: p.entregas, media: med, mediana, maior: ord[ord.length - 1] || 0, comTempo: ord.length };
+    }).sort((a, b) => b.entregas - a.entregas);
+
+    // demanda por setor (tasks criadas no período)
     const demanda = {};
-    (periodo === 'mes' ? tasks.filter(t => { const c = toDate(t.createdAt); return c && c >= inicioMes; }) : tasks)
+    tudoFiltrado.filter(t => periodo === 'tudo' || dentro(t.createdAt))
       .forEach(t => { if (t.requestedBySector) demanda[t.requestedBySector] = (demanda[t.requestedBySector] || 0) + 1; });
     const demandaRows = Object.entries(demanda).map(([id, v]) => ({ id, label: SECTORS[id]?.label || id, value: v, color: SECTORS[id]?.color }))
       .sort((a, b) => b.value - a.value);
@@ -176,20 +230,20 @@ export default function AdminCharts({ clients, tasks = [] }) {
     });
     const colabRows = Object.values(colab).sort((a, b) => b.total - a.total).slice(0, 8);
 
-    // refações por cliente
+    // refações por cliente (entregues no período + as ainda abertas)
     const redo = {};
-    (periodo === 'mes' ? noPeriodo.concat(tasks.filter(t => t.status !== 'done')) : tasks)
+    noPeriodo.concat(tudoFiltrado.filter(t => t.status !== 'done'))
       .forEach(t => { if (t.reworkCount > 0) redo[t.clientName || '—'] = (redo[t.clientName || '—'] || 0) + t.reworkCount; });
     const redoRows = Object.entries(redo).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value).slice(0, 8);
 
     return {
       total: noPeriodo.length, dePrimeira, aprov: pct(dePrimeira, noPeriodo.length),
       prazo: pct(noPrazo, comPrazo.length), comPrazo: comPrazo.length,
-      media, semana, ateHoje, demandaRows, colabRows, redoRows,
-      abertas: tasks.filter(t => t.status !== 'done').length,
-      refacaoAberta: tasks.filter(t => t.isRework && t.status !== 'done').length,
+      media, semana, ateHoje, demandaRows, colabRows, redoRows, tempoRows,
+      abertas: tudoFiltrado.filter(t => t.status !== 'done').length,
+      refacaoAberta: tudoFiltrado.filter(t => t.isRework && t.status !== 'done').length,
     };
-  }, [tasks, periodo]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tasks, periodo, de, ate, setor, pessoa]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const maxDem = Math.max(1, ...d.demandaRows.map(r => r.value));
   const maxColab = Math.max(1, ...d.colabRows.map(r => r.total));
@@ -209,10 +263,28 @@ export default function AdminCharts({ clients, tasks = [] }) {
             <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em' }}>Relatórios</h1>
             <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>Eficiência do time e gargalos</p>
           </div>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, padding: 3, borderRadius: 99, background: 'var(--bg3)', border: '1px solid var(--border)' }}>
-            {[['mes', MESES[now.getMonth()]], ['tudo', 'Tudo']].map(([k, l]) => (
-              <button key={k} onClick={() => setPeriodo(k)} className={`ui-btn small${periodo === k ? ' on' : ''}`} style={{ height: 28, border: 'none', textTransform: 'capitalize' }}>{l}</button>
-            ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            <select value={setor} onChange={e => setSetor(e.target.value)} style={{ ...SEL, ...(setor ? SEL_ON : null) }}>
+              <option value="">Todos os setores</option>
+              {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+            </select>
+            <select value={pessoa} onChange={e => setPessoa(e.target.value)} style={{ ...SEL, ...(pessoa ? SEL_ON : null), maxWidth: 200 }}>
+              <option value="">Todos os colaboradores</option>
+              {pessoas.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <select value={periodo} onChange={e => setPeriodo(e.target.value)} style={{ ...SEL, ...(periodo !== 'mes' ? SEL_ON : null) }}>
+              {PERIODOS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+            {periodo === 'custom' && (
+              <>
+                <input type="date" value={de} onChange={e => setDe(e.target.value)} style={{ ...SEL, padding: '0 10px', fontFamily: 'var(--fm)', color: 'var(--text)' }} />
+                <span style={{ color: 'var(--dim)', fontSize: 12 }}>até</span>
+                <input type="date" value={ate} onChange={e => setAte(e.target.value)} style={{ ...SEL, padding: '0 10px', fontFamily: 'var(--fm)', color: 'var(--text)' }} />
+              </>
+            )}
+            {(setor || pessoa || periodo !== 'mes') && (
+              <button className="ui-btn small" style={{ height: 34 }} onClick={() => { setSetor(''); setPessoa(''); setPeriodo('mes'); setDe(''); setAte(''); }}>Limpar</button>
+            )}
           </div>
         </div>
 
@@ -228,7 +300,7 @@ export default function AdminCharts({ clients, tasks = [] }) {
               <Ring value={d.prazo} tone={d.prazo >= 85 ? 'var(--green)' : d.prazo >= 60 ? 'var(--c)' : 'var(--red)'} />
             </div>
           </Glass>
-          <Glass title="Ritmo da semana" sub="entregas por dia">
+          <Glass title="Ritmo da semana" sub="entregas por dia da semana">
             <DayBars values={d.semana} />
           </Glass>
           <Glass title="Tempo de produção" sub="início → conclusão, média">
@@ -273,7 +345,46 @@ export default function AdminCharts({ clients, tasks = [] }) {
           </Glass>
         </div>
 
-        {/* ── linha 3: colaboradores + refações ── */}
+        {/* ── linha 3: tempo de produção por pessoa ── */}
+        <Glass title="Tempo de produção por colaborador" sub="quantas entregas e quanto tempo cada uma leva, de início a conclusão" style={{ marginBottom: 14 }}>
+          {d.tempoRows.length === 0
+            ? <p style={{ fontSize: 12.5, color: 'var(--muted)', padding: '20px 0', textAlign: 'center' }}>Nenhuma entrega no período.</p>
+            : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                  <thead>
+                    <tr>
+                      {['Colaborador', 'Entregas', 'Tempo médio', 'Mediana', 'Mais longa', ''].map((h, i) => (
+                        <th key={i} style={{ textAlign: i === 0 ? 'left' : 'right', fontFamily: 'var(--fm)', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 500, padding: '6px 10px 10px', borderBottom: '1px solid var(--border)' }}>{h.toUpperCase()}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.tempoRows.map(r => {
+                      const maxEnt = d.tempoRows[0].entregas || 1;
+                      return (
+                        <tr key={r.name}>
+                          <td style={{ padding: '9px 10px', color: 'var(--text)', fontWeight: 500, borderBottom: '1px solid var(--border)' }}>{r.name}</td>
+                          <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'var(--fm)', color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{r.entregas}</td>
+                          <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'var(--fm)', color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>{fmtDur(r.media)}</td>
+                          <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'var(--fm)', color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>{fmtDur(r.mediana)}</td>
+                          <td style={{ padding: '9px 10px', textAlign: 'right', fontFamily: 'var(--fm)', color: r.maior > 3 * 86400000 ? 'var(--amber)' : 'var(--muted)', borderBottom: '1px solid var(--border)' }}>{fmtDur(r.maior)}</td>
+                          <td style={{ padding: '9px 10px', width: 160, borderBottom: '1px solid var(--border)' }}>
+                            <div style={{ height: 6, borderRadius: 99, background: 'var(--soft)', overflow: 'hidden' }}>
+                              <div style={{ width: `${(r.entregas / maxEnt) * 100}%`, height: '100%', borderRadius: 99, background: 'var(--c)' }} />
+                            </div>
+                            {r.comTempo < r.entregas && <div style={{ fontSize: 9.5, color: 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 3 }}>{r.entregas - r.comTempo} sem horário de início</div>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+        </Glass>
+
+        {/* ── linha 4: colaboradores + refações ── */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <Glass title="Aprovação por colaborador" sub="de primeira vs. com ajuste · por quem entregou"
             right={<span style={{ display: 'flex', gap: 10, fontSize: 10.5, color: 'var(--muted)' }}><i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--green)', marginRight: 4, verticalAlign: 'middle' }} />de primeira<i style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'var(--red)', marginRight: 4, marginLeft: 6, verticalAlign: 'middle' }} />com ajuste</span>}>
