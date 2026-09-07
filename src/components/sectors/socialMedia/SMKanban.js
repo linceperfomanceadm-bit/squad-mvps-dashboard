@@ -9,7 +9,7 @@ function PostCard({ post, onStatusChange }) {
   const isStuck = post.status === 'client' && differenceInDays(new Date(), new Date(post.updatedAt || post.createdAt)) >= 3;
 
   return (
-    <div style={{ background: 'rgba(12,12,24,.9)', border: `1px solid ${isLate || isStuck ? 'rgba(238,51,99,.35)' : 'var(--border)'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, animation: 'fadeUp .2s ease' }}>
+    <div style={{ background: 'var(--bg2)', border: `1px solid ${isLate || isStuck ? 'var(--neon-border)' : 'var(--border)'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, animation: 'fadeUp .2s ease' }}>
       {(isLate || isStuck) && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
           <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'pulse 1.5s infinite' }} />
@@ -49,7 +49,7 @@ export default function SMKanban({ myPosts, onStatusChange }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Kanban</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Kanban</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>{myPosts.length} post{myPosts.length !== 1 ? 's' : ''} no total</p>
       </div>
 
@@ -57,7 +57,7 @@ export default function SMKanban({ myPosts, onStatusChange }) {
         {SM_COLUMNS.map(col => {
           const posts = myPosts.filter(p => p.status === col.id);
           return (
-            <div key={col.id} style={{ background: 'rgba(12,12,24,.6)', border: `1px solid ${col.color}20`, borderRadius: 12, padding: '12px 10px' }}>
+            <div key={col.id} style={{ background: 'var(--bg2)', border: `1px solid ${col.color}20`, borderRadius: 12, padding: '12px 10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>{col.label}</span>
                 <span style={{ background: `${col.color}20`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>{posts.length}</span>

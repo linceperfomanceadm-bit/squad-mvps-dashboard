@@ -111,7 +111,7 @@ export default function SMMural({
 }
 
 const S = {
-  titulo: { fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 },
+  titulo: { fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 },
   sub: { fontSize: 13, color: 'var(--muted)' },
   vazio: {
     background: 'var(--surface)', border: '1px dashed var(--border)', borderRadius: 14,
@@ -119,11 +119,11 @@ const S = {
   },
   grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 12 },
   card: {
-    background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14,
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14,
     padding: 16, display: 'flex', flexDirection: 'column', gap: 11, textAlign: 'left',
   },
   nome: {
-    display: 'block', fontSize: 15, fontWeight: 700, color: '#fff', letterSpacing: '-.2px',
+    display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   farol: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)', marginTop: 4 },

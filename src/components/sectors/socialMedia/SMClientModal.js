@@ -198,7 +198,7 @@ const S = {
     display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
     padding: '18px 20px', borderBottom: '1px solid var(--border)',
   },
-  nome: { fontSize: 18, fontWeight: 700, color: '#fff', letterSpacing: '-.3px' },
+  nome: { fontSize: 18, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.3px' },
   sub: { fontSize: 12, color: 'var(--muted)', marginTop: 3 },
   fechar: {
     background: 'transparent', border: '1px solid var(--border)', borderRadius: 8,

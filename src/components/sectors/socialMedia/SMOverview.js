@@ -1,4 +1,5 @@
 import React from 'react';
+import { Kpi } from '../../shared/ui';
 import { Users, FileText, Kanban, AlertTriangle } from 'lucide-react';
 import { DOC_STATUS } from '../../../hooks/useDocuments';
 
@@ -11,23 +12,11 @@ import { DOC_STATUS } from '../../../hooks/useDocuments';
 // atenção hoje.
 // ─────────────────────────────────────────────────────────────
 
-function StatCard({ icon: Icone, label, value, color = 'var(--blue)', onClick }) {
+function StatCard({ label, value, color, onClick }) {
+  const tone = color === 'var(--green)' ? 'good' : color === 'var(--amber)' ? 'warn' : color === 'var(--neon)' ? 'bad' : undefined;
   return (
-    <div
-      onClick={onClick}
-      role={onClick ? 'button' : undefined}
-      style={{ ...S.stat, cursor: onClick ? 'pointer' : 'default' }}
-    >
-      <div style={{ ...S.statBarra, background: `linear-gradient(90deg,${color},transparent)` }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
-          <p style={{ fontSize: 32, fontWeight: 800, color }}>{value}</p>
-        </div>
-        <div style={{ ...S.statIcone, background: `${color}18`, border: `1px solid ${color}30` }}>
-          <Icone size={20} color={color} />
-        </div>
-      </div>
+    <div onClick={onClick} role={onClick ? 'button' : undefined} style={{ cursor: onClick ? 'pointer' : 'default' }}>
+      <Kpi value={value} label={label} tone={tone} />
     </div>
   );
 }
@@ -99,20 +88,20 @@ export default function SMOverview({ myClients, myDocs, myTasks, onNavigate }) {
 }
 
 const S = {
-  titulo: { fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 },
+  titulo: { fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 },
   sub: { fontSize: 13, color: 'var(--muted)' },
-  grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 22 },
+  grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14, marginBottom: 14 },
   stat: {
-    background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14,
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14,
     padding: '20px 22px', position: 'relative', overflow: 'hidden',
   },
   statBarra: { position: 'absolute', top: 0, left: 0, right: 0, height: 2 },
   statIcone: { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   painel: {
-    background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14,
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14,
     padding: '20px 22px', marginBottom: 16,
   },
-  painelTit: { fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 14 },
+  painelTit: { fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 14 },
   linha: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
     background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 13px',
@@ -125,7 +114,7 @@ const S = {
   },
   rodape: { fontSize: 11.5, color: 'var(--muted)', marginTop: 12 },
   tag: {
-    fontSize: 11.5, color: 'var(--text)', background: 'rgba(255,255,255,.05)',
+    fontSize: 11.5, color: 'var(--text)', background: 'var(--soft)',
     border: '1px solid var(--border)', borderRadius: 100, padding: '4px 11px',
   },
 };

@@ -32,17 +32,17 @@ export default function SMBulkInput({ clients, responsible, onSave }) {
     <div className="fade-up">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Planejamento</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Planejamento</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>Adicione múltiplos posts de uma vez — cada linha vira um card no Kanban</p>
         </div>
-        <button onClick={handleSave} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--blue),#0284c7)', border: 'none', borderRadius: 10, padding: '10px 20px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(56,189,248,.3)' }}>
-          {loading ? <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)', width: 16, height: 16 }} /> : <><Send size={15} /> Salvar Planejamento</>}
+        <button onClick={handleSave} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--blue),#0284c7)', border: 'none', borderRadius: 10, padding: '10px 20px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(56,189,248,.3)' }}>
+          {loading ? <span className="spinner" style={{ borderTopColor: '#fff', borderColor: 'var(--dim)', width: 16, height: 16 }} /> : <><Send size={15} /> Salvar Planejamento</>}
         </button>
       </div>
 
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 180px 1fr 40px', gap: 0, background: 'rgba(255,255,255,.03)', borderBottom: '1px solid var(--border)', padding: '10px 16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr 180px 1fr 40px', gap: 0, background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '10px 16px' }}>
           {['Data Prevista', 'Nome da Publicação', 'Cliente', 'Link da Arte', ''].map((h, i) => (
             <span key={i} style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', letterSpacing: '.1em', fontFamily: 'var(--fm)' }}>{h}</span>
           ))}
@@ -59,7 +59,7 @@ export default function SMBulkInput({ clients, responsible, onSave }) {
                 {activeClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
               <input type="url" value={row.linkArt} onChange={e => updateRow(row.id, 'linkArt', e.target.value)} placeholder="https://drive.google.com/..." style={S.cell} />
-              <button onClick={() => removeRow(row.id)} style={{ background: 'rgba(238,51,99,.08)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 6, padding: '6px 7px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <button onClick={() => removeRow(row.id)} style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 6, padding: '6px 7px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                 <Trash2 size={13} />
               </button>
             </div>
@@ -79,5 +79,5 @@ export default function SMBulkInput({ clients, responsible, onSave }) {
 }
 
 const S = {
-  cell: { background: 'rgba(255,255,255,.04)', border: '1px solid var(--border)', borderRadius: 7, padding: '8px 10px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  cell: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '8px 10px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
 };
