@@ -66,17 +66,17 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
     <div className="fade-up">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Colaboradores</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Colaboradores</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>{collaborators.filter(c => c.active).length} ativo{collaborators.filter(c => c.active).length !== 1 ? 's' : ''} · {collaborators.length} total</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
+        <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           {showForm ? <><X size={15} /> Cancelar</> : <><UserPlus size={15} /> Novo Colaborador</>}
         </button>
       </div>
 
       {/* Add form */}
       {showForm && (
-        <div style={{ background: 'rgba(12,12,24,.9)', border: '1px solid var(--neon-border)', borderRadius: 14, padding: 22, marginBottom: 20 }} className="fade-up">
+        <div style={{ background: 'var(--bg2)', border: '1px solid var(--neon-border)', borderRadius: 14, padding: 22, marginBottom: 20 }} className="fade-up">
           <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Cadastrar Colaborador</h3>
           <form onSubmit={handleAdd} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
             <div style={S.field}>
@@ -134,7 +134,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
             <div style={{ gridColumn: '1/-1', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button type="button" style={S.cancelBtn} onClick={() => setShowForm(false)}>Cancelar</button>
               <button type="submit" style={S.submitBtn} disabled={loading}>
-                {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Cadastrar'}
+                {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar'}
               </button>
             </div>
           </form>
@@ -206,7 +206,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
   const [showReset, setShowReset] = useState(false);
 
   return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, opacity: collab.active ? 1 : 0.5, transition: 'opacity .3s' }}>
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, opacity: collab.active ? 1 : 0.5, transition: 'opacity .3s' }}>
       {isEditing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input style={S.input} value={editForm.name} onChange={e => onEditFormChange('name', e.target.value)} placeholder="Nome" />
@@ -254,7 +254,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               <button style={S.iconBtn} onClick={onEdit}><Edit2 size={13} /></button>
               <button style={S.iconBtn} onClick={onToggleActive} title={collab.active ? 'Desativar' : 'Ativar'}>{collab.active ? '⏸' : '▶'}</button>
               {confirmDelete
-                ? <><button style={{ ...S.iconBtn, background: 'rgba(238,51,99,.1)', borderColor: 'rgba(238,51,99,.3)', color: 'var(--neon)' }} onClick={onConfirmDelete}><Check size={13} /></button>
+                ? <><button style={{ ...S.iconBtn, background: 'var(--neon-dim)', borderColor: 'var(--neon-border)', color: 'var(--neon)' }} onClick={onConfirmDelete}><Check size={13} /></button>
                     <button style={S.iconBtn} onClick={onCancelDelete}><X size={13} /></button></>
                 : <button style={S.iconBtn} onClick={onDelete}><Trash2 size={13} color="rgba(238,51,99,.6)" /></button>
               }
@@ -291,9 +291,9 @@ const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
   input: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
-  submitBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '9px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
+  submitBtn: { background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '9px 22px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
   iconBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   iconBtnGreen: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 6, padding: '5px 7px', color: 'var(--green)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
 };

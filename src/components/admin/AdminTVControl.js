@@ -114,7 +114,7 @@ export default function AdminTVControl({ toast }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           Painel de TV
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
@@ -265,7 +265,7 @@ export default function AdminTVControl({ toast }) {
             {PRODUCTION_SECTORS.map(sector => {
               const atual = HONOR_METRIC_OPTIONS.find(o => o.id === honra[sector]) || HONOR_METRIC_OPTIONS[0];
               return (
-                <div key={sector} style={{ background: '#12121f', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                <div key={sector} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
                   <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>{SQUAD_NOME[sector]}</p>
                   <select
                     value={honra[sector]}
@@ -359,10 +359,10 @@ export default function AdminTVControl({ toast }) {
 
 const S = {
   box: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column' },
-  boxTitle: { fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 6 },
+  boxTitle: { fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 6 },
   boxText: { fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 12 },
-  input: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)', marginBottom: 10, width: '100%' },
-  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', cursor: 'pointer', fontFamily: 'var(--f)', width: '100%' },
+  input: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)', marginBottom: 10, width: '100%' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', cursor: 'pointer', fontFamily: 'var(--f)', width: '100%' },
   btn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, border: '1px solid transparent', borderRadius: 9, padding: '10px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', width: '100%' },
   btnAmber: { background: 'rgba(245,158,11,.14)', borderColor: 'rgba(245,158,11,.35)', color: 'var(--amber)' },
   btnGreen: { background: 'rgba(34,197,94,.14)', borderColor: 'rgba(34,197,94,.35)', color: 'var(--green)' },

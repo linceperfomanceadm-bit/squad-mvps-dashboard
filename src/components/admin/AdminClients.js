@@ -98,7 +98,7 @@ function AddClientModal({ collaborators, onClose, onAdd }) {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
             <button type="button" style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" style={MS.submitBtn} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Cadastrar Cliente'}
+              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar Cliente'}
             </button>
           </div>
         </form>
@@ -149,7 +149,7 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
             <button style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
             <button style={{ ...MS.submitBtn, background: 'linear-gradient(135deg,var(--blue),#0284c7)', boxShadow: '0 4px 14px rgba(56,189,248,.3)' }} onClick={handleSave} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'rgba(255,255,255,.3)' }} /> : 'Salvar Alterações'}
+              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Salvar Alterações'}
             </button>
           </div>
         </div>
@@ -173,12 +173,12 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
     <div className="fade-up">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Clientes</h1>
+          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Clientes</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
             {clients.filter(c => c.active).length} ativos · {clients.filter(c => c.stage === 'staffing').length} aguardando responsáveis · {clients.length} total
           </p>
         </div>
-        <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 10, padding: '10px 18px', color: '#fff', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
+        <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           <Plus size={15} /> Novo Cliente
         </button>
       </div>
@@ -188,11 +188,11 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         <input style={{ ...S.input, paddingLeft: 38, width: '100%', maxWidth: 380 }} placeholder="Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'rgba(255,255,255,.02)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
                 {['Cliente', 'WD Status', 'Serviço WD', ...Object.values(SECTORS).map(s => s.label), 'Ações'].map(h => (
                   <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: 10, letterSpacing: '.1em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
@@ -267,24 +267,24 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
 }
 
 const S = {
-  input: { background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)' },
+  input: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)' },
   iconBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   iconBtnBlue: { background: 'rgba(56,189,248,.08)', border: '1px solid rgba(56,189,248,.25)', borderRadius: 6, padding: '5px 7px', color: 'var(--blue)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
-  iconBtnRed: { background: 'rgba(238,51,99,.1)', border: '1px solid rgba(238,51,99,.3)', borderRadius: 6, padding: '5px 7px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+  iconBtnRed: { background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 6, padding: '5px 7px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
 };
 
 const MS = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
-  modal: { background: '#0e0e1c', border: '1px solid var(--neon-border)', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 24px 80px rgba(0,0,0,.7)', maxHeight: '90vh', overflow: 'auto' },
+  modal: { background: 'var(--bg2)', border: '1px solid var(--neon-border)', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 24px 80px rgba(0,0,0,.7)', maxHeight: '90vh', overflow: 'auto' },
   header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' },
   icon: { width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: 700, color: '#fff' },
+  title: { fontSize: 18, fontWeight: 700, color: 'var(--text)' },
   closeBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { padding: 22, display: 'flex', flexDirection: 'column', gap: 16 },
   field: { display: 'flex', flexDirection: 'column', gap: 8 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'rgba(12,12,24,.9)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
+  input: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  select: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
-  submitBtn: { background: 'linear-gradient(135deg,var(--neon),#c41f4a)', border: 'none', borderRadius: 8, padding: '9px 22px', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
+  submitBtn: { background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '9px 22px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
 };

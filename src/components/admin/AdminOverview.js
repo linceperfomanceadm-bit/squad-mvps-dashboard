@@ -1,142 +1,170 @@
 import React from 'react';
-import { differenceInDays } from 'date-fns';
-import { Activity, TrendingUp, Calendar, AlertTriangle, Users, Kanban } from 'lucide-react';
-import { SECTORS } from '../../lib/firebase';
+import { differenceInDays, subDays, startOfWeek } from 'date-fns';
+import { Target, CheckCircle2, XCircle, Users, LayoutGrid, Package, AlertTriangle } from 'lucide-react';
+import { SECTORS, stageOf } from '../../lib/firebase';
+import { PageHeader, Card, Grid, Kpi, Breakdown, MiniBars, Goal, Pills, Trio, Tag, Row } from '../shared/ui';
 
-function StatCard({ icon: Icon, label, value, sub, color }) {
-  return (
-    <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: `linear-gradient(90deg,${color},transparent)` }} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>{label}</p>
-          <p style={{ fontSize: 32, fontWeight: 800, color }}>{value}</p>
-          {sub && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{sub}</p>}
-        </div>
-        <div style={{ width: 44, height: 44, borderRadius: 12, background: `${color}18`, border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <Icon size={20} color={color} />
-        </div>
-      </div>
-    </div>
-  );
-}
+// ─── Visão Geral do Admin (Layout 01) ─────────────────────────
+// Tudo calculado das coleções ao vivo. Cor só onde é informação:
+// verde/vermelho para variação e alerta; a cor do painel (--c)
+// no destaque dos gráficos.
 
-export default function AdminOverview({ clients, collaborators, tasks = [], onNavigate }) {
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const toDate = (v) => (v?.toDate ? v.toDate() : v ? new Date(v) : null);
+const sameMonth = (d, ref) => d && d.getMonth() === ref.getMonth() && d.getFullYear() === ref.getFullYear();
+const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) : 0);
+const deltaOf = (cur, prev) => {
+  if (prev === 0 && cur === 0) return null;
+  if (prev === 0) return { text: `▲ ${cur}`, tone: 'up' };
+  const d = cur - prev;
+  if (d === 0) return { text: '= mês anterior', tone: 'neutral' };
+  return { text: `${d > 0 ? '▲' : '▼'} ${Math.abs(d)}`, tone: d > 0 ? 'up' : 'down' };
+};
+
+export default function AdminOverview({ clients = [], collaborators = [], tasks = [], onNavigate }) {
   const now = new Date();
-  const thisMonth = now.getMonth();
-  const thisYear = now.getFullYear();
+  const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const active = clients.filter(c => c.active !== false);
 
-  // Tasks metrics
-  const doneTasks = tasks.filter(t => t.status === 'done');
-  const monthDone = doneTasks.filter(t => {
-    const d = new Date(t.completedAt || t.createdAt);
-    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
-  });
-  const firstApproval = doneTasks.filter(t => t.reworkCount === 0);
-  const globalApprovalRate = doneTasks.length > 0 ? Math.round((firstApproval.length / doneTasks.length) * 100) : 0;
-  const pendingApproval = tasks.filter(t => t.status === 'approval').length;
-  const reworkTasks = tasks.filter(t => t.isRework && t.status !== 'done').length;
-
-  // Social Media posts
-  const allPosts = [];
-  clients.forEach(c => (c.sm?.posts || []).forEach(p => allPosts.push({ ...p, clientName: c.name })));
-  const publishedPosts = allPosts.filter(p => p.status === 'published' || p.status === 'scheduled');
-
-  // WD overdue onboarding
-  const wdClients = clients.filter(c => c.wd?.status);
-  const overdueOnboarding = wdClients.filter(c => {
-    if (c.wd.status !== 'onboarding' || !c.wd.onboardingStartedAt) return false;
-    return differenceInDays(now, new Date(c.wd.onboardingStartedAt)) > 7;
+  // ── tasks ──
+  const done = tasks.filter(t => t.status === 'done');
+  const doneThis = done.filter(t => sameMonth(toDate(t.completedAt || t.createdAt), now));
+  const doneLast = done.filter(t => sameMonth(toDate(t.completedAt || t.createdAt), lastMonth));
+  const firstApproval = done.filter(t => !t.reworkCount);
+  const approvalRate = pct(firstApproval.length, done.length);
+  const approvalLast = pct(doneLast.filter(t => !t.reworkCount).length, doneLast.length);
+  const approval = tasks.filter(t => t.status === 'approval');
+  const doing = tasks.filter(t => t.status === 'doing');
+  const rework = tasks.filter(t => t.isRework && t.status !== 'done');
+  const dueSoon = approval.filter(t => {
+    const d = toDate(t.deadline);
+    return d && differenceInDays(d, now) <= 2;
   });
 
-  // Stuck SM posts
-  const stuckPosts = allPosts.filter(p => {
-    if (p.status !== 'client') return false;
-    return differenceInDays(now, new Date(p.updatedAt || p.createdAt)) >= 3;
+  // aprovação de primeira nas últimas 8 semanas
+  const weeks = Array.from({ length: 8 }, (_, i) => {
+    const start = startOfWeek(subDays(now, (7 - i) * 7), { weekStartsOn: 1 });
+    const end = subDays(startOfWeek(subDays(now, (6 - i) * 7), { weekStartsOn: 1 }), 0);
+    const w = done.filter(t => { const d = toDate(t.completedAt); return d && d >= start && d < end; });
+    return w.length ? w.filter(t => !t.reworkCount).length / w.length : 0;
   });
 
-  // Sector breakdown
-  const sectorData = Object.values(SECTORS).map(s => {
-    const collabCount = collaborators.filter(c => c.sector === s.id && c.active).length;
-    const activeTasks = tasks.filter(t => t.responsibleSector === s.id && t.status !== 'done').length;
-    return { ...s, collabCount, activeTasks };
-  });
+  // entregas por setor (mês)
+  const bySector = Object.values(SECTORS).map(s => ({
+    label: s.label, id: s.id,
+    value: doneThis.filter(t => (t.deliveredBySector || t.responsibleSector) === s.id).length,
+  }));
+  const top4 = [...bySector].sort((a, b) => b.value - a.value);
+  const breakdown = [...top4.slice(0, 3).map(s => [s.label, s.value]), ['Outros', top4.slice(3).reduce((a, s) => a + s.value, 0)]];
+
+  // ── clientes ──
+  const stages = ['staffing', 'kickoff', 'onboarding', 'live'].map(k => ({ k, n: active.filter(c => stageOf(c) === k).length }));
+  const newWeek = active.filter(c => { const d = toDate(c.createdAt); return d && differenceInDays(now, d) < 7; }).length;
+  const newMonth = active.filter(c => sameMonth(toDate(c.createdAt), now)).length;
+
+  // ── time ──
+  const team = collaborators.filter(c => c.active);
+  const heroes = Object.values(SECTORS).filter(s => doneThis.some(t => (t.deliveredBySector || t.responsibleSector) === s.id));
+
+  // ── alertas ──
+  const wdOverdue = active.filter(c => c.wd?.status === 'onboarding' && c.wd.onboardingStartedAt && differenceInDays(now, toDate(c.wd.onboardingStartedAt)) > 7);
+  const staffing = active.filter(c => stageOf(c) === 'staffing');
+  const alerts = [
+    rework.length > 0 && { key: 'rework', title: `${rework.length} task${rework.length > 1 ? 's' : ''} em ajuste/refação`, sub: 'Kanban', tone: 'bad', go: 'kanban' },
+    staffing.length > 0 && { key: 'staff', title: `${staffing.length} cliente${staffing.length > 1 ? 's' : ''} aguardando responsáveis`, sub: 'Onboarding · staffing', tone: 'warn', go: 'onboarding' },
+    ...wdOverdue.map(c => ({ key: c.id, title: c.name, sub: `WebDesign · onboarding há ${differenceInDays(now, toDate(c.wd.onboardingStartedAt))} dias`, tone: 'warn', go: 'clients' })),
+  ].filter(Boolean);
+
+  const dEntregas = deltaOf(doneThis.length, doneLast.length);
+  const dAprov = doneLast.length ? deltaOf(approvalRate, approvalLast) : null;
 
   return (
     <div className="fade-up">
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Visão Geral da Agência</h1>
-        <p style={{ fontSize: 13, color: 'var(--muted)' }}>Painel Admin · mês atual</p>
-      </div>
+      <PageHeader title="Visão Geral da Agência" sub={`Painel Admin · ${MESES[now.getMonth()]}`} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12, marginBottom: 20 }}>
-        <StatCard icon={Activity}      label="Entregas no Mês"          value={monthDone.length}          sub="Tasks concluídas"        color="var(--neon)" />
-        <StatCard icon={TrendingUp}    label="Taxa de Aprovação Global"  value={`${globalApprovalRate}%`}  sub="De primeira"             color={globalApprovalRate >= 70 ? 'var(--green)' : globalApprovalRate >= 40 ? 'var(--amber)' : 'var(--neon)'} />
-        <StatCard icon={Kanban}        label="Aguard. Aprovação"         value={pendingApproval}           sub="Em todos os setores"     color={pendingApproval > 0 ? 'var(--amber)' : 'var(--green)'} />
-        <StatCard icon={Calendar}      label="Posts Social Media"        value={publishedPosts.length}     sub="Publicados/Agendados"    color="var(--blue)" />
-        <StatCard icon={AlertTriangle} label="Onboardings em Atraso"     value={overdueOnboarding.length}  sub="WebDesign"               color={overdueOnboarding.length > 0 ? 'var(--neon)' : 'var(--green)'} />
-        <StatCard icon={Users}         label="Time Ativo"                value={collaborators.filter(c => c.active).length} sub="Colaboradores" color="var(--purple)" />
-      </div>
+      <Grid cols={4}>
+        <Kpi value={doneThis.length} label="Entregas no mês" delta={dEntregas?.text} deltaTone={dEntregas?.tone}>
+          <Breakdown rows={breakdown} />
+        </Kpi>
+        <Kpi value={`${approvalRate}%`} label="Aprovação de primeira" delta={dAprov ? `${dAprov.text}${dAprov.tone !== 'neutral' ? ' pts' : ''}` : null} deltaTone={dAprov?.tone}>
+          <MiniBars values={weeks} />
+        </Kpi>
+        <Kpi value={approval.length} label="Aguardando aprovação" tone={approval.length > 0 ? 'warn' : undefined}>
+          <Goal pct={approval.length ? (dueSoon.length / approval.length) * 100 : 0}>
+            <b style={{ color: 'var(--text)', fontWeight: 500 }}>{dueSoon.length}</b> {dueSoon.length === 1 ? 'vence' : 'vencem'} nas próximas 48h
+          </Goal>
+        </Kpi>
+        <Kpi value={team.length} label="Colaboradores ativos">
+          <p style={{ color: 'var(--muted)', fontSize: 12 }}>Setores com entrega no mês</p>
+          <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
+            {heroes.slice(0, 5).map((s, i) => (
+              <span key={s.id} title={s.label} style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--bg4)', border: '2px solid var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: i ? -8 : 0, overflow: 'hidden' }}>
+                <img src={s.logo} alt={s.label} style={{ width: 22, height: 22, objectFit: 'contain' }} />
+              </span>
+            ))}
+            {heroes.length === 0 && <span style={{ fontSize: 12, color: 'var(--dim)' }}>Nenhuma entrega ainda</span>}
+          </div>
+        </Kpi>
+      </Grid>
 
-      {/* Alerts */}
-      {(overdueOnboarding.length > 0 || stuckPosts.length > 0 || reworkTasks > 0) && (
-        <div style={{ background: 'rgba(238,51,99,.06)', border: '1px solid rgba(238,51,99,.2)', borderRadius: 14, padding: '16px 20px', marginBottom: 20 }}>
-          <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--neon)', marginBottom: 12 }}>⚠ Alertas</p>
-          {reworkTasks > 0 && (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-              <p style={{ fontSize: 13, color: 'var(--text)' }}>Tasks em ajuste/refação</p>
-              <span style={{ fontSize: 11, color: 'var(--amber)', background: 'rgba(245,158,11,.12)', padding: '2px 8px', borderRadius: 6, fontFamily: 'var(--fm)', fontWeight: 600 }}>{reworkTasks}</span>
-            </div>
-          )}
-          {overdueOnboarding.map(c => (
-            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{c.name}</p>
-                <p style={{ fontSize: 11, color: 'var(--muted)' }}>WebDesign · Onboarding em atraso</p>
-              </div>
-              <span style={{ fontSize: 11, color: 'var(--neon)', background: 'rgba(238,51,99,.12)', padding: '2px 8px', borderRadius: 6, fontFamily: 'var(--fm)', fontWeight: 600 }}>
-                {differenceInDays(now, new Date(c.wd.onboardingStartedAt))}d
-              </span>
-            </div>
-          ))}
-          {stuckPosts.map(p => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{p.name}</p>
-                <p style={{ fontSize: 11, color: 'var(--muted)' }}>Social Media · {p.clientName} · travado com cliente</p>
-              </div>
-              <span style={{ fontSize: 11, color: 'var(--amber)', background: 'rgba(245,158,11,.12)', padding: '2px 8px', borderRadius: 6, fontFamily: 'var(--fm)', fontWeight: 600 }}>
-                +{differenceInDays(now, new Date(p.updatedAt || p.createdAt))}d
-              </span>
-            </div>
-          ))}
-        </div>
+      {alerts.length > 0 && (
+        <Card title={<><AlertTriangle size={14} color="var(--red)" /> Alertas</>} style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+            {alerts.map(a => (
+              <Row key={a.key} title={a.title} sub={a.sub} onClick={onNavigate ? () => onNavigate(a.go) : undefined}
+                right={<Tag tone={a.tone}>{a.tone === 'bad' ? 'ação' : 'atenção'}</Tag>} />
+            ))}
+          </div>
+        </Card>
       )}
 
-      {/* Sector cards */}
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, padding: '20px 22px' }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 16 }}>Setores</h2>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12 }}>
-          {sectorData.map(s => (
-            <div key={s.id} style={{ background: `${s.color}08`, border: `1px solid ${s.color}25`, borderRadius: 12, padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <span style={{ fontSize: 20 }}>{s.emoji}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.label}</span>
+      <Grid cols="1fr 2fr">
+        <Card title="Clientes ativos">
+          <div style={{ fontSize: 38, fontWeight: 500, letterSpacing: '-.02em', lineHeight: 1, marginTop: 10, color: 'var(--text)' }}>{active.length}</div>
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[['Novos na semana', newWeek], ['Novos no mês', newMonth]].map(([l, v]) => (
+              <div key={l} style={{ display: 'flex', justifyContent: 'space-between', background: 'var(--bg3)', borderRadius: 10, padding: '9px 12px', fontSize: 12, color: 'var(--muted)' }}>
+                <span>{l}</span><b style={{ fontFamily: 'var(--fm)', fontSize: 11, color: v > 0 ? 'var(--green)' : 'var(--muted)' }}>{v > 0 ? `▲ ${v}` : '—'}</b>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <div>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: '#fff' }}>{s.collabCount}</p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>colaboradores</p>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: s.activeTasks > 0 ? s.color : '#fff' }}>{s.activeTasks}</p>
-                  <p style={{ fontSize: 11, color: 'var(--muted)' }}>tasks ativas</p>
+            ))}
+          </div>
+        </Card>
+        <Card title="Ciclo de vida" sub="staffing → kickoff → onboarding → live">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', marginTop: 14 }}>
+            {stages.map((s, i) => (
+              <div key={s.k} style={{ padding: '6px 18px 4px 0', borderRight: i < 3 ? '1px solid var(--border)' : 'none', marginRight: i < 3 ? 18 : 0 }}>
+                <div style={{ color: 'var(--muted)', fontSize: 12, textTransform: 'capitalize' }}>{s.k === 'kickoff' ? 'Kick Off' : s.k}</div>
+                <b style={{ display: 'block', fontSize: 26, fontWeight: 500, marginTop: 8, color: s.k === 'staffing' && s.n > 0 ? 'var(--amber)' : 'var(--text)' }}>{s.n}</b>
+                <div style={{ marginTop: 10 }}>
+                  <Tag tone={s.k === 'live' ? 'good' : s.k === 'staffing' && s.n > 0 ? 'warn' : undefined}>{pct(s.n, active.length)}% da carteira</Tag>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </Card>
+      </Grid>
+
+      <Grid cols="1.55fr 1fr" style={{ marginBottom: 0 }}>
+        <Card title="Entregas por setor" sub="no mês">
+          <Pills rows={bySector} />
+        </Card>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Card title="Tasks">
+            <Trio items={[
+              { icon: Target, label: 'Em produção', value: doing.length, color: 'var(--purple)' },
+              { icon: CheckCircle2, label: 'Aprovadas', value: done.length, color: 'var(--green)' },
+              { icon: XCircle, label: 'Refação', value: rework.length, color: rework.length ? 'var(--red)' : 'var(--muted)' },
+            ]} />
+          </Card>
+          <Card title="Time">
+            <Trio items={[
+              { icon: Users, label: 'Colaboradores', value: team.length, color: 'var(--purple)' },
+              { icon: LayoutGrid, label: 'Clientes', value: active.length, color: 'var(--blue)' },
+              { icon: Package, label: 'Setores', value: Object.keys(SECTORS).length, color: 'var(--c)' },
+            ]} />
+          </Card>
         </div>
-      </div>
+      </Grid>
     </div>
   );
 }

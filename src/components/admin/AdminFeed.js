@@ -85,13 +85,13 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Extrato de Produção</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Extrato de Produção</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Clique em uma task para ver os detalhes</p>
       </div>
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4 }}>
           {DATE_FILTERS.map(f => (
             <button key={f.key} onClick={() => setDateFilter(f.key)}
               style={{ background: dateFilter === f.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '6px 14px', color: dateFilter === f.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' }}>
@@ -100,24 +100,24 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
           ))}
         </div>
         <select value={collabFilter} onChange={e => setCollabFilter(e.target.value)}
-          style={{ background: '#12121f', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: collabFilter ? 'var(--text)' : 'var(--muted)', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
+          style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: collabFilter ? 'var(--text)' : 'var(--muted)', fontSize: 12, outline: 'none', cursor: 'pointer' }}>
           <option value="">Todos os colaboradores</option>
           {collaborators.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
         </select>
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
+      <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
         {sectorTabs.map(t => (
           <button key={t.key} onClick={() => setSectorTab(t.key)}
             style={{ background: sectorTab === t.key ? 'var(--neon-dim)' : 'transparent', border: 'none', borderRadius: 7, padding: '7px 16px', color: sectorTab === t.key ? 'var(--neon)' : 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}>
             {t.label}
-            <span style={{ background: 'rgba(255,255,255,.06)', borderRadius: 8, padding: '0 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>{t.count}</span>
+            <span style={{ background: 'var(--soft)', borderRadius: 8, padding: '0 6px', fontSize: 10, fontFamily: 'var(--fm)' }}>{t.count}</span>
           </button>
         ))}
       </div>
 
-      <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
         {sectorTab === 'tasks' && (
           filteredTasks.length === 0
             ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>Nenhuma task no período.</p>
@@ -155,7 +155,7 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                             cursor: 'pointer',
                             transition: 'background .15s',
                           }}
-                          onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,.04)'}
+                          onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
                           onMouseLeave={e => e.currentTarget.style.background = t.isRework ? 'rgba(245,158,11,.03)' : 'transparent'}
                         >
                           <td style={{ padding: '10px 12px', color: '#ddd', fontWeight: 600, whiteSpace: 'nowrap' }}>
