@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { SECTORS } from '../../lib/firebase';
+import { entregadoresDe } from '../../hooks/useTasks';
 
 const COLORS = ['#EE3363','#a78bfa','#38bdf8','#fb923c','#22c55e','#f59e0b','#e879f9'];
 
@@ -45,11 +46,15 @@ export default function AdminCharts({ clients, tasks = [] }) {
   // Use deliveredBy for done tasks (who actually did the work)
   const collabMap = {};
   tasks.filter(t => t.status === 'done').forEach(t => {
-    // deliveredBy = who did the work; fallback to responsibleName for old tasks
-    const name = t.deliveredBy || t.responsibleName || 'Desconhecido';
-    if (!collabMap[name]) collabMap[name] = { name, total: 0, firstApproval: 0 };
-    collabMap[name].total++;
-    if (t.reworkCount === 0) collabMap[name].firstApproval++;
+    // A entrega conta para TODOS que executaram, não só para o
+    // principal. O total da agência não muda: quem soma aqui é o
+    // ranking por pessoa, não o número de tasks.
+    const nomes = entregadoresDe(t);
+    (nomes.length ? nomes : ['Desconhecido']).forEach(name => {
+      if (!collabMap[name]) collabMap[name] = { name, total: 0, firstApproval: 0 };
+      collabMap[name].total++;
+      if (t.reworkCount === 0) collabMap[name].firstApproval++;
+    });
   });
   const collabData = Object.values(collabMap)
     .map(c => ({

@@ -4,6 +4,8 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { differenceInDays, isSameDay, startOfWeek, subWeeks, startOfMonth, isAfter } from 'date-fns';
 import { db, auth } from '../lib/firebase';
 import { computeOpsHealth, resolveClientHealth, HEALTH_ORDER_4 } from './useClientHealth';
+import { entregadoresDe } from './useTasks';
+import { resolveTimeStats, formatBusinessDuration } from '../lib/taskTime';
 
 /*
  * useTVData — alimenta o painel de parede (/tv).
@@ -93,30 +95,35 @@ const pessoaDe = (t) => t.deliveredBy || t.responsibleName;
 function porPessoa(lista) {
   const mapa = {};
   lista.forEach(t => {
-    const quem = pessoaDe(t);
-    if (!quem) return;
-    if (!mapa[quem]) {
-      mapa[quem] = {
-        name: quem, sector: setorDe(t),
-        total: 0, limpas: 0, comPrazo: 0, noPrazo: 0, duracoes: [],
-        clientes: new Set(), dias: new Set(),
-      };
-    }
-    const p = mapa[quem];
+    // A entrega conta para todos que executaram a task. Os totais por
+    // squad e do mês continuam contando TASKS (contaPorSetor e
+    // monthStats), então o número geral da agência não infla.
+    const equipe = entregadoresDe(t);
+    if (!equipe.length) return;
     const fim = new Date(t.completedAt);
-    p.total += 1;
-    if (!t.reworkCount) p.limpas += 1;
-    if (t.deadline) {
-      p.comPrazo += 1;
-      if (differenceInDays(fim, new Date(t.deadline)) <= 0) p.noPrazo += 1;
-    }
-    if (t.startedAt) {
-      const ms = fim - new Date(t.startedAt);
-      if (ms > 0) p.duracoes.push(ms);
-    }
-    if (t.clientId) p.clientes.add(t.clientId);
-    const ds = diaSemana(fim);
-    if (ds < 5) p.dias.add(ds);
+    equipe.forEach(quem => {
+      if (!mapa[quem]) {
+        mapa[quem] = {
+          name: quem, sector: setorDe(t),
+          total: 0, limpas: 0, comPrazo: 0, noPrazo: 0, duracoes: [],
+          clientes: new Set(), dias: new Set(),
+        };
+      }
+      const p = mapa[quem];
+      p.total += 1;
+      if (!t.reworkCount) p.limpas += 1;
+      if (t.deadline) {
+        p.comPrazo += 1;
+        if (differenceInDays(fim, new Date(t.deadline)) <= 0) p.noPrazo += 1;
+      }
+      if (t.startedAt) {
+        const ms = fim - new Date(t.startedAt);
+        if (ms > 0) p.duracoes.push(ms);
+      }
+      if (t.clientId) p.clientes.add(t.clientId);
+      const ds = diaSemana(fim);
+      if (ds < 5) p.dias.add(ds);
+    });
   });
   return Object.values(mapa);
 }
@@ -240,6 +247,23 @@ export function useTVData() {
         const nova = list.find(t => !seenDoneRef.current.has(t.id));
         seenDoneRef.current = ids;
         if (nova) {
+          // Tempo útil por pessoa — o mesmo retrato que o popup de
+          // conclusão mostra no painel. Vem formatado daqui para o
+          // TVPanel não precisar conhecer o motor de tempo.
+          // `byPerson` fica vazio em task antiga (sem timeline) ou
+          // trabalhada só fora do expediente: aí a TV não mostra o
+          // bloco, em vez de exibir uma lista de zeros.
+          const stats = resolveTimeStats(nova);
+          const rotulo = (ms) => {
+            const s = formatBusinessDuration(ms);
+            return s === '—' ? null : s; // menos de 1 min não vira linha
+          };
+          const equipe = (stats.byPerson || [])
+            .filter(p => p && p.name)
+            .map(p => ({ name: p.name, total: rotulo(p.totalMs) }))
+            .filter(p => p.total)
+            .slice(0, 4);
+
           setCelebration({
             key: `${nova.id}_${Date.now()}`,
             taskName: nova.name,
@@ -247,6 +271,8 @@ export function useTVData() {
             by: pessoaDe(nova) || 'Squad',
             sector: setorDe(nova),
             clean: !nova.reworkCount,
+            people: equipe,
+            totalLabel: rotulo(stats.totalMs),
           });
         }
       }

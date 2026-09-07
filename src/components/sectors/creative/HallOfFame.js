@@ -1,5 +1,6 @@
 import React from 'react';
 import { ExternalLink } from 'lucide-react';
+import { entregadoresDe } from '../../../hooks/useTasks';
 
 function RankBadge({ rank }) {
   const medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
@@ -13,13 +14,17 @@ export default function HallOfFame({ tasks }) {
     t => t.status === 'done' && t.reworkCount === 0
   );
 
-  // Rank by deliveredBy (who actually did the work), fallback to responsibleName for old tasks
+  // A entrega de primeira conta para TODOS que executaram a task, não
+  // só para o responsável principal. A lista de tasks recentes abaixo
+  // continua listando cada task uma única vez.
   const rankMap = {};
   firstApprovalTasks.forEach(t => {
-    const key = t.deliveredBy || t.responsibleName || 'Desconhecido';
-    if (!rankMap[key]) rankMap[key] = { name: key, count: 0, tasks: [] };
-    rankMap[key].count++;
-    rankMap[key].tasks.push(t);
+    const nomes = entregadoresDe(t);
+    (nomes.length ? nomes : ['Desconhecido']).forEach(key => {
+      if (!rankMap[key]) rankMap[key] = { name: key, count: 0, tasks: [] };
+      rankMap[key].count++;
+      rankMap[key].tasks.push(t);
+    });
   });
 
   const ranking = Object.values(rankMap)
@@ -90,9 +95,9 @@ export default function HallOfFame({ tasks }) {
             {recentFirstApproval.map(task => (
               <div key={task.id} style={{ background: 'linear-gradient(135deg,rgba(34,197,94,.08),rgba(34,197,94,.04))', border: '1px solid var(--green-b)', borderRadius: 10, padding: '12px 14px' }}>
                 <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.name}</p>
-                {/* Show who actually delivered */}
+                {/* Equipe da entrega — todos que executaram, não só o principal */}
                 <p style={{ fontSize: 11, color: 'var(--green)', fontWeight: 500, marginBottom: 2 }}>
-                  {task.deliveredBy || task.responsibleName}
+                  {entregadoresDe(task).join(', ') || '—'}
                 </p>
                 <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: task.links?.length > 0 ? 8 : 0 }}>
                   {task.clientName}

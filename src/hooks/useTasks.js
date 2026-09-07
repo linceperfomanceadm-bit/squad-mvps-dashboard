@@ -32,6 +32,30 @@ function hasNameMismatch(t) {
   return !names.includes(t.responsibleName);
 }
 
+// ─── Crédito de entrega ───────────────────────────────────────
+// REGRA: uma task entregue vale UMA entrega no total da agência,
+// mas conta para TODOS que a executaram. O total por setor, o
+// recorde do dia e o contador do mês seguem contando TASKS; só os
+// rankings por pessoa é que expandem a equipe.
+//
+// `deliveredByNames` guarda quem estava responsável no momento de
+// cada entrega. Existe porque `responsibleNames` é sobrescrito com o
+// aprovador logo em seguida (moveToApproval), o que apagava a equipe.
+// É acumulativo: se a task voltou para ajuste com outra pessoa, todo
+// mundo que entregou em alguma rodada continua creditado.
+//
+// Task antiga, sem o campo, cai no responsável principal — exatamente
+// o comportamento anterior, então nenhum número histórico muda.
+export function entregadoresDe(task) {
+  if (!task) return [];
+  const equipe = Array.isArray(task.deliveredByNames)
+    ? task.deliveredByNames.filter(Boolean)
+    : [];
+  if (equipe.length) return [...new Set(equipe)];
+  const principal = task.deliveredBy || task.responsibleName;
+  return principal ? [principal] : [];
+}
+
 // ─── Responsáveis adicionais (depois da task já criada) ────────
 // Só o CRIADOR da task (requestedBy) e o admin chamam esta função —
 // a permissão é validada na UI (TaskModal).
@@ -204,6 +228,10 @@ export function useTasks() {
           by: requestedBy,
           sector: requestedBySector,
           at: now,
+          // Equipe inicial. É o que permite ao motor de tempo saber
+          // quem acumula desde o primeiro minuto, mesmo depois de
+          // responsibleNames ser sobrescrito pelo aprovador.
+          equipe: names,
         }],
         startedAt: null,
         approvalAt: null,
@@ -267,6 +295,17 @@ export function useTasks() {
       const now = at.toISOString();
       const onTime = isDeliveryOnTime(task, at);
 
+      // Quem estava responsável ANTES do handoff para o aprovador.
+      // Somado ao que já havia sido creditado em entregas anteriores
+      // (a task pode ter voltado para ajuste com outra pessoa).
+      const executores = (Array.isArray(task.responsibleNames) && task.responsibleNames.length)
+        ? task.responsibleNames.filter(Boolean)
+        : (task.responsibleName ? [task.responsibleName] : []);
+      const jaCreditados = Array.isArray(task.deliveredByNames)
+        ? task.deliveredByNames.filter(Boolean)
+        : [];
+      const equipeDaEntrega = [...new Set([...jaCreditados, ...executores])];
+
       const timeline = [...(task.timeline || []), {
         action: 'sent_for_approval',
         by: task.responsibleName,
@@ -286,6 +325,11 @@ export function useTasks() {
         // Save who delivered before changing responsible to approver
         deliveredBy: task.responsibleName,
         deliveredBySector: task.responsibleSector,
+        // Equipe da entrega: TODOS os responsáveis deste ciclo, não só
+        // o principal. Precisa ser gravado aqui porque a linha abaixo
+        // sobrescreve responsibleNames com o aprovador. Acumula entre
+        // rodadas de ajuste — ver entregadoresDe().
+        deliveredByNames: equipeDaEntrega,
         responsibleName: approverName,
         responsibleSector: approverSector,
         // Sincroniza o array plural — a UI (card, filtros do kanban,

@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   resolveTimeStats, formatBusinessDuration, BUSINESS_MS_PER_DAY,
 } from '../../lib/taskTime';
+import { entregadoresDe } from '../../hooks/useTasks';
 
 // SLA em DIAS ÚTEIS. Antes o extrato mostrava differenceInDays entre
 // início e conclusão, o que dava "0d" para tudo que fechava no mesmo
@@ -55,8 +56,10 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
     const date = t.completedAt || t.updatedAt || t.createdAt;
     if (!inRange(date, dateFilter)) return false;
     if (collabFilter) {
-      const delivered = t.deliveredBy || t.responsibleName;
-      if (delivered !== collabFilter && t.requestedBy !== collabFilter) return false;
+      // Filtra por QUALQUER pessoa da equipe da entrega, não só pelo
+      // principal — senão o co-responsável some do próprio extrato.
+      const equipe = entregadoresDe(t);
+      if (!equipe.includes(collabFilter) && t.requestedBy !== collabFilter) return false;
     }
     return true;
   });
@@ -133,8 +136,10 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                       const sector    = SECTORS[t.responsibleSector];
                       const stats     = resolveTimeStats(t);
                       const slaMs     = stats.totalMs > 0 ? stats.totalMs : null;
+                      // Task concluída mostra a equipe inteira da
+                      // entrega; em andamento, quem está com ela agora.
                       const deliveredBy = t.status === 'done'
-                        ? (t.deliveredBy || t.responsibleName)
+                        ? entregadoresDe(t).join(', ')
                         : t.responsibleName;
                       // null em task antiga, que nunca passou pelo
                       // novo fluxo — não marca nem verde nem vermelho.

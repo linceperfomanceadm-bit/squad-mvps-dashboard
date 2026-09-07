@@ -166,6 +166,12 @@ export function formatBusinessDuration(ms) {
 // tempo restante toda vez que alguém mexia em algo no meio.
 const OWNERSHIP_ACTIONS = ['created', 'started', 'sent_for_approval', 'rejected', 'completed'];
 
+// `responsibles_changed` não troca a FASE da task (execução, aprovação,
+// retrabalho), mas troca QUEM está com ela. Por isso entra como corte de
+// intervalo: quem entra depois só acumula do momento em que entrou, e
+// quem sai para de acumular ali.
+const TIME_BOUNDARY_ACTIONS = [...OWNERSHIP_ACTIONS, 'responsibles_changed'];
+
 const segmentFor = (event) => {
   switch (event.action) {
     case 'created':
@@ -180,6 +186,38 @@ const segmentFor = (event) => {
       return null;
   }
 };
+
+/*
+ * Equipe no INÍCIO da task, para saber quem acumula desde o primeiro
+ * minuto. Três caminhos, do mais confiável ao mais antigo:
+ *
+ *  1. Gravado no evento `created` (tasks criadas a partir desta versão).
+ *  2. Reconstruído da primeira troca de responsáveis: quem estava antes
+ *     é `to` menos quem entrou, mais quem saiu.
+ *  3. Sem nenhuma troca, a equipe da entrega é a mesma do início.
+ *     `responsibleNames` só serve de última opção porque, depois da
+ *     entrega, ele guarda o aprovador — não a equipe.
+ */
+function equipeInicialDe(task, eventos) {
+  const criacao = eventos.find(e => e.action === 'created');
+  if (Array.isArray(criacao?.equipe) && criacao.equipe.length) {
+    return [...new Set(criacao.equipe.filter(Boolean))];
+  }
+  const primeiraTroca = eventos.find(e => e.action === 'responsibles_changed');
+  if (primeiraTroca && Array.isArray(primeiraTroca.to)) {
+    const entraram = Array.isArray(primeiraTroca.added) ? primeiraTroca.added : [];
+    const sairam = Array.isArray(primeiraTroca.removed) ? primeiraTroca.removed : [];
+    const antes = primeiraTroca.to.filter(n => !entraram.includes(n));
+    return [...new Set([...antes, ...sairam].filter(Boolean))];
+  }
+  if (Array.isArray(task.deliveredByNames) && task.deliveredByNames.length) {
+    return [...new Set(task.deliveredByNames.filter(Boolean))];
+  }
+  if (Array.isArray(task.responsibleNames) && task.responsibleNames.length) {
+    return [...new Set(task.responsibleNames.filter(Boolean))];
+  }
+  return task.responsibleName ? [task.responsibleName] : [];
+}
 
 /*
  * Estatística completa de tempo da task.
@@ -202,7 +240,7 @@ export function taskTimeStats(task, now = new Date()) {
 
   const timeline = Array.isArray(task.timeline) ? task.timeline : [];
   const events = timeline
-    .filter(e => e && OWNERSHIP_ACTIONS.includes(e.action) && e.at)
+    .filter(e => e && TIME_BOUNDARY_ACTIONS.includes(e.action) && e.at)
     .sort((a, b) => new Date(a.at) - new Date(b.at));
 
   if (!events.length) return empty;
@@ -228,16 +266,35 @@ export function taskTimeStats(task, now = new Date()) {
   const totals = { queue: 0, work: 0, rework: 0, approval: 0 };
   let reworkOpen = false;
 
+  // Fase corrente e equipe corrente. A fase só muda nos eventos de
+  // posse; a equipe muda também em `responsibles_changed`.
+  let fase = null;               // { owner, kind } do último evento de posse
+  let equipe = equipeInicialDe(task, events);
+
   for (let i = 0; i < events.length; i++) {
     const event = events[i];
     if (event.action === 'completed') break;
     if (event.action === 'rejected') reworkOpen = true;
 
-    const seg = segmentFor(event);
-    if (!seg) continue;
+    if (event.action === 'responsibles_changed') {
+      // Não troca a fase — só quem está na task daqui para a frente.
+      if (Array.isArray(event.to)) equipe = [...new Set(event.to.filter(Boolean))];
+    } else {
+      const seg = segmentFor(event);
+      if (!seg) continue;
+      fase = seg;
+      // Reprovação devolve a task a uma pessoa só; a equipe recomeça
+      // com quem recebeu o ajuste.
+      if (event.action === 'rejected' && seg.owner) equipe = [seg.owner];
+      // O `started` confirma quem tocou o trabalho: se a equipe estiver
+      // vazia (task antiga, sem registro), cai no autor do evento.
+      if (event.action === 'started' && !equipe.length && seg.owner) equipe = [seg.owner];
+    }
+
+    if (!fase) continue;
 
     // Depois de uma reprovação, execução conta como retrabalho.
-    const kind = (seg.kind === 'work' && reworkOpen) ? 'rework' : seg.kind;
+    const kind = (fase.kind === 'work' && reworkOpen) ? 'rework' : fase.kind;
 
     const from = toDate(event.at);
     const nextEvent = events[i + 1];
@@ -247,8 +304,22 @@ export function taskTimeStats(task, now = new Date()) {
     const ms = businessMsBetween(from, to);
     if (ms <= 0) continue;
 
+    // O total da task soma o trecho UMA vez — o relógio é um só.
     totals[kind] += ms;
-    bump(seg.owner, kind, ms);
+
+    if (kind === 'approval') {
+      // Aprovação é individual: fica só com quem tem a task na mão.
+      bump(fase.owner, kind, ms);
+    } else if (kind === 'work' || kind === 'rework') {
+      // Execução e retrabalho contam INTEGRALMENTE para cada pessoa
+      // que estava na task no trecho. Quem entrou desde o começo fica
+      // com o tempo cheio; quem entrou depois, só do seu trecho em
+      // diante. Por isso a soma de byPerson pode passar do totalMs:
+      // são duas perguntas diferentes ("quanto durou" x "quanto tempo
+      // ficou com cada um").
+      const nomes = equipe.length ? equipe : (fase.owner ? [fase.owner] : []);
+      nomes.forEach(nome => bump(nome, kind, ms));
+    }
   }
 
   const byPerson = Array.from(people.values()).sort((a, b) => b.totalMs - a.totalMs);

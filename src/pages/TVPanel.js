@@ -669,6 +669,24 @@ function Celebration({ data, hideClient }) {
             <Gem size={22} strokeWidth={2.2} /> Aprovada de primeira
           </div>
         )}
+        {/* Tempo útil por pessoa — mesmo retrato do popup de conclusão
+            do painel. Só aparece quando há tempo medido; task antiga ou
+            trabalhada fora do expediente não rende bloco nenhum. */}
+        {data.people?.length > 0 && (
+          <div style={{ marginTop: '2.6cqh', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '.7cqh' }}>
+            <div style={{ fontSize: '.82cqw', fontWeight: 300, color: '#8a7b83', letterSpacing: '.06em' }}>
+              TEMPO ÚTIL{data.totalLabel ? ` · ${data.totalLabel}` : ''}
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.45cqh', minWidth: '18cqw' }}>
+              {data.people.map(p => (
+                <div key={p.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '2cqw' }}>
+                  <span style={{ fontSize: '1.05cqw', fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                  <span style={{ fontSize: '1.05cqw', fontWeight: 500, color: '#8a7b83', fontFamily: "'JetBrains Mono',monospace", whiteSpace: 'nowrap' }}>{p.total}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
