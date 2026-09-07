@@ -47,19 +47,19 @@ export default function HomePage() {
               style={{
                 width: 160, height: 160, objectFit: 'contain',
                 filter: isHov
-                  ? `drop-shadow(0 0 24px ${sector.color}90)`
-                  : `drop-shadow(0 0 8px ${sector.color}35)`,
+                  ? `drop-shadow(0 0 24px color-mix(in srgb, ${sector.color} 56%, transparent))`
+                  : `drop-shadow(0 0 8px color-mix(in srgb, ${sector.color} 21%, transparent))`,
                 transition: 'filter .25s ease',
               }}
             />
           ) : (
             <div style={{
               width: 160, height: 160, borderRadius: 20,
-              background: `radial-gradient(circle at 40% 35%, ${sector.color}28, ${sector.color}08)`,
+              background: `radial-gradient(circle at 40% 35%, color-mix(in srgb, ${sector.color} 16%, transparent), color-mix(in srgb, ${sector.color} 3%, transparent))`,
               border: `2px solid ${sector.color}${isHov ? '50' : '25'}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 52,
-              boxShadow: isHov ? `0 0 36px ${sector.color}30` : 'none',
+              boxShadow: isHov ? `0 0 36px color-mix(in srgb, ${sector.color} 19%, transparent)` : 'none',
               transition: 'all .25s ease',
             }}>
               {sector.emoji}
