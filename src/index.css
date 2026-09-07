@@ -171,6 +171,8 @@ select option:checked, select option:hover { background-color: var(--bg4); color
 @keyframes spin { to { transform:rotate(360deg); } }
 @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 @keyframes glow { 0%,100%{filter:drop-shadow(0 0 12px currentColor)} 50%{filter:drop-shadow(0 0 24px currentColor)} }
+/* Respiração por escala: nada muda de brilho, então nunca lê como pisca. */
+@keyframes breathe { 0%,100%{transform:scale(1)} 50%{transform:scale(1.22)} }
 
 .fade-up { animation: fadeUp .3s ease both; }
 .fade-in { animation: fadeIn .2s ease both; }
