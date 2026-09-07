@@ -203,6 +203,7 @@ export default function CSOperacionalDashboard() {
     kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
     requests: ['Reporte da CS', 'Solicitações abertas para os times de produção'],
     overview: ['Visão Geral', 'Sua carteira em números'],
+    day:      ['', ''],   // o DayTasks desenha o próprio título
     agenda:   ['Agenda', ''],
   };
 
@@ -213,8 +214,8 @@ export default function CSOperacionalDashboard() {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, gap: 12 }}>
               <div>
                 <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>🎧 CS OPERACIONAL</span>
-                <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>
-                {HEAD[page][1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
+                {HEAD[page]?.[0] && <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>}
+                {HEAD[page]?.[1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
               </div>
               {['ops', 'client', 'overview'].includes(page) && (
                 <button
