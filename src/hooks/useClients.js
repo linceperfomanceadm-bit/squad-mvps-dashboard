@@ -19,18 +19,23 @@ export function useClients() {
   }, []);
 
   // Add client — o CS Comercial cadastra o cliente novo (estágio
-  // `staffing`) ou o admin cadastra direto. Campos extras (bloco
+  // `kickoff`) ou o admin cadastra direto. Campos extras (bloco
   // `contrato`, `kickoff`, etc.) são preservados: só `name`,
   // `responsibles` e os blocos de setor têm tratamento especial.
   //
-  // Em `staffing` o cliente grava `active: false` de propósito: é o
+  // Fora de `live` o cliente grava `active: false` de propósito: é o
   // que já o esconde de todos os filtros do app (`active !== false`)
-  // sem precisar mexer em dezenas de telas. Ele volta a `true` quando
-  // o quadro de responsáveis fecha.
+  // sem precisar mexer em dezenas de telas. Ele volta a `true` no
+  // agendamento da call de onboarding.
   const addClient = async (data) => {
     try {
       const { name, responsibles, wdService, idVisualResponsible, stage, ...extra } = data || {};
-      const emStaffing = stage === 'staffing';
+      const emFluxo = stage === 'kickoff' || stage === 'staffing' || stage === 'onboarding';
+      // Cadastro da CS Comercial: a call de Kick Off já nasce aberta,
+      // sem depender de responsáveis — eles vêm depois dela.
+      const kickoffCall = stage === 'kickoff'
+        ? { pending: true, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null }
+        : undefined;
       const newClient = {
         ...extra,
         name,
@@ -65,8 +70,9 @@ export function useClients() {
         video: { deliveries: [] },
         // Brandbook (shared Design + Video)
         brandbook: { colors: [], typography: '', driveLink: '' },
+        ...(kickoffCall ? { kickoffCall } : {}),
         createdAt: serverTimestamp(),
-        active: !emStaffing,
+        active: !emFluxo,
       };
       const ref = await addDoc(collection(db, 'clients'), newClient);
       return { success: true, id: ref.id };
@@ -302,12 +308,14 @@ export function useClients() {
   // ════════════════════════════════════════════════════════════
   //  ONBOARDING DE CLIENTES — duas calls
   //
-  //  staffing   → líderes indicam os responsáveis
-  //  kickoff    → CS COMERCIAL agenda e realiza a call de Kick Off,
-  //               junto com a CS Operacional
-  //  onboarding → CS OPERACIONAL agenda a call de onboarding. É no
-  //               AGENDAMENTO que o cliente vira `active: true` e
-  //               aparece para os responsáveis de cada setor
+  //  kickoff    → CS COMERCIAL agenda e realiza a call de Kick Off.
+  //               A CS Operacional acompanha a data, sem agendar.
+  //  staffing   → Kick Off realizado. Os LÍDERES de cada setor
+  //               indicam os responsáveis, pelo card travado na aba
+  //               de Onboarding da CS Operacional.
+  //  onboarding → quadro fechado. A CS OPERACIONAL agenda a call de
+  //               onboarding. É no AGENDAMENTO que o cliente vira
+  //               `active: true` e aparece para os responsáveis
   //  live       → call de onboarding realizada, rotina normal
   //
   //  Dois blocos separados no documento:
@@ -327,9 +335,9 @@ export function useClients() {
   };
 
   // Líder indica os responsáveis do SETOR DELE. Se com isso o quadro
-  // fechar, o cliente avança para o Kick Off na mesma escrita — nada
-  // de rodar duas vezes e deixar o cliente num estado quebrado se a
-  // segunda falhar.
+  // fechar, o cliente avança para o onboarding na mesma escrita —
+  // nada de rodar duas vezes e deixar o cliente num estado quebrado
+  // se a segunda falhar.
   const setSectorResponsibles = async (clientId, sector, names, byName, opts = {}) => {
     try {
       const client = clients.find(c => c.id === clientId);
@@ -366,13 +374,13 @@ export function useClients() {
       const fechou = aindaFalta.length === 0 && client.stage === 'staffing';
 
       if (fechou) {
-        // Quadro completo: destrava o Kick Off para a CS Comercial.
-        // O cliente CONTINUA invisível para os setores — só aparece
-        // quando a call de onboarding for agendada.
-        patch.stage = 'kickoff';
+        // Quadro completo: destrava a call de onboarding para a CS
+        // Operacional. O cliente CONTINUA invisível para os setores —
+        // só aparece quando essa call for agendada.
+        patch.stage = 'onboarding';
         patch.active = false;
         patch['staffing.completedAt'] = new Date().toISOString();
-        patch.kickoffCall = {
+        patch.kickoff = {
           pending: true, at: null, meetLink: '',
           scheduledBy: null, scheduledAt: null,
           confirmedAt: null, confirmedBy: null,
@@ -384,17 +392,27 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // Cobrança do líder que ainda não indicou ninguém. Fica registrado
+  // no cliente (quem cobrou, quando) — é o histórico que a CS usa
+  // depois para explicar um onboarding atrasado.
+  const nudgeSectorLeader = async (clientId, sector, byName) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        [`staffing.nudges.${sector}`]: { by: byName || null, at: new Date().toISOString() },
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Call 1: Kick Off (CS Comercial) ──────────────────────────
-  // Só destrava com o quadro de responsáveis fechado. Quem agenda é a
-  // CS Comercial; na ausência dela, o admin.
+  // Primeira etapa do ciclo: acontece logo após o cadastro, antes de
+  // existir qualquer responsável. Quem agenda é a CS Comercial; na
+  // ausência dela, o admin.
   const scheduleKickoffCall = async (clientId, byName, at, meetLink) => {
     if (!at) return { success: false, error: 'Defina a data e a hora da call.' };
     try {
       const client = clients.find(c => c.id === clientId);
       if (!client) return { success: false, error: 'Cliente não encontrado.' };
-      if (pendingSectorsOf(client).length > 0) {
-        return { success: false, error: 'Ainda faltam responsáveis. A call de Kick Off só abre com o quadro completo.' };
-      }
       await updateDoc(doc(db, 'clients', clientId), {
         'kickoffCall.pending': true,
         'kickoffCall.at': at,
@@ -420,8 +438,9 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // Kick Off realizado: o cliente passa para a mão da CS Operacional,
-  // que agenda a call de onboarding com o time.
+  // Kick Off realizado: abre o staffing. O card travado aparece na
+  // aba de Onboarding da CS Operacional e só os líderes de cada setor
+  // conseguem indicar quem fica com o cliente.
   const confirmKickoffCall = async (clientId, byName) => {
     try {
       const client = clients.find(c => c.id === clientId);
@@ -431,16 +450,12 @@ export function useClients() {
       }
       const now = new Date().toISOString();
       await updateDoc(doc(db, 'clients', clientId), {
-        stage: 'onboarding',
+        stage: 'staffing',
+        active: false,
         'kickoffCall.pending': false,
         'kickoffCall.confirmedAt': now,
         'kickoffCall.confirmedBy': byName || null,
-        // Abre a call 2 para a CS Operacional.
-        kickoff: {
-          pending: true, at: null, meetLink: '',
-          scheduledBy: null, scheduledAt: null,
-          confirmedAt: null, confirmedBy: null,
-        },
+        'staffing.startedAt': now,
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
@@ -452,6 +467,10 @@ export function useClients() {
   const scheduleOnboarding = async (clientId, byName, at, meetLink) => {
     if (!at) return { success: false, error: 'Defina a data e a hora da call.' };
     try {
+      const client = clients.find(c => c.id === clientId);
+      if (client && pendingSectorsOf(client).length > 0) {
+        return { success: false, error: 'Ainda faltam responsáveis. A call de onboarding só abre com o quadro completo.' };
+      }
       await updateDoc(doc(db, 'clients', clientId), {
         stage: 'onboarding',
         active: true,
@@ -546,6 +565,6 @@ export function useClients() {
     addBrandMaterial, removeBrandMaterial,
     setSectorResponsibles, scheduleOnboarding, cancelStaffing,
     scheduleKickoffCall, cancelKickoffCall, confirmKickoffCall,
-    pendingSectorsOf, uploadClientFile,
+    pendingSectorsOf, uploadClientFile, nudgeSectorLeader,
   };
 }
