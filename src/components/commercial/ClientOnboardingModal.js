@@ -8,7 +8,7 @@ import {
 } from './ui';
 
 const COLOR = SECTORS.cs.color;
-const KICKOFF_COLOR = '#a78bfa';
+const KICKOFF_COLOR = 'var(--purple)';
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
 /*
@@ -228,19 +228,19 @@ function CallBlock({ label, sublabel, color, call, client, kind, participants, w
   return (
     <div style={{ background: agendada ? `${color}12` : 'var(--surface)', border: `1px solid ${agendada ? `${color}40` : 'var(--border)'}`, borderRadius: 12, padding: 14, marginBottom: 14 }}>
       <p style={{ fontSize: 9, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{label}</p>
-      <p style={{ fontSize: 10, color: '#666', marginTop: 2 }}>{sublabel}</p>
+      <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{sublabel}</p>
 
       {agendada ? (
         <>
-          <p style={{ fontSize: 17, fontWeight: 800, color, marginTop: 8, fontFamily: 'var(--fm)' }}>
+          <p style={{ fontSize: 17, fontWeight: 600, color, marginTop: 8, fontFamily: 'var(--fm)' }}>
             📅 {fmtDateTime(call.at)}
           </p>
           {call.scheduledBy && (
-            <p style={{ fontSize: 10, color: '#666', fontFamily: 'var(--fm)', marginTop: 4 }}>agendada por {call.scheduledBy}</p>
+            <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 4 }}>agendada por {call.scheduledBy}</p>
           )}
           <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
             {call.meetLink && (
-              <a href={call.meetLink} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
+              <a href={call.meetLink} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 130, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '10px', borderRadius: 9, background: 'var(--green)', color: 'var(--on)', fontSize: 12, fontWeight: 700, textDecoration: 'none' }}>
                 <Video size={14} /> Abrir call
               </a>
             )}

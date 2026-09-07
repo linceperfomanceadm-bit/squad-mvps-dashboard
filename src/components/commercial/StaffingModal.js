@@ -91,7 +91,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
               </div>
             )}
             {contrato.contractMonths && (
-              <p style={{ fontSize: 11, color: '#666', fontFamily: 'var(--fm)' }}>
+              <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>
                 {contrato.contractMonths} meses{contrato.saleTotal != null ? ` · ${money(contrato.saleTotal)}` : ''}
               </p>
             )}
@@ -144,7 +144,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                       })}
                     </div>
                     {sid === 'design' && temIdVisual && escolhidos.length > 1 && (
-                      <div style={{ marginTop: 10, background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 9, padding: 12 }}>
+                      <div style={{ marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: 12 }}>
                         <p style={LBL}>QUEM FICA COM A ID VISUAL?</p>
                         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
                           A criação de marca tem um dono só. Os demais continuam responsáveis pelo cliente no Design.

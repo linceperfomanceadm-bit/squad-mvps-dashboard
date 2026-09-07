@@ -15,7 +15,7 @@ import {
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const RECENT_DAYS = 30;
-const KICKOFF_COLOR = '#a78bfa';
+const KICKOFF_COLOR = 'var(--purple)';
 
 /*
  * ONBOARDING DE CLIENTES — a mesma tela para todo mundo, mudando só
@@ -116,7 +116,7 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
   return (
     <div className="fade-up">
       <div style={{ marginBottom: 22 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginBottom: 4 }}>Onboarding de Clientes</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Onboarding de Clientes</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
           Clientes novos entrando na agência. Leia o briefing antes de começar a produzir.
         </p>
@@ -278,7 +278,7 @@ function AdminKickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
     <div style={{ ...CARD, border: `1px solid ${agendada ? (passou ? 'var(--amber-b)' : `${KICKOFF_COLOR}40`) : 'var(--border)'}` }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
           {agendada
             ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : KICKOFF_COLOR} />
             : <Tag text="SEM AGENDA" color="var(--muted)" />}
@@ -307,7 +307,7 @@ function Bloco({ title, sub, color, children }) {
     <div style={{ marginBottom: 30 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
         <span style={{ width: 3, height: 15, background: color, borderRadius: 2 }} />
-        <h2 style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{title}</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{title}</h2>
       </div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>{sub}</p>
       {children}
@@ -326,7 +326,7 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
   return (
     <div style={{ ...CARD, border: `1px solid ${atrasado ? 'var(--neon-border)' : 'var(--amber-b)'}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         <Tag text="AGUARDANDO VOCÊ" color="var(--amber)" />
       </div>
 
@@ -339,7 +339,7 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
       </div>
 
       {todosPendentes.length > pendentes.length && (
-        <p style={{ fontSize: 11, color: '#666', marginTop: 8, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
           Outros setores também pendentes: {todosPendentes.filter(s => !pendentes.includes(s)).map(s => SECTORS[s]?.label || s).join(', ')}
         </p>
       )}
@@ -352,7 +352,7 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
 
       <button
         onClick={onOpen}
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 14, padding: '11px', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,var(--neon),#c41f4a)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, width: '100%', marginTop: 14, padding: '11px', borderRadius: 10, border: 'none', background: 'var(--grad)', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
       >
         <UserPlus size={14} /> Indicar responsáveis
       </button>
@@ -374,7 +374,7 @@ function OnboardingCard({ client, color, onOpen }) {
       style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${at ? (passou ? 'var(--amber-b)' : `${color}40`) : 'var(--border)'}` }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         {at
           ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : color} />
           : <Tag text="AGUARDANDO AGENDAMENTO" color="var(--muted)" />}
@@ -402,7 +402,7 @@ function OnboardingCard({ client, color, onOpen }) {
         </div>
       )}
 
-      <p style={{ fontSize: 11, color: '#555', marginTop: 12 }}>Abrir para ver o briefing completo →</p>
+      <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 12 }}>Abrir para ver o briefing completo →</p>
     </button>
   );
 }
@@ -416,12 +416,12 @@ function RecenteCard({ client, onOpen }) {
       style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: '1px solid var(--green-b)' }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{client.name}</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</p>
         <Tag text="ATIVO" color="var(--green)" />
       </div>
       {contrato.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>👤 {contrato.contactName}</p>}
       {client.kickoff?.confirmedAt && (
-        <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 8 }}>
+        <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 8 }}>
           Onboarding em {fmtDate(client.kickoff.confirmedAt)}
         </p>
       )}

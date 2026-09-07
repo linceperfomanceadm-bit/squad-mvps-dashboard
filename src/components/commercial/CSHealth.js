@@ -45,7 +45,7 @@ export default function CSHealth({ clients, tasks, onUpdateClient, toast }) {
     <div className="fade-up">
       <div style={{ marginBottom: 20 }}>
         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `${COLOR}1a`, color: COLOR, border: `1px solid ${COLOR}40`, fontFamily: 'var(--fm)' }}>🎧 CUSTOMER SUCCESS</span>
-        <h1 style={{ fontSize: 26, fontWeight: 800, color: '#fff', letterSpacing: '-.5px', marginTop: 10, marginBottom: 4 }}>Saúde dos Clientes</h1>
+        <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>Saúde dos Clientes</h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>Farol automático por tarefas, ajustável pelo CS · {activeClients.length} clientes ativos</p>
       </div>
 
@@ -82,10 +82,10 @@ export default function CSHealth({ clients, tasks, onUpdateClient, toast }) {
 function HealthCard({ client, health, onClick }) {
   const lvl = HEALTH_LEVELS[health.level];
   return (
-    <button onClick={onClick} style={{ textAlign: 'left', cursor: 'pointer', background: 'rgba(12,12,24,.88)', border: `1px solid ${lvl.color}30`, borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
+    <button onClick={onClick} style={{ textAlign: 'left', cursor: 'pointer', background: 'var(--bg2)', border: `1px solid ${lvl.color}30`, borderRadius: 14, padding: 16, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, background: lvl.color }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-        <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>{client.name}</span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</span>
         <span style={{ fontSize: 18, lineHeight: 1 }}>{lvl.emoji}</span>
       </div>
       <span style={{ display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: `${lvl.color}1a`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 8 }}>
@@ -110,10 +110,10 @@ function HealthDrawer({ client, health, tasks, onClose, onSetRisk }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'flex-end', zIndex: 1100 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ width: 'min(480px,100%)', height: '100%', background: 'rgba(14,14,28,.99)', borderLeft: '1px solid var(--border)', overflowY: 'auto', padding: 24 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ width: 'min(480px,100%)', height: '100%', background: 'var(--bg2)', borderLeft: '1px solid var(--border)', overflowY: 'auto', padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 800, color: '#fff' }}>{client.name}</h2>
+            <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>{client.name}</h2>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 12, background: `${lvl.color}1a`, color: lvl.color, fontFamily: 'var(--fm)', marginTop: 6 }}>
               {lvl.emoji} {lvl.label}{health.overridden ? ' (manual)' : ' (automático)'}
             </span>
@@ -199,14 +199,14 @@ function Section({ title, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
       <h3 style={{ fontSize: 12, fontWeight: 700, color: COLOR, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>{title}</h3>
-      <div style={{ background: 'rgba(12,12,24,.6)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>{children}</div>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>{children}</div>
     </div>
   );
 }
 function Stat({ label, value, color }) {
   return (
     <div>
-      <p style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--text)' }}>{value}</p>
+      <p style={{ fontSize: 22, fontWeight: 600, color: color || 'var(--text)' }}>{value}</p>
       <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', letterSpacing: '.08em' }}>{label.toUpperCase()}</p>
     </div>
   );

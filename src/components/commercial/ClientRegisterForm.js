@@ -385,7 +385,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
             </div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
             <p style={LBL}>CS OPERACIONAL RESPONSÁVEL *</p>
             <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, marginBottom: 10, lineHeight: 1.5 }}>
               Quem vai tocar este cliente no dia a dia. Participa da call de Kick Off com você
@@ -402,7 +402,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
             )}
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
             <p style={LBL}>SETORES ENVOLVIDOS NO PROJETO *</p>
             <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, marginBottom: 10, lineHeight: 1.5 }}>
               Cada setor marcado precisa que o líder dele indique um responsável antes da call de Kick Off ser liberada.
@@ -420,7 +420,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
             </div>
           </div>
 
-          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
             <p style={LBL}>ENTREGAS COM PIPELINE PRÓPRIO</p>
             <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 5, marginBottom: 12, lineHeight: 1.5 }}>
               Estas duas abrem checklist e acompanhamento próprios no painel do time. Podem ser
@@ -443,7 +443,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
               {data.hasIdVisual ? <Check size={14} /> : <span style={{ width: 14 }} />}
               ID Visual — criação de marca completa
             </button>
-            <p style={{ fontSize: 11, color: '#666', marginTop: 7, lineHeight: 1.5 }}>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 7, lineHeight: 1.5 }}>
               O designer dono da marca é definido pelo líder de Design, na indicação de responsáveis.
             </p>
           </div>
@@ -511,7 +511,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           </div>
 
           {data.paymentType === 'prazo' && (
-            <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text)', cursor: 'pointer', marginBottom: 10 }}>
                 <input type="checkbox" checked={data.customInstallment} onChange={e => set('customInstallment', e.target.checked)} style={{ accentColor: COLOR }} />
                 Parcelamento personalizado (entrada diferente, valores variados)
@@ -548,7 +548,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           </div>
 
           {/* Anexos */}
-          <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <FileSlot
               label="ANEXO DO BRIEFING"
               hint="Visível para todos os responsáveis pelo projeto."
@@ -571,7 +571,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
             <button style={CANCEL} onClick={() => setStep(2)}>Voltar</button>
             <button
-              style={{ ...BTN, flex: 1, background: 'linear-gradient(135deg,#22c55e,#16a34a)', opacity: (step3Valid && !submitting) ? 1 : .5 }}
+              style={{ ...BTN, flex: 1, background: 'var(--green)', opacity: (step3Valid && !submitting) ? 1 : .5 }}
               disabled={!step3Valid || submitting || !!uploading}
               onClick={submit}
             >
@@ -588,7 +588,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
 
 function Bloco({ titulo, children }) {
   return (
-    <div style={{ background: 'rgba(255,255,255,.03)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <p style={{ ...LBL, color: 'var(--text)' }}>{titulo}</p>
       {children}
     </div>
@@ -599,7 +599,7 @@ function FileSlot({ label, hint, file, busy, onPick, onClear }) {
   return (
     <div>
       <p style={LBL}>{label}</p>
-      <p style={{ fontSize: 10, color: '#666', marginTop: 3, marginBottom: 7, lineHeight: 1.5 }}>{hint}</p>
+      <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, marginBottom: 7, lineHeight: 1.5 }}>{hint}</p>
       {file ? (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 9, padding: '9px 12px' }}>
           <Check size={13} color="var(--green)" />
@@ -637,7 +637,7 @@ function Hint({ text }) {
 const money = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const LBL = { fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' };
-const INP = { width: '100%', background: '#12121f', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)' };
+const INP = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)' };
 const SEL = { ...INP, cursor: 'pointer' };
-const BTN = { padding: '12px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg,var(--neon),#c41f4a)', color: '#fff' };
+const BTN = { padding: '12px', borderRadius: 10, border: 'none', fontSize: 14, fontWeight: 700, cursor: 'pointer', background: 'var(--grad)', color: 'var(--on)' };
 const CANCEL = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer' };

@@ -147,7 +147,7 @@ export default function CSRequests({
     <div className="fade-up">
       {/* Escopo + ação */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 10, padding: 4 }}>
+        <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 10, padding: 4 }}>
           {SCOPES.map(s => (
             <button
               key={s.id}
@@ -160,7 +160,7 @@ export default function CSRequests({
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ display: 'flex', gap: 4, background: 'rgba(255,255,255,.03)', borderRadius: 9, padding: 3 }}>
+          <div style={{ display: 'flex', gap: 4, background: 'var(--surface)', borderRadius: 9, padding: 3 }}>
             <button onClick={() => setView('list')} title="Lista compacta"
               style={{ background: view === 'list' ? 'var(--surface)' : 'transparent', border: 'none', borderRadius: 6, padding: '6px 8px', color: view === 'list' ? 'var(--text)' : 'var(--muted)', cursor: 'pointer', display: 'flex' }}>
               <List size={14} />
@@ -239,7 +239,7 @@ export default function CSRequests({
             </div>
           )
           : (
-            <div style={{ background: 'rgba(12,12,24,.88)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
               {visible.map((r, i) => (
                 <RequestRow key={r.id} request={r} last={i === visible.length - 1} onClick={() => setOpenId(r.id)} />
               ))}
@@ -279,7 +279,7 @@ export default function CSRequests({
 }
 
 const SELECT = {
-  background: '#12121f', border: '1px solid var(--border)', borderRadius: 9,
+  background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
   padding: '9px 12px', color: 'var(--text)', fontSize: 12, outline: 'none',
   cursor: 'pointer', fontFamily: 'var(--f)',
 };
@@ -299,7 +299,7 @@ function RequestRow({ request, last, onClick }) {
       style={{
         display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left',
         background: 'transparent', border: 'none',
-        borderBottom: last ? 'none' : '1px solid rgba(255,255,255,.05)',
+        borderBottom: last ? 'none' : '1px solid var(--border)',
         padding: '11px 14px', cursor: 'pointer',
       }}
     >
@@ -340,7 +340,7 @@ function RequestCard({ request, onClick }) {
   return (
     <button onClick={onClick} style={{ ...CARD, textAlign: 'left', width: '100%', cursor: 'pointer', border: `1px solid ${aging?.estourou ? 'var(--neon-border)' : `${st.color}33`}` }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.35 }}>{request.subject}</p>
+        <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.35 }}>{request.subject}</p>
         <Tag text={u.label.toUpperCase()} color={u.color} />
       </div>
 
@@ -369,7 +369,7 @@ function RequestCard({ request, onClick }) {
             <CheckCircle2 size={12} /> Resolvida pelo colaborador
           </span>
         )}
-        <span style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginLeft: 'auto' }}>
+        <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginLeft: 'auto' }}>
           {(request.replies || []).length} resposta(s)
         </span>
       </div>
@@ -413,7 +413,7 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
             <span style={{ fontSize: 12, color: sec?.color || 'var(--text)' }}>{sec?.emoji} {request.toName}</span>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap', marginTop: 8 }}>{request.description}</p>
-          <p style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)', marginTop: 10 }}>
+          <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 10 }}>
             Aberta por {request.createdBy} · {fmt(request.createdAt)}
           </p>
         </div>
@@ -433,16 +433,16 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
         <p style={LBL}>CONVERSA</p>
         <div style={{ marginTop: 8, marginBottom: 14 }}>
           {(request.replies || []).length === 0
-            ? <p style={{ fontSize: 12, color: '#555', padding: '10px 0' }}>Nenhuma resposta ainda.</p>
+            ? <p style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 0' }}>Nenhuma resposta ainda.</p>
             : (request.replies || []).map(rep => (
               <div key={rep.id} style={{
-                background: rep.role === 'cs' ? 'rgba(255,255,255,.03)' : 'rgba(56,189,248,.06)',
+                background: rep.role === 'cs' ? 'var(--surface)' : 'rgba(56,189,248,.06)',
                 border: `1px solid ${rep.role === 'cs' ? 'var(--border)' : 'rgba(56,189,248,.25)'}`,
                 borderRadius: 9, padding: '10px 12px', marginBottom: 8,
               }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: rep.role === 'cs' ? 'var(--neon)' : 'var(--blue)' }}>{rep.author}</span>
-                  <span style={{ fontSize: 10, color: '#555', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{fmt(rep.at)}</span>
                 </div>
                 <p style={{ fontSize: 13, color: '#ddd', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>{rep.text}</p>
                 {rep.role === 'collab' && (
@@ -489,7 +489,7 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
         <div style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: 8, alignItems: 'center' }}>
           {!confirmDel
             ? (
-              <button onClick={() => setConfirmDel(true)} style={{ background: 'transparent', border: 'none', color: '#666', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
+              <button onClick={() => setConfirmDel(true)} style={{ background: 'transparent', border: 'none', color: 'var(--muted)', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>
                 <Trash2 size={13} /> Excluir
               </button>
             ) : (
