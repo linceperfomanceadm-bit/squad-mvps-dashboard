@@ -131,7 +131,17 @@ export default function TaskKanban({
   const filtroAtivo = Boolean(clientFilter || dateFilter);
   const limparFiltros = () => { setClientFilter(''); setDateFilter(''); };
 
-  const tasksByColumn = (colId) => visibleTasks.filter(t => t.status === colId);
+  // Concluídas: só as do mês corrente. O histórico inteiro continua no
+  // Firestore e nos Relatórios; aqui ele só empurrava a coluna para
+  // baixo e engordava o board sem servir para o trabalho do dia.
+  const inicioMes = useMemo(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); }, []);
+  const doneNoMes = (t) => {
+    if (t.status !== 'done') return true;
+    const c = t.completedAt?.toDate ? t.completedAt.toDate() : t.completedAt ? new Date(t.completedAt) : null;
+    return !!c && c >= inicioMes;
+  };
+  const tasksByColumn = (colId) => visibleTasks.filter(t => t.status === colId && doneNoMes(t));
+  const doneOcultas = visibleTasks.filter(t => t.status === 'done' && !doneNoMes(t)).length;
 
   // ── Drag handlers ─────────────────────────────────────────────
   const handleDragStart = (e, task) => {
@@ -297,8 +307,16 @@ export default function TaskKanban({
             >
               {/* Column header */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>{col.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>
+                  {col.label}
+                  {col.id === 'done' && <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: 6, fontSize: 10.5 }}>este mês</span>}
+                </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {col.id === 'done' && doneOcultas > 0 && (
+                    <span title={`${doneOcultas} concluídas em meses anteriores — veja nos Relatórios ou no Extrato`} style={{ fontSize: 9.5, color: 'var(--dim)', fontFamily: 'var(--fm)' }}>
+                      +{doneOcultas} antes
+                    </span>
+                  )}
                   {reworkCount > 0 && (
                     <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>
                       🔄 {reworkCount}
