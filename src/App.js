@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer } from './components/shared/Toast';
 import PatchNotesPopup from './components/shared/PatchNotesPopup';
 import NotificationCenter from './components/shared/NotificationCenter';
@@ -42,7 +43,7 @@ function ProtectedRoute({ children, requireSector, requireAdmin, requireCsRole, 
   const { user, loading } = useAuth();
 
   if (loading) return (
-    <div style={{ minHeight: '100vh', background: '#07070e', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div className="spinner" style={{ width: 36, height: 36 }} />
     </div>
   );
@@ -167,13 +168,15 @@ function PortalProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <PortalAuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-          <ToastContainer />
-        </BrowserRouter>
-      </PortalAuthProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <PortalAuthProvider>
+          <BrowserRouter>
+            <AppRoutes />
+            <ToastContainer />
+          </BrowserRouter>
+        </PortalAuthProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
