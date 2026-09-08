@@ -106,7 +106,7 @@ function AddMaterialModal({ onClose, onAdd }) {
 
   const content = (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 24px 64px rgba(0,0,0,.7)', flexShrink: 0 }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, padding: 22, boxShadow: '0 24px 64px rgba(0,0,0,.7)', flexShrink: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 17, fontWeight: 600, color: 'var(--text)' }}>Adicionar material</h3>
           <button onClick={onClose} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: 6, cursor: 'pointer', display: 'flex' }}><X size={15} color="var(--muted)" /></button>
