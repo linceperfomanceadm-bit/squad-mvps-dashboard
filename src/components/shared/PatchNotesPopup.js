@@ -67,7 +67,7 @@ export default function PatchNotesPopup({ user }) {
  
   return ReactDOM.createPortal(
     <div onClick={close} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.65)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
-      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'rgba(18,18,32,.99)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
+      <div onClick={e => e.stopPropagation()} className="fade-up" style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, width: '100%', maxWidth: 440, overflow: 'hidden', boxShadow: '0 24px 64px rgba(0,0,0,.7)' }}>
         <div style={{ background: 'var(--grad)', padding: '22px 24px', position: 'relative' }}>
           <Sparkles size={26} color="#fff" style={{ marginBottom: 8 }} />
           <h2 style={{ fontSize: 20, fontWeight: 600, color: 'var(--text)' }}>{PATCH_NOTES.title}</h2>

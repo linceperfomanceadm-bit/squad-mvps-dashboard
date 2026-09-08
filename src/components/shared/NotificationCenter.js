@@ -36,7 +36,7 @@ export default function NotificationCenter() {
   return ReactDOM.createPortal(
     <div style={{
       position: 'fixed', right: 20, bottom: 20, zIndex: 99990,
-      width: 320, background: 'rgba(16,16,30,.98)',
+      width: 320, background: 'var(--bg2)',
       border: '1px solid var(--neon-border)', borderRadius: 14,
       padding: 16, boxShadow: '0 18px 50px rgba(0,0,0,.6)',
     }}>
