@@ -62,7 +62,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 620, maxHeight: '88vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 620, maxHeight: '88vh', overflowY: 'auto' }}>
         <ModalHeader title={client.name} onClose={onClose} />
         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 18, lineHeight: 1.5 }}>
           Leia o briefing e defina quem fica responsável por este cliente. Pode escolher mais de uma pessoa.

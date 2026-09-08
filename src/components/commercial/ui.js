@@ -10,11 +10,14 @@ import { X, Check } from 'lucide-react';
 
 export const CARD = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' };
 export const GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12 };
-export const MODAL = { background: 'rgba(16,16,30,.99)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '88vh', overflowY: 'auto' };
+export const MODAL = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 480, maxHeight: '88vh', overflowY: 'auto' };
 export const LBL = { fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' };
 export const INP = { width: '100%', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)' };
-export const BTN_PRIMARY = { background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '11px 16px', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
-export const BTN_GREEN = { background: 'var(--green)', border: 'none', borderRadius: 10, padding: '11px 16px', color: 'var(--text)', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
+// Texto sobre o gradiente: --on (calculado por setor e tema).
+export const BTN_PRIMARY = { background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '11px 16px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
+// Sobre o verde: --bg inverte junto com o tema (escuro sobre verde-claro no
+// dark, claro sobre verde-escuro no light) — sempre legível.
+export const BTN_GREEN = { background: 'var(--green)', border: 'none', borderRadius: 10, padding: '11px 16px', color: 'var(--bg)', fontSize: 13, fontWeight: 700, cursor: 'pointer' };
 export const BTN_CANCEL = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '11px 16px', color: 'var(--muted)', fontSize: 13, fontWeight: 600, cursor: 'pointer' };
 export const ICON_BTN = { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' };
 
@@ -25,7 +28,7 @@ export const ICON_BTN = { background: 'var(--surface)', border: '1px solid var(-
 // precisa rolar a página para achar.
 export function Overlay({ children, onClose }) {
   const content = (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.55)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99997, padding: 20, overflowY: 'auto' }}>
       <div onClick={e => e.stopPropagation()} className="fade-up" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
         {children}
       </div>
