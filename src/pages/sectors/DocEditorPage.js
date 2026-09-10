@@ -7,6 +7,9 @@ import { useDocuments, DOC_STATUS } from '../../hooks/useDocuments';
 import { useToast } from '../../components/shared/Toast';
 import { docPorId } from '../../lib/docs/catalogo';
 import { marcaPendente } from '../../lib/docs/marca';
+import {
+  semearPadroes, colunasVisiveis, linhasVisiveis, campoVisivel,
+} from '../../lib/docs/motor';
 import DocForm from '../../components/sectors/socialMedia/docs/DocForm';
 import DocPreview, { blocosDoDeck } from '../../components/sectors/socialMedia/docs/DocPreview';
 import DocApoio from '../../components/sectors/socialMedia/docs/DocApoio';
@@ -30,19 +33,25 @@ const ATRASO_SALVAR = 800;
 // Conta os campos que ainda vão sair marcados no slide.
 // Uma linha de lista conta cada coluna em branco: é o que aparece
 // como [rótulo] em itálico no documento impresso.
+//
+// Com `essencial`, conta só o que o formulário está mostrando — é o
+// contador de progresso de cada seção. O total do topo e o aviso do
+// PDF contam tudo, porque é o que aparece marcado nos slides.
 const vazio = (v) => !v || !String(v).trim();
 
-function vaziosDoCampo(campo, valor) {
+function vaziosDoCampo(campo, valor, essencial) {
+  if (campo.tipo === 'nota' || !campoVisivel(campo, essencial)) return 0;
   if (campo.tipo !== 'lista') return vazio(valor) ? 1 : 0;
   const linhas = Array.isArray(valor) ? valor : [];
-  return Array.from({ length: campo.linhas }).reduce((acc, _, i) => {
+  const cols = colunasVisiveis(campo, essencial);
+  return Array.from({ length: linhasVisiveis(campo, essencial) }).reduce((acc, _, i) => {
     const linha = linhas[i] || {};
-    return acc + campo.cols.filter((col) => vazio(linha[col.id])).length;
+    return acc + cols.filter((col) => vazio(linha[col.id])).length;
   }, 0);
 }
 
-function vaziosDaSecao(secao, dados) {
-  return secao.campos.reduce((acc, c) => acc + vaziosDoCampo(c, dados[c.id]), 0);
+function vaziosDaSecao(secao, dados, essencial) {
+  return secao.campos.reduce((acc, c) => acc + vaziosDoCampo(c, dados[c.id], essencial), 0);
 }
 
 function contarVazios(doc, dados, opcionais) {
@@ -65,29 +74,19 @@ export default function DocEditorPage() {
   const [salvando, setSalvando] = useState(false);
   const [rascunho, setRascunho] = useState(null);
   const [deckCompleto, setDeckCompleto] = useState(false);
+  // REGRA 3.10 — modo essencial vem ligado.
+  const [essencial, setEssencial] = useState(true);
 
   const colMeio = useRef(null);
   const colDeck = useRef(null);
 
   const timer = useRef(null);
   const pendenteRef = useRef(null);
+  const abertoRef = useRef(null);
 
   const documento = documents.find((d) => d.id === docId) || null;
   const doc = documento ? docPorId(documento.tipo) : null;
   const cliente = documento ? clients.find((c) => c.id === documento.clientId) : null;
-
-  // O rascunho local absorve a digitação; o Firestore recebe depois
-  // do intervalo. Sem isso, cada tecla vira uma escrita.
-  useEffect(() => {
-    if (!documento) return;
-    setRascunho((r) => (r && r.id === documento.id ? r : {
-      id: documento.id,
-      dados: documento.dados || {},
-      extras: documento.extras || [],
-      opcionais: documento.opcionais || {},
-      pendencias: documento.pendencias || [],
-    }));
-  }, [documento]);
 
   const gravar = useCallback((patch) => {
     if (!docId) return;
@@ -102,6 +101,25 @@ export default function DocEditorPage() {
       if (!res.success) toast(`Não foi possível salvar: ${res.error}`, 'e');
     }, ATRASO_SALVAR);
   }, [docId, updateDocument, user, toast]);
+
+  // O rascunho local absorve a digitação; o Firestore recebe depois
+  // do intervalo. Sem isso, cada tecla vira uma escrita.
+  // REGRA 3.11 — ao abrir, as listas recebem os valores padrão
+  // (nome e direção das métricas) nas células nunca tocadas.
+  useEffect(() => {
+    if (!documento || abertoRef.current === documento.id) return;
+    abertoRef.current = documento.id;
+    const original = documento.dados || {};
+    const dados = semearPadroes(doc, original);
+    setRascunho({
+      id: documento.id,
+      dados,
+      extras: documento.extras || [],
+      opcionais: documento.opcionais || {},
+      pendencias: documento.pendencias || [],
+    });
+    if (dados !== original) gravar({ dados });
+  }, [documento, doc, gravar]);
 
   // Grava o que estiver pendente ao sair da página.
   useEffect(() => () => {
@@ -301,7 +319,7 @@ export default function DocEditorPage() {
       <div style={S.corpo}>
         <nav style={S.nav}>
           {secoes.map((s, i) => {
-            const faltam = vaziosDaSecao(s, dados);
+            const faltam = vaziosDaSecao(s, dados, essencial);
             const desligada = s.opcional && rascunho.opcionais[s.t] === false;
             const ativa = aba === i;
             return (
@@ -341,17 +359,30 @@ export default function DocEditorPage() {
           {aba === -1 ? (
             <DocExtras doc={doc} extras={rascunho.extras} onChange={alterarExtras} />
           ) : (
-            <DocForm
-              secao={secaoAtual}
-              dados={dados}
-              onChange={alterar}
-              campoBase={doc.campoBase}
-              baseTravada={!!baseSalva}
-              baseDesde={baseDesde}
-              onDestravarBase={destravarBase}
-              opcionalLigada={secaoAtual && rascunho.opcionais[secaoAtual.t]}
-              onToggleOpcional={alterarOpcional}
-            />
+            <>
+              <label style={S.chave}>
+                <input
+                  type="checkbox"
+                  checked={essencial}
+                  onChange={(e) => setEssencial(e.target.checked)}
+                  style={{ accentColor: '#EE3363', width: 15, height: 15 }}
+                />
+                <span style={{ color: 'var(--text)', fontWeight: 600 }}>Mostrar só o essencial</span>
+                <span>· esconde os campos complementares, sem apagar o que já foi digitado</span>
+              </label>
+              <DocForm
+                secao={secaoAtual}
+                dados={dados}
+                onChange={alterar}
+                campoBase={doc.campoBase}
+                baseTravada={!!baseSalva}
+                baseDesde={baseDesde}
+                onDestravarBase={destravarBase}
+                opcionalLigada={secaoAtual && rascunho.opcionais[secaoAtual.t]}
+                onToggleOpcional={alterarOpcional}
+                essencial={essencial}
+              />
+            </>
           )}
 
           <div style={{ marginTop: 28, paddingTop: 22, borderTop: '1px solid var(--border)' }}>
@@ -448,6 +479,12 @@ const S = {
   },
   navOff: { fontSize: 10, color: 'var(--muted)', fontStyle: 'italic', flexShrink: 0 },
   navExtras: { marginTop: 10, borderTop: '1px solid var(--border)', borderRadius: 0, paddingTop: 14 },
+  chave: {
+    display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+    fontSize: 11.5, color: 'var(--muted)', cursor: 'pointer',
+    background: 'var(--surface)', border: '1px solid var(--border)',
+    borderRadius: 9, padding: '9px 12px', marginBottom: 22,
+  },
   meio: { padding: '26px 26px 60px', overflowY: 'auto', borderRight: '1px solid var(--border)' },
   direita: { padding: 22, overflowY: 'auto', background: 'var(--bg)' },
 };
