@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, stageOf, contractState } from '../lib/firebase';
 
 /*
  * useDesktopNotifications — notificação nativa do navegador.
@@ -20,6 +20,8 @@ import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../lib/firebase';
  *   · Task devolvida para ajuste na sua mão
  *   · Call de Kick Off ou Onboarding agendada em cliente seu
  *   · Cobrança de staffing parado (admin e líder do setor travado)
+ *   · Contrato vencendo ou vencido (CS e admin)
+ *   · Lembrete da Tarefa do Dia na hora marcada (via notifyLocal)
  *
  * HISTÓRICO: tudo que o hook detecta vai para um registro por pessoa
  * (localStorage), mesmo com a notificação do navegador desligada. É o
@@ -31,6 +33,7 @@ import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../lib/firebase';
 
 const STORAGE_KEY = 'squadmvps.notify.enabled';
 const ALERT_LOG_KEY = 'squadmvps.notify.staffingLog';
+const CONTRACT_LOG_KEY = 'squadmvps.notify.contractLog';
 const HISTORY_KEY = (id) => `squadmvps.notify.history.${id}`;
 const HISTORY_EVENT = 'squadmvps:notify-history';
 const HISTORY_MAX = 50;
@@ -62,6 +65,40 @@ const readAlertLog = () => {
 };
 const writeAlertLog = (log) => {
   try { localStorage.setItem(ALERT_LOG_KEY, JSON.stringify(log)); } catch { /* quota cheia, ignora */ }
+};
+
+const readContractLog = () => {
+  try { return JSON.parse(localStorage.getItem(CONTRACT_LOG_KEY) || '{}'); }
+  catch { return {}; }
+};
+const writeContractLog = (log) => {
+  try { localStorage.setItem(CONTRACT_LOG_KEY, JSON.stringify(log)); } catch { /* quota cheia, ignora */ }
+};
+
+/*
+ * Disparo avulso, para quem não roda o motor de detecção deste hook —
+ * hoje é o lembrete da Tarefa do Dia, que é local e não vem de
+ * transição no Firestore.
+ *
+ * Respeita o mesmo interruptor e grava no mesmo histórico do sino, e
+ * a deduplicação por `tag` é o que impede o lembrete de repetir a
+ * cada varredura.
+ */
+export const notifyLocal = (userId, title, body, tag) => {
+  if (!userId || !tag) return false;
+  const list = readHistory(userId);
+  if (list.some(n => n.tag === tag)) return false;
+  writeHistory(userId, [{ tag, title, body, at: new Date().toISOString(), read: false }, ...list]);
+
+  let ligado = true;
+  try { ligado = localStorage.getItem(STORAGE_KEY) !== 'off'; } catch { /* ignora */ }
+  if (!ligado || notificationPermission() !== 'granted') return true;
+
+  try {
+    const n = new Notification(title, { body, tag, icon: '/logos/admin.png', badge: '/logos/admin.png' });
+    n.onclick = () => { window.focus(); n.close(); };
+  } catch { /* navegador recusou, não trava o app */ }
+  return true;
 };
 
 export function useDesktopNotifications({ tasks = [], requests = [], clients = [], user }) {
@@ -285,6 +322,42 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
 
     if (mudou) writeAlertLog(log);
   }, [clients, me, fire, isAdmin, user, myLeaderSectors]);
+
+  // ── Contrato vencendo ou vencido ─────────────────────────────
+  // Diferente do resto: não é transição, é relógio. Por isso checa o
+  // estado atual em vez de comparar com a foto anterior, e se apoia
+  // num log diário para não repetir o mesmo aviso no mesmo dia.
+  //
+  // Vai para a CS (comercial e operacional) e para o admin — são
+  // quem negocia a renovação.
+  useEffect(() => {
+    if (!me) return;
+    if (!isAdmin && user?.sector !== 'cs') return;
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const log = readContractLog();
+    let mudou = false;
+
+    clients.forEach(c => {
+      if (c.active === false) return;
+      const st = contractState(c);
+      if (st.status !== 'ending' && st.status !== 'expired') return;
+      if (log[c.id] === hoje) return;
+      log[c.id] = hoje;
+      mudou = true;
+
+      const dias = Math.abs(st.daysLeft);
+      fire(
+        st.status === 'expired' ? 'Contrato vencido' : 'Contrato vencendo',
+        st.status === 'expired'
+          ? `${c.name} venceu há ${dias} dia${dias !== 1 ? 's' : ''}. Registre a renovação ou o encerramento.`
+          : `${c.name} vence em ${dias} dia${dias !== 1 ? 's' : ''}. Registre a renovação ou o encerramento.`,
+        `contract-${c.id}-${hoje}`
+      );
+    });
+
+    if (mudou) writeContractLog(log);
+  }, [clients, me, fire, isAdmin, user]);
 
   return {
     permission,
