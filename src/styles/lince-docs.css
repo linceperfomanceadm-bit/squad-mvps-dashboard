@@ -262,14 +262,40 @@
 @media print {
   .lince-nao-imprime { display: none !important; }
 
-  .lince-deck { gap: 0; display: block; }
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #fff !important;
+  }
 
+  .lince-deck {
+    gap: 0;
+    display: block;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Tamanho TRAVADO em pixel, não em porcentagem.
+     O layout inteiro do deck é medido em unidades de container
+     (cqw/cqh): o corpo do texto, o título, o respiro. Com
+     `width: 100%` o slide assumia a largura da folha que o driver
+     escolhesse — carta retrato, por exemplo — e toda a tipografia
+     encolhia junto, saindo diferente do que aparece na tela.
+     Travando em 1280x720 o container mede sempre o mesmo, e a folha
+     definida no @page (13.333in x 7.5in) encaixa exato. */
   .lince-deck .slide {
-    max-width: none;
-    width: 100%;
+    width: 1280px !important;
+    height: 720px !important;
+    max-width: none !important;
+    aspect-ratio: auto !important;
+    margin: 0 !important;
     page-break-after: always;
     break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
     outline: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
