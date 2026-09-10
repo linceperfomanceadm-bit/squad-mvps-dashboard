@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, UserPlus, ClipboardList, Kanban, MessageSquare,
-  Calendar, Clock, Trash2, Rocket, Lock, ListTodo,
+  Calendar, Clock, Trash2, Rocket, Lock, ListTodo, Bell,
 } from 'lucide-react';
 import DayTasks from '../../components/shared/DayTasks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -50,6 +50,8 @@ export default function CSComercialDashboard() {
   const {
     clients, loading, addClient, cancelStaffing, pendingSectorsOf, uploadClientFile,
     scheduleKickoffCall, cancelKickoffCall, confirmKickoffCall,
+    renameClient, addClientAttachment, removeClientAttachment,
+    renewContract, closeContract, reopenContract, nudgeSectorLeader,
   } = useClients();
   const { collaborators } = useCollaborators();
   const {
@@ -208,6 +210,11 @@ export default function CSComercialDashboard() {
                         pendentes={pendingSectorsOf(c)}
                         onOpen={() => setOpenId(c.id)}
                         onDelete={() => setDeleteTarget(c)}
+                        onNudge={async (sid) => {
+                          const r = await nudgeSectorLeader(c.id, sid, me);
+                          if (r.success) toast(`Líder de ${SECTORS[sid]?.label || sid} cobrado.`);
+                          else toast(r.error, 'e');
+                        }}
                       />
                     ))}
                   </div>
@@ -339,6 +346,42 @@ export default function CSComercialDashboard() {
               setOpenId(null);
             }
             : undefined}
+          onRename={async (nome) => {
+            const r = await renameClient(openClient.id, nome, me);
+            if (r.success) toast(`Cliente renomeado para ${nome}.`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onAddAttachment={async (file) => {
+            const r = await addClientAttachment(openClient.id, file, me);
+            if (r.success) toast('Arquivo anexado!');
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onRemoveAttachment={async (anexo) => {
+            const r = await removeClientAttachment(openClient.id, anexo);
+            if (r.success) toast('Anexo removido.');
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onRenewContract={async (meses, obs) => {
+            const r = await renewContract(openClient.id, meses, me, obs);
+            if (r.success) toast(`Contrato renovado por ${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}.`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onCloseContract={async (motivo) => {
+            const r = await closeContract(openClient.id, me, motivo);
+            if (r.success) toast(`Contrato de ${openClient.name} encerrado.`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onReopenContract={async () => {
+            const r = await reopenContract(openClient.id);
+            if (r.success) toast('Contrato reaberto.');
+            else toast(r.error, 'e');
+            return r;
+          }}
         />
       )}
 
@@ -407,7 +450,7 @@ function Bloco({ title, sub, color, children }) {
 }
 
 // ── Card de acompanhamento do staffing ─────────────────────────
-function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
+function StaffingWatchCard({ client, pendentes, onOpen, onDelete, onNudge }) {
   const contrato = client.contrato || {};
   const exigidos = client.staffing?.sectors || [];
   const prontos = exigidos.filter(s => !pendentes.includes(s));
@@ -435,13 +478,22 @@ function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
           {exigidos.map(sid => {
             const nomes = asArray(client.responsibles?.[sid]);
             const ok = nomes.length > 0;
+            const indicacao = client.staffing?.log?.[sid];
             return (
-              <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+              <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 12, color: ok ? (SECTORS[sid]?.color || 'var(--text)') : 'var(--muted)' }}>
                   {ok ? '✓' : '○'} {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
                 </span>
                 <span style={{ fontSize: 11, color: ok ? 'var(--muted)' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
                   {ok ? nomes.join(', ') : 'pendente'}
+                  {ok && indicacao?.at && (
+                    <>
+                      <br />
+                      <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+                        em {fmtDate(indicacao.at)}{indicacao.by ? ` por ${indicacao.by}` : ''}
+                      </span>
+                    </>
+                  )}
                 </span>
               </div>
             );
@@ -461,6 +513,33 @@ function StaffingWatchCard({ client, pendentes, onOpen, onDelete }) {
           </p>
         )}
       </button>
+
+      {/* Cobrança do líder que ainda não indicou ninguém. A mesma
+          ação da CS Operacional, com o mesmo registro — quem estiver
+          com o cliente na mão cobra, sem depender do outro time. */}
+      {onNudge && pendentes.length > 0 && (
+        <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {pendentes.map(sid => {
+            const cobrado = client.staffing?.nudges?.[sid];
+            const quando = cobrado?.at ? fmtDate(cobrado.at) : null;
+            return (
+              <button
+                key={sid}
+                onClick={() => onNudge(sid)}
+                title={quando ? `Última cobrança em ${quando}` : 'Avisar o líder deste setor'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5, padding: '6px 10px', borderRadius: 99,
+                  background: cobrado ? 'var(--soft)' : 'var(--amber-dim)',
+                  border: `1px solid ${cobrado ? 'var(--border-h)' : 'var(--amber-b)'}`,
+                  color: cobrado ? 'var(--muted)' : 'var(--amber)', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                <Bell size={11} /> {cobrado ? 'Cobrado' : 'Cobrar'} · {SECTORS[sid]?.label || sid}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {semIndicacao && (
         <button

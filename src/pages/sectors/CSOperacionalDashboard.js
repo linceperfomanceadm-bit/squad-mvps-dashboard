@@ -17,6 +17,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import CSRequests from '../../components/commercial/CSRequests';
 import ClientOnboardingModal from '../../components/commercial/ClientOnboardingModal';
 import StaffingModal from '../../components/commercial/StaffingModal';
+import ContractBlock from '../../components/commercial/ContractBlock';
 import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
@@ -56,7 +57,7 @@ const KICKOFF_COLOR = 'var(--purple)';
 export default function CSOperacionalDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, confirmKickoff, scheduleOnboarding, setClientHealth, pendingSectorsOf, setSectorResponsibles, nudgeSectorLeader } = useClients();
+  const { clients, loading, confirmKickoff, scheduleOnboarding, setClientHealth, pendingSectorsOf, setSectorResponsibles, nudgeSectorLeader, renewContract, closeContract, reopenContract } = useClients();
   const { collaborators } = useCollaborators();
   const {
     tasks, moveToProduction, moveToApproval, approveTask, rejectTask,
@@ -421,6 +422,24 @@ export default function CSOperacionalDashboard() {
           manual={resolveClientHealth(openClient)}
           onClose={() => setOpenId(null)}
           onSetHealth={() => { setHealthTarget(openClient); setOpenId(null); }}
+          onRenewContract={async (meses, obs) => {
+            const r = await renewContract(openClient.id, meses, me, obs);
+            if (r.success) toast(`Contrato renovado por ${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}.`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onCloseContract={async (motivo) => {
+            const r = await closeContract(openClient.id, me, motivo);
+            if (r.success) toast(`Contrato de ${openClient.name} encerrado.`);
+            else toast(r.error, 'e');
+            return r;
+          }}
+          onReopenContract={async () => {
+            const r = await reopenContract(openClient.id);
+            if (r.success) toast('Contrato reaberto.');
+            else toast(r.error, 'e');
+            return r;
+          }}
         />, document.body)}
 
       {onboardingClient && (
@@ -513,13 +532,22 @@ function LockedCard({ client, pendentes, meus = [], onStaff, onNudge }) {
           const nomes = client.responsibles?.[sid];
           const lista = Array.isArray(nomes) ? nomes : nomes ? [nomes] : [];
           const ok = lista.length > 0;
+          const indicacao = client.staffing?.log?.[sid];
           return (
-            <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+            <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
               <span style={{ fontSize: 12, color: ok ? (SECTORS[sid]?.color || 'var(--text)') : 'var(--muted)' }}>
                 {ok ? '✓' : '○'} {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
               </span>
               <span style={{ fontSize: 11, color: ok ? 'var(--muted)' : 'var(--amber)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
                 {ok ? lista.join(', ') : 'pendente'}
+                {ok && indicacao?.at && (
+                  <>
+                    <br />
+                    <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+                      em {fmtDate(indicacao.at)}{indicacao.by ? ` por ${indicacao.by}` : ''}
+                    </span>
+                  </>
+                )}
               </span>
             </div>
           );
@@ -792,7 +820,7 @@ function ClientHealthModal({ client, onClose, onSave }) {
 }
 
 // ── Drawer do cliente ──────────────────────────────────────────
-function ClientDrawer({ client, health, manual, onClose, onSetHealth }) {
+function ClientDrawer({ client, health, manual, onClose, onSetHealth, onRenewContract, onCloseContract, onReopenContract }) {
   const lv = HEALTH_LEVELS_4[health.level];
   const mlv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const sectors = Object.entries(client.responsibles || {}).filter(([, v]) => v && (Array.isArray(v) ? v.length : true));
@@ -843,14 +871,23 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth }) {
           </Section>
         )}
 
-        <Section title="Contrato" color={COLOR}>
+        {(onRenewContract || onCloseContract) && (
+          <ContractBlock
+            client={client}
+            color={COLOR}
+            onRenew={onRenewContract}
+            onClose={onCloseContract}
+            onReopen={onReopenContract}
+          />
+        )}
+
+        <Section title="Dados do cliente" color={COLOR}>
           <RO label="Responsável" value={client.contactName} />
           <RO label="Telefone" value={client.contactPhone} />
           <RO label="E-mail" value={client.contactEmail} />
           <RO label="CNPJ" value={client.cnpj} />
           <RO label="Valor" value={client.saleTotal != null ? money(client.saleTotal) : null} />
-          <RO label="Duração" value={client.contractMonths ? `${client.contractMonths} meses` : null} />
-          <RO label="Kickoff" value={client.kickoff?.confirmedAt ? `realizado em ${fmtDate(client.kickoff.confirmedAt)} por ${client.kickoff.confirmedBy || '—'}` : null} />
+          <RO label="Onboarding" value={client.kickoff?.confirmedAt ? `realizado em ${fmtDate(client.kickoff.confirmedAt)} por ${client.kickoff.confirmedBy || '—'}` : null} />
         </Section>
 
         {client.briefing && (
