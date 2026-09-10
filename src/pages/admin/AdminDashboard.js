@@ -221,7 +221,12 @@ export default function AdminDashboard() {
             collaborators={collaborators}
             onAdd={handleAddClient}
             onUpdate={updateClient}
-            onRename={(id, nome) => renameClient(id, nome, user?.name)}
+            onRename={async (id, nome) => {
+              const r = await renameClient(id, nome, user?.name);
+              if (r.success) toast(r.warning || `Cliente renomeado para ${nome}.`, r.warning ? 'e' : undefined);
+              else toast(r.error, 'e');
+              return r;
+            }}
             onDelete={deleteClient}
             onWdMoveToProduction={wdMoveToProduction}
             onWdMoveBackToOnboarding={wdMoveBackToOnboarding}
