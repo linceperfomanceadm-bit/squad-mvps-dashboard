@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const {
     clients, loading: loadingClients,
-    addClient, updateClient, deleteClient,
+    addClient, updateClient, deleteClient, renameClient,
     wdMoveToProduction, wdMoveBackToOnboarding, wdMoveStatus,
     updateBrandbook,
     addBrandMaterial,
@@ -221,6 +221,7 @@ export default function AdminDashboard() {
             collaborators={collaborators}
             onAdd={handleAddClient}
             onUpdate={updateClient}
+            onRename={(id, nome) => renameClient(id, nome, user?.name)}
             onDelete={deleteClient}
             onWdMoveToProduction={wdMoveToProduction}
             onWdMoveBackToOnboarding={wdMoveBackToOnboarding}
