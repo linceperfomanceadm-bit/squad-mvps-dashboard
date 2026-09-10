@@ -115,21 +115,37 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave, onRename
 
   // O nome vai por `onRename` e não por `onSave`: ele está copiado em
   // tasks, requests e documents, e só o renameClient propaga isso.
+  //
+  // O `if (onRename && ...)` que existia aqui engolia o problema: sem
+  // o handler, a troca de nome era pulada, o modal fechava limpo e o
+  // nome continuava o mesmo, sem nenhum aviso. Agora a ausência do
+  // handler é erro na cara, não silêncio.
   const handleSave = async () => {
     setError('');
     const novoNome = name.trim();
     if (!novoNome) { setError('O nome não pode ficar vazio.'); return; }
+
+    const mudouNome = novoNome !== (client.name || '');
+    if (mudouNome && !onRename) {
+      setError('A renomeação não está ligada nesta tela — o AdminDashboard.js atualizado não subiu junto.');
+      return;
+    }
+
     setLoading(true);
-    if (onRename && novoNome !== (client.name || '')) {
+    if (mudouNome) {
       const r = await onRename(client.id, novoNome);
-      if (r && r.success === false) {
+      if (!r || r.success === false) {
         setLoading(false);
-        setError(r.error || 'Não foi possível renomear.');
+        setError(r?.error || 'Não foi possível renomear.');
         return;
       }
     }
-    await onSave(client.id, { responsibles });
+    const salvo = await onSave(client.id, { responsibles });
     setLoading(false);
+    if (salvo && salvo.success === false) {
+      setError(salvo.error || 'O nome foi salvo, mas os responsáveis não.');
+      return;
+    }
     onClose();
   };
 
