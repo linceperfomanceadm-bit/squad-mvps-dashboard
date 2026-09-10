@@ -4,6 +4,8 @@ import {
   serverTimestamp, query, orderBy,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { docPorId } from '../lib/docs/catalogo';
+import { semearPadroes, opcionaisIniciais } from '../lib/docs/motor';
 
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — persistência
@@ -43,6 +45,9 @@ export function useDocuments() {
     try {
       if (!tipo) return { success: false, error: 'Escolha o tipo de documento.' };
       if (!clientId) return { success: false, error: 'Escolha o cliente.' };
+      // REGRA 3.11 — listas nascem com os valores padrão e as seções
+      // marcadas como `iniciaDesligada` nascem fora do documento.
+      const modelo = docPorId(tipo);
       const novo = {
         tipo,
         clientId,
@@ -50,9 +55,9 @@ export function useDocuments() {
         titulo: titulo || '',
         status: 'rascunho',
         // Conteúdo do documento
-        dados: {},
+        dados: semearPadroes(modelo, {}),
         extras: [],
-        opcionais: {},
+        opcionais: opcionaisIniciais(modelo),
         pendencias: [],
         // Janelas comparadas — regra 3.7, só o relatório usa
         periodoInicio: null,
