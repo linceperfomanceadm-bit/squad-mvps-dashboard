@@ -112,6 +112,128 @@ export const isStaffing = (c) => stageOf(c) === 'staffing';
 // O alerta vai para o admin e para o líder do setor travado.
 export const STAFFING_ALERT_DAYS = 2;
 
+// ─── Contrato: prazo, aviso e renovação ───────────────────────
+// A duração vem do cadastro da CS Comercial (`contrato.contractMonths`)
+// e vira um relógio interno. O contador só começa quando o cliente
+// entra em produção de verdade — ou seja, na call de onboarding
+// realizada. Antes disso não há contrato correndo.
+//
+// O bloco `contract{}` só nasce quando alguém renova ou encerra. Até
+// lá o estado é 100% derivado, que é o mesmo princípio do `stageOf`:
+// nada de migrar a base para ligar a funcionalidade.
+//
+//   contract: {
+//     addedMonths,                  // meses somados por renovações
+//     status: 'active' | 'closed',
+//     renewals: [{ months, by, at, until }],
+//     closedAt, closedBy, closeReason,
+//   }
+export const CONTRACT_ALERT_DAYS = 30;
+
+export const CONTRACT_STATUS = {
+  active:  { id: 'active',  label: 'Em vigência',      color: '#22c55e' },
+  ending:  { id: 'ending',  label: 'Vencendo',         color: '#f59e0b' },
+  expired: { id: 'expired', label: 'Prazo vencido',    color: '#EE3363' },
+  closed:  { id: 'closed',  label: 'Encerrado',        color: '#8b8b9a' },
+  unknown: { id: 'unknown', label: 'Sem prazo',        color: '#8b8b9a' },
+};
+
+// Soma meses preservando o fim de mês: 31/jan + 1 mês = 28/fev, e não
+// 03/mar como o Date faz sozinho.
+export const addMonths = (date, months) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return null;
+  const dia = d.getDate();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + Number(months || 0));
+  const ultimoDia = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+  d.setDate(Math.min(dia, ultimoDia));
+  return d;
+};
+
+// `createdAt` é Timestamp do Firestore nos docs novos e string nos
+// antigos — normaliza os dois.
+const toDate = (v) => {
+  if (!v) return null;
+  if (typeof v?.toDate === 'function') return v.toDate();
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+/*
+ * Estado do contrato de um cliente.
+ *
+ * Retorna sempre o mesmo formato, inclusive quando não há prazo
+ * definido (`status: 'unknown'`), para a tela não precisar checar
+ * nulo em cada campo.
+ */
+export const contractState = (c) => {
+  const vazio = {
+    status: 'unknown', months: null, baseMonths: null, addedMonths: 0,
+    startAt: null, endAt: null, daysLeft: null, renewals: [],
+    closedAt: null, closedBy: null, closeReason: '',
+  };
+  if (!c) return vazio;
+
+  const contract = c.contract || {};
+  const renewals = Array.isArray(contract.renewals) ? contract.renewals : [];
+  const addedMonths = Number(contract.addedMonths || 0);
+
+  const baseMonths = Number(
+    contract.baseMonths
+    ?? c.contrato?.contractMonths
+    ?? c.contractMonths
+    ?? 0
+  );
+
+  // O relógio começa na call de onboarding realizada. Cliente do fluxo
+  // antigo cai no kickoff confirmado; em último caso, na criação.
+  const startAt = toDate(
+    contract.startAt
+    || c.kickoff?.confirmedAt
+    || c.kickoffCall?.confirmedAt
+    || c.createdAt
+  );
+
+  if (contract.status === 'closed') {
+    return {
+      ...vazio,
+      status: 'closed', months: baseMonths + addedMonths, baseMonths, addedMonths,
+      startAt: startAt ? startAt.toISOString() : null,
+      renewals,
+      closedAt: contract.closedAt || null,
+      closedBy: contract.closedBy || null,
+      closeReason: contract.closeReason || '',
+    };
+  }
+
+  if (!baseMonths || !startAt) return { ...vazio, baseMonths, addedMonths, renewals };
+
+  const endAt = addMonths(startAt, baseMonths + addedMonths);
+  if (!endAt) return { ...vazio, baseMonths, addedMonths, renewals };
+
+  const daysLeft = Math.ceil((endAt.getTime() - Date.now()) / 86400000);
+  const status = daysLeft < 0 ? 'expired' : (daysLeft <= CONTRACT_ALERT_DAYS ? 'ending' : 'active');
+
+  return {
+    status,
+    months: baseMonths + addedMonths,
+    baseMonths,
+    addedMonths,
+    startAt: startAt.toISOString(),
+    endAt: endAt.toISOString(),
+    daysLeft,
+    renewals,
+    closedAt: null, closedBy: null, closeReason: '',
+  };
+};
+
+// Precisa da atenção da CS: vencendo ou já vencido, e ainda aberto.
+export const contractNeedsAttention = (c) => {
+  const st = contractState(c);
+  return st.status === 'ending' || st.status === 'expired';
+};
+
 
 // ─── Serviço contratado → setor responsável ───────────────────
 // Usado só para SUGERIR os setores no cadastro do cliente. A CS
