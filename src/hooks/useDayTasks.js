@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { notifyLocal } from './useDesktopNotifications';
 
 // ─── Tarefas do Dia ───────────────────────────────────────────
 // Agenda pessoal de cada pessoa. Nada aqui é compartilhado: a query
@@ -45,6 +46,36 @@ export function useDayTasks(ownerId) {
     }, () => setLoading(false));
     return unsub;
   }, [ownerId]);
+
+  // ── Lembrete: avisa na hora marcada ─────────────────────────
+  // Varre a cada 30s enquanto o app está aberto. Não é agendamento de
+  // verdade — isso exigiria service worker + push, que é outro bloco.
+  // Se ninguém estiver com o app aberto na hora, o aviso sai no
+  // primeiro momento em que a pessoa abrir, dentro da janela de 2h.
+  // Passado disso o lembrete não vale mais e some sem avisar, para
+  // não encher o sino de coisa velha ao abrir o app no fim do dia.
+  useEffect(() => {
+    if (!ownerId) return undefined;
+
+    const checar = () => {
+      const agora = new Date();
+      const hoje = todayKey();
+      items.forEach(i => {
+        if (i.type !== 'lembrete' || i.done) return;
+        if (!i.time || i.at !== hoje) return;
+        const [h, m] = String(i.time).split(':');
+        const quando = new Date(agora);
+        quando.setHours(Number(h) || 0, Number(m) || 0, 0, 0);
+        if (quando > agora) return;
+        if (agora.getTime() - quando.getTime() > 2 * 3600000) return;
+        notifyLocal(ownerId, 'Lembrete', i.text, `daytask-${i.id}-${i.at}`);
+      });
+    };
+
+    checar();
+    const timer = setInterval(checar, 30000);
+    return () => clearInterval(timer);
+  }, [items, ownerId]);
 
   const addItem = async ({ type, text, at, time }) => {
     if (!ownerId) return { success: false, error: 'Sessão expirada.' };
