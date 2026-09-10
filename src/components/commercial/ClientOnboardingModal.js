@@ -1,10 +1,11 @@
-import React from 'react';
-import { Video, CalendarPlus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Video, CalendarPlus, Pencil, Paperclip, Trash2, Check, X } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES } from '../../lib/firebase';
 import { clientCallCalendarUrl } from '../../lib/calendarLink';
+import ContractBlock from './ContractBlock';
 import {
   Overlay, ModalHeader, Section, RO, Tag,
-  money, fmtDateTime, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
+  money, fmtDateTime, fmtDate, INP, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
 } from './ui';
 
 const COLOR = SECTORS.cs.color;
@@ -24,6 +25,17 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  *   onSchedule / onReschedule / onConfirm
  *     → CS Operacional e admin, depois do Kick Off realizado.
  *
+ *   onRename
+ *     → libera a edição do nome do cliente. Quem renomeia mexe em
+ *       card, solicitação e documento já criados (o nome está
+ *       copiado neles), então isso é da CS Comercial e do admin.
+ *
+ *   onAddAttachment / onRemoveAttachment
+ *     → anexos avulsos, adicionados depois do cadastro.
+ *
+ *   onRenewContract / onCloseContract / onReopenContract
+ *     → prazo do contrato. É a CS que registra o desfecho.
+ *
  *   nenhum handler
  *     → leitura pura. É o caso da CS Operacional na aba Kick Off e
  *       dos responsáveis de setor na aba Onboarding.
@@ -35,7 +47,17 @@ export default function ClientOnboardingModal({
   client, onClose,
   onScheduleKickoff, onCancelKickoff, onConfirmKickoffCall,
   onSchedule, onReschedule, onConfirm,
+  onRename, onAddAttachment, onRemoveAttachment,
+  onRenewContract, onCloseContract, onReopenContract,
 }) {
+  const [editandoNome, setEditandoNome] = useState(false);
+  const [rascunho, setRascunho] = useState(client.name || '');
+  const [salvandoNome, setSalvandoNome] = useState(false);
+  const [erroNome, setErroNome] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [erroAnexo, setErroAnexo] = useState('');
+  const [removendo, setRemovendo] = useState(null);
+
   const contrato = client.contrato || {};
   const briefing = contrato.briefing || client.briefing || '';
   const servicos = contrato.servicos || client.services || [];
@@ -51,11 +73,76 @@ export default function ClientOnboardingModal({
   const quadroCompleto = faltando.length === 0;
 
   const participantes = time.flatMap(([, v]) => asArray(v));
+  const anexos = Array.isArray(client.anexos) ? client.anexos : [];
+
+  const salvarNome = async () => {
+    setErroNome('');
+    setSalvandoNome(true);
+    const r = await onRename(rascunho);
+    setSalvandoNome(false);
+    if (r && r.success === false) { setErroNome(r.error || 'Não foi possível renomear.'); return; }
+    setEditandoNome(false);
+  };
+
+  const enviarAnexo = async (file) => {
+    if (!file) return;
+    setErroAnexo('');
+    setEnviando(true);
+    const r = await onAddAttachment(file);
+    setEnviando(false);
+    if (r && r.success === false) setErroAnexo(r.error || 'Não foi possível enviar.');
+  };
+
+  const removerAnexo = async (anexo) => {
+    setErroAnexo('');
+    setRemovendo(anexo.id || anexo.path || anexo.url);
+    const r = await onRemoveAttachment(anexo);
+    setRemovendo(null);
+    if (r && r.success === false) setErroAnexo(r.error || 'Não foi possível remover.');
+  };
 
   return (
     <Overlay onClose={onClose}>
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 600, maxHeight: '88vh', overflowY: 'auto' }}>
         <ModalHeader title={client.name} onClose={onClose} />
+
+        {onRename && (editandoNome ? (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                style={{ ...INP, flex: 1 }}
+                value={rascunho}
+                onChange={e => setRascunho(e.target.value)}
+                placeholder="Nome do cliente"
+                autoFocus
+              />
+              <button
+                style={{ ...BTN_GREEN, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 5, opacity: salvandoNome ? .6 : 1 }}
+                disabled={salvandoNome}
+                onClick={salvarNome}
+              >
+                <Check size={14} /> Salvar
+              </button>
+              <button
+                style={{ ...BTN_CANCEL, padding: '10px 12px', display: 'flex', alignItems: 'center' }}
+                onClick={() => { setEditandoNome(false); setRascunho(client.name || ''); setErroNome(''); }}
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
+              O nome novo também é aplicado nos cards, solicitações e documentos já criados para este cliente.
+            </p>
+            {erroNome && <p style={{ fontSize: 11, color: 'var(--neon)', marginTop: 5 }}>⚠ {erroNome}</p>}
+          </div>
+        ) : (
+          <button
+            style={{ background: 'none', border: 'none', padding: 0, marginBottom: 12, cursor: 'pointer', color: 'var(--muted)', fontSize: 11, fontFamily: 'var(--fm)', display: 'flex', alignItems: 'center', gap: 5 }}
+            onClick={() => { setRascunho(client.name || ''); setEditandoNome(true); }}
+          >
+            <Pencil size={11} /> editar nome
+          </button>
+        ))}
 
         <div style={{ marginBottom: 16 }}>
           <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
@@ -140,14 +227,27 @@ export default function ClientOnboardingModal({
 
         {time.length > 0 && (
           <Section title="Time do projeto" color={COLOR}>
-            {time.map(([sid, v]) => (
-              <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 5 }}>
-                <span style={{ fontSize: 12, color: SECTORS[sid]?.color || 'var(--text)' }}>
-                  {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>{asArray(v).join(', ')}</span>
-              </div>
-            ))}
+            {time.map(([sid, v]) => {
+              const indicacao = client.staffing?.log?.[sid];
+              return (
+                <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontSize: 12, color: SECTORS[sid]?.color || 'var(--text)' }}>
+                    {SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>
+                    {asArray(v).join(', ')}
+                    {indicacao?.at && (
+                      <>
+                        <br />
+                        <span style={{ fontSize: 10, color: 'var(--dim)' }}>
+                          indicado em {fmtDate(indicacao.at)}{indicacao.by ? ` por ${indicacao.by}` : ''}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </Section>
         )}
 
@@ -188,6 +288,16 @@ export default function ClientOnboardingModal({
           </Section>
         )}
 
+        {(onRenewContract || onCloseContract) && (
+          <ContractBlock
+            client={client}
+            color={COLOR}
+            onRenew={onRenewContract}
+            onClose={onCloseContract}
+            onReopen={onReopenContract}
+          />
+        )}
+
         <Section title="Cliente" color={COLOR}>
           <RO label="Razão social" value={contrato.razaoSocial} />
           <RO label="Nome fantasia" value={contrato.tradeName || contrato.companyName} />
@@ -205,6 +315,62 @@ export default function ClientOnboardingModal({
             <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
               {contrato.observations || client.observations}
             </p>
+          </Section>
+        )}
+
+        {(onAddAttachment || anexos.length > 0) && (
+          <Section title="Anexos" color={COLOR}>
+            {anexos.length === 0 && (
+              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 10 }}>
+                Nenhum arquivo além do cadastro.
+              </p>
+            )}
+
+            {anexos.map((a, i) => {
+              const chave = a.id || a.path || a.url || i;
+              const saindo = removendo === (a.id || a.path || a.url);
+              return (
+                <div key={chave} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 0', borderBottom: i < anexos.length - 1 ? '1px solid var(--border)' : 'none', opacity: saindo ? .45 : 1 }}>
+                  <Paperclip size={13} color="var(--muted)" style={{ flexShrink: 0 }} />
+                  <a
+                    href={a.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ flex: 1, fontSize: 12, color: 'var(--blue)', textDecoration: 'none', wordBreak: 'break-all' }}
+                  >
+                    {a.name}
+                  </a>
+                  <span style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>
+                    {a.by ? `${a.by} · ` : ''}{fmtDate(a.at)}
+                  </span>
+                  {onRemoveAttachment && (
+                    <button
+                      style={{ background: 'none', border: 'none', padding: 4, cursor: 'pointer', display: 'flex', flexShrink: 0 }}
+                      disabled={saindo}
+                      onClick={() => removerAnexo(a)}
+                      title="Remover anexo"
+                    >
+                      <Trash2 size={13} color="var(--muted)" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+
+            {onAddAttachment && (
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 12, padding: '9px 14px', borderRadius: 9, border: '1px dashed var(--border)', background: 'var(--surface)', color: enviando ? 'var(--muted)' : 'var(--text)', fontSize: 12, fontWeight: 600, cursor: enviando ? 'default' : 'pointer' }}>
+                <Paperclip size={13} />
+                {enviando ? 'Enviando...' : 'Adicionar arquivo'}
+                <input
+                  type="file"
+                  disabled={enviando}
+                  style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; enviarAnexo(f); }}
+                />
+              </label>
+            )}
+
+            {erroAnexo && <p style={{ fontSize: 11, color: 'var(--neon)', marginTop: 8 }}>⚠ {erroAnexo}</p>}
           </Section>
         )}
 
