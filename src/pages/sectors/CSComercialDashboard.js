@@ -348,7 +348,7 @@ export default function CSComercialDashboard() {
             : undefined}
           onRename={async (nome) => {
             const r = await renameClient(openClient.id, nome, me);
-            if (r.success) toast(`Cliente renomeado para ${nome}.`);
+            if (r.success) toast(r.warning || `Cliente renomeado para ${nome}.`, r.warning ? 'e' : undefined);
             else toast(r.error, 'e');
             return r;
           }}
