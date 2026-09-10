@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Send, Eye, EyeOff, CheckCircle2, Trash2, Search, LayoutGrid, List } from 'lucide-react';
-import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS, REQUEST_SECTORS, REQUEST_SLA_HOURS } from '../../lib/firebase';
+import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS, REQUEST_SECTORS, REQUEST_SLA_HOURS, CLIENT_STAGES, stageOf } from '../../lib/firebase';
 import { businessMsBetween, formatBusinessDuration } from '../../lib/taskTime';
 import {
   Overlay, ModalHeader, Tag, Empty,
@@ -516,9 +516,20 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
+  // Cliente fora de `live` grava `active: false` de propósito, para
+  // sumir dos painéis de produção. Aqui isso não vale: a CS precisa
+  // abrir solicitação para quem ainda está em Kick Off ou onboarding
+  // (é justamente quando mais aparece pedido solto). Entram com o
+  // estágio no rótulo, para ninguém confundir com cliente em rotina.
   const activeClients = (clients || [])
-    .filter(c => c.active !== false)
+    .filter(c => c.active !== false || ['kickoff', 'staffing', 'onboarding'].includes(stageOf(c)))
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+  const rotuloCliente = (c) => {
+    const st = stageOf(c);
+    if (st === 'live') return c.name;
+    return `${c.name} — ${CLIENT_STAGES[st]?.label || st}`;
+  };
 
   const sectorPeople = (collaborators || [])
     .filter(c => c.active !== false && c.sector === form.toSector)
@@ -562,7 +573,7 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
         <p style={LBL}>CLIENTE</p>
         <select style={{ ...INP, marginTop: 6, marginBottom: 14, cursor: 'pointer' }} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
           <option value="">Sem cliente vinculado</option>
-          {activeClients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {activeClients.map(c => <option key={c.id} value={c.id}>{rotuloCliente(c)}</option>)}
         </select>
 
         <p style={LBL}>SETOR *</p>
