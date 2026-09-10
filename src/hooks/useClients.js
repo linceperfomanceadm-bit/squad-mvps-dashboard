@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG } from '../lib/firebase';
+import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState } from '../lib/firebase';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -543,6 +543,166 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Renomear cliente ────────────────────────────────────────
+  // `clientName` está desnormalizado em `tasks`, `requests` e
+  // `documents`. Renomear só o doc do cliente deixaria o nome velho
+  // colado em card, solicitação e documento já criados — então a
+  // troca propaga para as três coleções na mesma chamada.
+  const renameClient = async (clientId, newName, byName) => {
+    const nome = String(newName || '').trim();
+    if (!nome) return { success: false, error: 'O nome não pode ficar vazio.' };
+    const client = clients.find(c => c.id === clientId);
+    if (client && client.name === nome) return { success: true, propagated: 0 };
+    const duplicado = clients.some(c => c.id !== clientId
+      && String(c.name || '').trim().toLowerCase() === nome.toLowerCase());
+    if (duplicado) return { success: false, error: 'Já existe outro cliente com esse nome.' };
+
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        name: nome,
+        renameLog: arrayUnion({
+          from: client?.name || '', to: nome,
+          by: byName || null, at: new Date().toISOString(),
+        }),
+      });
+
+      // Propaga o nome onde ele está copiado. Em lotes de 400 porque
+      // o batch do Firestore para em 500 operações.
+      let propagated = 0;
+      for (const col of ['tasks', 'requests', 'documents']) {
+        const snap = await getDocs(query(collection(db, col), where('clientId', '==', clientId)));
+        const docs = snap.docs;
+        for (let i = 0; i < docs.length; i += 400) {
+          const batch = writeBatch(db);
+          docs.slice(i, i + 400).forEach(d => batch.update(d.ref, { clientName: nome }));
+          await batch.commit();
+        }
+        propagated += docs.length;
+      }
+      return { success: true, propagated };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Anexos avulsos do cliente ───────────────────────────────
+  // Diferente do briefing e do contrato, que vêm do cadastro e são
+  // fixos: aqui entra o que aparece depois — aditivo, print, planilha.
+  // Vive em `anexos[]` e é visível para quem abre o modal do cliente.
+  const addClientAttachment = async (clientId, file, byName) => {
+    const MAX = 25 * 1024 * 1024;
+    if (!clientId) return { success: false, error: 'Cliente não identificado.' };
+    if (!file) return { success: false, error: 'Nenhum arquivo selecionado.' };
+    if (file.size > MAX) return { success: false, error: `"${file.name}" passa de 25MB.` };
+    try {
+      const clean = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+      const path = `anexos/${clientId}/${Date.now()}_${clean}`;
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, file);
+      const anexo = {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name: file.name,
+        url: await getDownloadURL(storageRef),
+        path,
+        type: file.type || '',
+        size: file.size,
+        by: byName || null,
+        at: new Date().toISOString(),
+      };
+      await updateDoc(doc(db, 'clients', clientId), { anexos: arrayUnion(anexo) });
+      return { success: true, file: anexo };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Remove o anexo do doc e, se der, o arquivo do Storage. A ordem
+  // importa: primeiro o doc, porque é o que a tela lê. Se o Storage
+  // falhar, sobra um arquivo órfão — barato — em vez de um link morto.
+  const removeClientAttachment = async (clientId, anexo) => {
+    if (!anexo) return { success: false, error: 'Anexo inválido.' };
+    try {
+      await updateDoc(doc(db, 'clients', clientId), { anexos: arrayRemove(anexo) });
+      if (anexo.path) {
+        try { await deleteObject(ref(storage, anexo.path)); }
+        catch { /* arquivo já não existe no Storage */ }
+      }
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Contrato: renovação e encerramento ──────────────────────
+  // A renovação SOMA meses ao prazo original em vez de reiniciar a
+  // contagem: o cliente de 6 meses que renova por mais 6 tem um
+  // contrato de 12 correndo desde o começo, e o histórico de quando
+  // cada renovação foi feita fica em `renewals[]`.
+  const renewContract = async (clientId, months, byName, note) => {
+    const meses = Number(months);
+    if (!meses || meses <= 0) return { success: false, error: 'Informe por quantos meses foi renovado.' };
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+
+    const atual = contractState(client);
+    if (!atual.baseMonths) {
+      return { success: false, error: 'Este cliente não tem prazo de contrato no cadastro. Preencha a duração antes de renovar.' };
+    }
+
+    const addedMonths = Number(atual.addedMonths || 0) + meses;
+    // Prazo resultante, só para deixar registrado no histórico.
+    const simulado = contractState({
+      ...client,
+      contract: { ...(client.contract || {}), addedMonths, status: 'active' },
+    });
+
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'contract.addedMonths': addedMonths,
+        'contract.status': 'active',
+        'contract.baseMonths': atual.baseMonths,
+        'contract.closedAt': null,
+        'contract.closedBy': null,
+        'contract.closeReason': '',
+        'contract.renewals': arrayUnion({
+          months: meses,
+          by: byName || null,
+          at: new Date().toISOString(),
+          until: simulado.endAt || null,
+          note: String(note || '').trim(),
+        }),
+      });
+      return { success: true, endAt: simulado.endAt };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Encerramento. NÃO mexe em `active`: desativar o cliente aqui o
+  // sumiria de todos os painéis de uma vez, inclusive com task aberta
+  // em produção. Quem decide desativar é o admin, na tela de clientes.
+  const closeContract = async (clientId, byName, reason) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    const atual = contractState(client);
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'contract.status': 'closed',
+        'contract.baseMonths': atual.baseMonths || 0,
+        'contract.addedMonths': atual.addedMonths || 0,
+        'contract.closedAt': new Date().toISOString(),
+        'contract.closedBy': byName || null,
+        'contract.closeReason': String(reason || '').trim(),
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Reabre um contrato encerrado por engano.
+  const reopenContract = async (clientId) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        'contract.status': 'active',
+        'contract.closedAt': null,
+        'contract.closedBy': null,
+        'contract.closeReason': '',
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── CS Operacional: Saúde do Cliente (farol manual) ─────────
   // level: 'green' | 'yellow' | 'orange' | 'red' | null (limpar)
   const setClientHealth = async (clientId, level, note, byName) => {
@@ -566,5 +726,7 @@ export function useClients() {
     setSectorResponsibles, scheduleOnboarding, cancelStaffing,
     scheduleKickoffCall, cancelKickoffCall, confirmKickoffCall,
     pendingSectorsOf, uploadClientFile, nudgeSectorLeader,
+    renameClient, addClientAttachment, removeClientAttachment,
+    renewContract, closeContract, reopenContract,
   };
 }
