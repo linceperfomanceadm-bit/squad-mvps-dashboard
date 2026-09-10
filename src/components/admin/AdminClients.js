@@ -107,12 +107,27 @@ function AddClientModal({ collaborators, onClose, onAdd }) {
   );
 }
 
-function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
+function EditResponsibleModal({ client, collaborators, onClose, onSave, onRename }) {
   const [responsibles, setResponsibles] = useState({ ...(client.responsibles || {}) });
+  const [name, setName] = useState(client.name || '');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
+  // O nome vai por `onRename` e não por `onSave`: ele está copiado em
+  // tasks, requests e documents, e só o renameClient propaga isso.
   const handleSave = async () => {
+    setError('');
+    const novoNome = name.trim();
+    if (!novoNome) { setError('O nome não pode ficar vazio.'); return; }
     setLoading(true);
+    if (onRename && novoNome !== (client.name || '')) {
+      const r = await onRename(client.id, novoNome);
+      if (r && r.success === false) {
+        setLoading(false);
+        setError(r.error || 'Não foi possível renomear.');
+        return;
+      }
+    }
     await onSave(client.id, { responsibles });
     setLoading(false);
     onClose();
@@ -127,13 +142,20 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
               <Edit2 size={16} color="var(--blue)" />
             </div>
             <div>
-              <h2 style={MS.title}>Editar Responsáveis</h2>
+              <h2 style={MS.title}>Editar Cliente</h2>
               <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{client.name}</p>
             </div>
           </div>
           <button style={MS.closeBtn} onClick={onClose}><X size={16} color="var(--muted)" /></button>
         </div>
         <div style={MS.body}>
+          <div style={MS.field}>
+            <label style={MS.label}>NOME DO CLIENTE *</label>
+            <input style={MS.input} value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Empresa XYZ" />
+            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
+              Renomear também atualiza o nome nos cards, solicitações e documentos já criados para este cliente.
+            </p>
+          </div>
           <div style={MS.field}>
             <label style={MS.label}>RESPONSÁVEIS POR SETOR</label>
             {Object.values(SECTORS).map(s => (
@@ -146,6 +168,7 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
               />
             ))}
           </div>
+          {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
             <button style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
             <button style={{ ...MS.submitBtn, background: 'linear-gradient(135deg,var(--blue),#0284c7)', boxShadow: '0 4px 14px rgba(56,189,248,.3)' }} onClick={handleSave} disabled={loading}>
@@ -158,7 +181,7 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave }) {
   );
 }
 
-export default function AdminClients({ clients, collaborators, onAdd, onUpdate, onDelete }) {
+export default function AdminClients({ clients, collaborators, onAdd, onUpdate, onDelete, onRename }) {
   const [showAdd, setShowAdd] = useState(false);
   const [editClient, setEditClient] = useState(null);
   const [search, setSearch] = useState('');
@@ -260,7 +283,7 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         <AddClientModal collaborators={collaborators} onClose={() => setShowAdd(false)} onAdd={onAdd} />,
         document.body)}
       {editClient && ReactDOM.createPortal(
-        <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} />,
+        <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} onRename={onRename} />,
         document.body)}
     </div>
   );
