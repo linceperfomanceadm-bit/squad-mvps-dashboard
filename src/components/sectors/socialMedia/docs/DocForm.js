@@ -1,5 +1,6 @@
 import React from 'react';
 import { Lock, Info } from 'lucide-react';
+import { colunasVisiveis, linhasVisiveis, campoVisivel } from '../../../../lib/docs/motor';
 
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — FORMULÁRIO
@@ -8,8 +9,13 @@ import { Lock, Info } from 'lucide-react';
 // documento específico: lê `secao.campos` e desenha. Documento novo
 // no catálogo aparece aqui sozinho.
 //
-// Tipos: 'texto', 'area' e 'lista' (linhas fixas com colunas).
-// Uma coluna pode ser 'opcao', que vira select.
+// Tipos: 'texto', 'area', 'lista' (linhas fixas com colunas) e
+// 'nota' (orientação, sem valor). Uma coluna pode ser 'opcao', que
+// vira select.
+//
+// REGRA 3.10 — no modo essencial, campos, colunas e linhas marcados
+// como complementares somem do formulário. Só da tela: o que já foi
+// digitado continua no documento.
 // ─────────────────────────────────────────────────────────────
 
 function Dica({ children }) {
@@ -58,10 +64,25 @@ function CampoBase({ campo, valor, travada, desde, onChange, onDestravar }) {
   );
 }
 
-function Lista({ campo, valor, onChange }) {
+function Nota({ campo }) {
+  return (
+    <div style={S.campo}>
+      <label style={S.label}>{campo.rot}</label>
+      <p style={S.nota}>
+        <Info size={13} color="var(--neon)" style={{ flexShrink: 0, marginTop: 2 }} />
+        <span>{campo.texto}</span>
+      </p>
+    </div>
+  );
+}
+
+function Lista({ campo, valor, onChange, essencial }) {
+  // Todas as linhas continuam no valor salvo; só a exibição recorta.
   const linhas = Array.from({ length: campo.linhas }, (_, i) => (valor && valor[i]) || {});
-  // A grade acompanha o número de colunas declarado no esquema.
-  const grade = { gridTemplateColumns: `18px repeat(${campo.cols.length}, 1fr)` };
+  const cols = colunasVisiveis(campo, essencial);
+  const qtd = linhasVisiveis(campo, essencial);
+  // A grade acompanha o número de colunas visíveis.
+  const grade = { gridTemplateColumns: `18px repeat(${cols.length}, 1fr)` };
   const set = (i, col, v) => {
     const novo = linhas.map((l) => ({ ...l }));
     novo[i] = { ...novo[i], [col]: v };
@@ -75,14 +96,14 @@ function Lista({ campo, valor, onChange }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
         <div style={{ ...S.linha, ...grade, paddingBottom: 2 }}>
           <span style={S.numLinha} />
-          {campo.cols.map((c) => (
+          {cols.map((c) => (
             <span key={c.id} style={S.colRot}>{c.rot}</span>
           ))}
         </div>
-        {linhas.map((linha, i) => (
+        {linhas.slice(0, qtd).map((linha, i) => (
           <div key={i} style={{ ...S.linha, ...grade }}>
             <span style={S.numLinha}>{i + 1}</span>
-            {campo.cols.map((c) => (
+            {cols.map((c) => (
               c.tipo === 'opcao' ? (
                 <select
                   key={c.id}
@@ -112,7 +133,7 @@ function Lista({ campo, valor, onChange }) {
 
 export default function DocForm({
   secao, dados, onChange, campoBase, baseTravada, baseDesde, onDestravarBase,
-  opcionalLigada, onToggleOpcional,
+  opcionalLigada, onToggleOpcional, essencial,
 }) {
   if (!secao) return null;
 
@@ -139,7 +160,8 @@ export default function DocForm({
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {secao.campos.map((c) => {
+          {secao.campos.filter((c) => campoVisivel(c, essencial)).map((c) => {
+            if (c.tipo === 'nota') return <Nota key={c.id} campo={c} />;
             if (c.id === campoBase) {
               return (
                 <CampoBase
@@ -154,7 +176,15 @@ export default function DocForm({
               );
             }
             if (c.tipo === 'lista') {
-              return <Lista key={c.id} campo={c} valor={dados[c.id]} onChange={(v) => onChange(c.id, v)} />;
+              return (
+                <Lista
+                  key={c.id}
+                  campo={c}
+                  valor={dados[c.id]}
+                  essencial={essencial}
+                  onChange={(v) => onChange(c.id, v)}
+                />
+              );
             }
             return (
               <div key={c.id} style={S.campo}>
@@ -198,6 +228,11 @@ const S = {
   dica: {
     display: 'flex', gap: 6, fontSize: 11.5, color: 'var(--muted)',
     lineHeight: 1.5, maxWidth: '68ch',
+  },
+  nota: {
+    display: 'flex', gap: 8, fontSize: 12.5, color: 'var(--text)', lineHeight: 1.55,
+    background: 'var(--neon-dim)', border: '1px solid var(--neon-border)',
+    borderRadius: 9, padding: '11px 13px', maxWidth: '68ch',
   },
   linha: { display: 'grid', gap: 6, alignItems: 'center' },
   numLinha: { fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' },
