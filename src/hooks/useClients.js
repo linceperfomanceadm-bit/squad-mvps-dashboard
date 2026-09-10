@@ -557,6 +557,12 @@ export function useClients() {
       && String(c.name || '').trim().toLowerCase() === nome.toLowerCase());
     if (duplicado) return { success: false, error: 'Já existe outro cliente com esse nome.' };
 
+    // Duas etapas com try separados de propósito. A renomeação do
+    // cliente é a parte que não pode falhar; a propagação para as
+    // outras coleções é reparável depois. Com um try só, um erro na
+    // segunda etapa devolvia `success: false` mesmo com o nome já
+    // trocado — a tela mostrava erro e o usuário não sabia se algo
+    // tinha sido gravado.
     try {
       await updateDoc(doc(db, 'clients', clientId), {
         name: nome,
@@ -565,9 +571,13 @@ export function useClients() {
           by: byName || null, at: new Date().toISOString(),
         }),
       });
+    } catch (err) {
+      return { success: false, error: `Não foi possível renomear: ${err.message}` };
+    }
 
-      // Propaga o nome onde ele está copiado. Em lotes de 400 porque
-      // o batch do Firestore para em 500 operações.
+    // Propaga o nome onde ele está copiado. Em lotes de 400 porque o
+    // batch do Firestore para em 500 operações.
+    try {
       let propagated = 0;
       for (const col of ['tasks', 'requests', 'documents']) {
         const snap = await getDocs(query(collection(db, col), where('clientId', '==', clientId)));
@@ -580,7 +590,13 @@ export function useClients() {
         propagated += docs.length;
       }
       return { success: true, propagated };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) {
+      return {
+        success: true,
+        propagated: 0,
+        warning: `O cliente foi renomeado, mas o nome antigo continua nos cards e solicitações já criados (${err.message}).`,
+      };
+    }
   };
 
   // ── Anexos avulsos do cliente ───────────────────────────────
