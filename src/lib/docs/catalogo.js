@@ -6,7 +6,16 @@
 // objeto aqui — nada fora desta pasta precisa ser tocado.
 //
 // Campos suportados: 'texto', 'area', 'lista' (linhas fixas com
-// colunas) e coluna do tipo 'opcao' (select).
+// colunas), 'nota' (texto de orientação, sem valor) e coluna do tipo
+// 'opcao' (select).
+//
+// REGRA 3.10 — dois níveis de profundidade:
+//   `extra: true`  no campo ou na coluna → complementar
+//   `linhasEss: n` na lista → quantas linhas bastam no modo essencial
+// O modo essencial esconde, nunca apaga.
+//
+// REGRA 3.11 — `padrao: [...]` na coluna pré-preenche as linhas
+// quando o documento abre. Seção com `iniciaDesligada` nasce fora.
 // ─────────────────────────────────────────────────────────────
 
 import { esc, v, lista, num, delta } from './motor';
@@ -46,11 +55,11 @@ export const DOCS = [
             ph: 'O que o documento cobre e no que o cliente deve se transformar aos olhos do mercado.',
           },
           {
-            id: 'sobre2', rot: 'Em que a análise se baseia', tipo: 'area',
+            id: 'sobre2', rot: 'Em que a análise se baseia', tipo: 'area', extra: true,
             ph: 'Por que está neste nível de detalhe: benchmark, comportamento das plataformas, objetivos declarados.',
           },
           {
-            id: 'prioridades', rot: 'Prioridades, em ordem', tipo: 'lista', linhas: 4,
+            id: 'prioridades', rot: 'Prioridades, em ordem', tipo: 'lista', linhas: 4, linhasEss: 3,
             dica: 'Ordem importa: é o critério de desempate quando duas boas ideias competem.',
             cols: [{ id: 't', rot: 'Prioridade', ph: 'Construir autoridade e marca' }],
           },
@@ -84,13 +93,13 @@ export const DOCS = [
             ph: 'Seguidores são públicos; frequência e horário não são auditáveis de fora e foram tratados como leitura de padrão.',
           },
           {
-            id: 'concorrentes', rot: 'Perfis mapeados', tipo: 'lista', linhas: 4,
+            id: 'concorrentes', rot: 'Perfis mapeados', tipo: 'lista', linhas: 4, linhasEss: 3,
             dica: 'Três níveis: referência do setor, par direto e marca pessoal. A quarta linha é o próprio cliente.',
             cols: [
               { id: 'perfil', rot: 'Perfil', ph: '@lucasacrilicos' },
-              { id: 'nivel', rot: 'Nível', ph: 'Par direto' },
+              { id: 'nivel', rot: 'Nível', ph: 'Par direto', extra: true },
               { id: 'seg', rot: 'Seguidores', ph: '312 mil' },
-              { id: 'fmt', rot: 'Formato dominante', ph: 'Vídeo' },
+              { id: 'fmt', rot: 'Formato dominante', ph: 'Vídeo', extra: true },
               { id: 'tema', rot: 'Sobre o que fala', ph: 'Produto e bastidor' },
             ],
           },
@@ -141,7 +150,7 @@ export const DOCS = [
             ph: 'Os pesos não são iguais, e isso é proposital. O maior peso fica em...',
           },
           {
-            id: 'pilares', rot: 'Pilares', tipo: 'lista', linhas: 4,
+            id: 'pilares', rot: 'Pilares', tipo: 'lista', linhas: 4, linhasEss: 3,
             dica: 'A etapa do funil não é enfeite: é o que impede um mês inteiro de descoberta sem nenhuma peça que ajude alguém a decidir.',
             cols: [
               { id: 'n', rot: 'Nome', ph: 'Autoridade institucional' },
@@ -160,17 +169,17 @@ export const DOCS = [
             ph: 'Referência 2026: 3 a 5 posts/semana + stories quase diários. Quarta ao meio-dia e quinta às 9h concentram engajamento.',
           },
           {
-            id: 'grade', rot: 'Grade de publicação', tipo: 'lista', linhas: 5,
+            id: 'grade', rot: 'Grade de publicação', tipo: 'lista', linhas: 5, linhasEss: 3,
             dica: 'Inclua Stories como linha própria, mesmo que fora do contrato — o que some da grade some da conversa.',
             cols: [
               { id: 'dia', rot: 'Dia', ph: 'Terça' },
-              { id: 'pilar', rot: 'Pilar', ph: 'Autoridade' },
+              { id: 'pilar', rot: 'Pilar', ph: 'Autoridade', extra: true },
               { id: 'fmt', rot: 'Formato', ph: 'Carrossel' },
               { id: 'hora', rot: 'Horário', ph: '11h às 13h' },
             ],
           },
           {
-            id: 'obs', rot: 'Observações', tipo: 'area',
+            id: 'obs', rot: 'Observações', tipo: 'area', extra: true,
             ph: 'Estes horários são ponto de partida. Depois de 4 a 6 semanas, os dados do próprio perfil passam a mandar.',
           },
         ],
@@ -178,9 +187,10 @@ export const DOCS = [
       {
         t: '05 · Mockup do mês',
         opcional: true,
+        iniciaDesligada: true,
         campos: [
           {
-            id: 'mockup', rot: 'Peças do mês', tipo: 'lista', linhas: 8,
+            id: 'mockup', rot: 'Peças do mês', tipo: 'lista', linhas: 8, linhasEss: 6,
             dica: 'E = estático (fazer desejar) · C = carrossel (fazer entender) · V = vídeo (fazer acreditar). T, M e F marcam a etapa do funil — acompanhe o balanço no topo da pré-visualização.',
             cols: [
               { id: 't', rot: 'Tema', ph: 'Bastidores da produção' },
@@ -197,9 +207,9 @@ export const DOCS = [
             id: 'metricasIntro', rot: 'Por que este conjunto', tipo: 'area',
             ph: 'Como o objetivo é autoridade e não venda imediata, as métricas de vaidade importam menos.',
           },
-          { id: 'objetivo', rot: 'Nome do objetivo (aparece no título do card)', tipo: 'texto', ph: 'autoridade' },
+          { id: 'objetivo', rot: 'Nome do objetivo (aparece no título)', tipo: 'texto', ph: 'autoridade', extra: true },
           {
-            id: 'metricas', rot: 'Métricas que provam o objetivo', tipo: 'lista', linhas: 4,
+            id: 'metricas', rot: 'Métricas que provam o objetivo', tipo: 'lista', linhas: 4, linhasEss: 3,
             cols: [
               { id: 'n', rot: 'Métrica', ph: 'Taxa de salvamento' },
               { id: 'd', rot: 'Por quê', ph: 'Quem salva está dizendo que o conteúdo é útil e que vai voltar.' },
@@ -407,15 +417,12 @@ export const DOCS = [
             dica: 'É a única linha que o decisor lê inteira. Diga se a agulha se moveu, sim ou não.',
             ph: 'O alcance cresceu 38% puxado por dois Reels, mas a conversa no direct ficou estável — o gargalo agora é o convite, não a descoberta.',
           },
+          // O slide monta sozinho a partir das camadas — não há campo
+          // para os quatro números. Quando existia, o resumo divergia do
+          // corpo do relatório.
           {
-            id: 'kpis', rot: 'Os quatro números do mês', tipo: 'lista', linhas: 4,
-            dica: 'A variação é calculada sozinha. Marque "↓ melhor" em métricas onde cair é bom, como skip rate e CPL.',
-            cols: [
-              { id: 'n', rot: 'Métrica', ph: 'Alcance' },
-              { id: 'a', rot: 'Anterior', ph: '12400' },
-              { id: 'b', rot: 'Atual', ph: '17100' },
-              { id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'] },
-            ],
+            id: 'kpiNota', rot: 'Os quatro números do slide', tipo: 'nota',
+            texto: 'Este slide monta sozinho: ele pega a primeira métrica preenchida de cada camada. Se quiser destacar outra, mova ela para a primeira linha da camada.',
           },
         ],
       },
@@ -423,11 +430,16 @@ export const DOCS = [
         t: 'Camada 1 · Distribuição',
         campos: [
           {
-            id: 'm1', rot: 'Métricas', tipo: 'lista', linhas: 4,
-            dica: 'O algoritmo deu chance? Alcance, % de não seguidores, views, novos seguidores.',
+            id: 'm1', rot: 'Métricas', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Só os dois números. O nome e a direção já vêm postos — troque se este cliente medir outra coisa.',
             cols: [
-              { id: 'n', rot: 'Métrica' }, { id: 'a', rot: 'Anterior' }, { id: 'b', rot: 'Atual' },
-              { id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'] },
+              { id: 'n', rot: 'Métrica', padrao: ['Alcance', '% de não seguidores', 'Views', 'Novos seguidores'] },
+              { id: 'a', rot: 'Mês anterior' },
+              { id: 'b', rot: 'Mês atual' },
+              {
+                id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'], extra: true,
+                padrao: ['↑ melhor', '↑ melhor', '↑ melhor', '↑ melhor'],
+              },
             ],
           },
           { id: 'l1', rot: 'O que aconteceu e por quê', tipo: 'area', ph: 'Não repita o número da tabela. Explique a causa.' },
@@ -438,11 +450,16 @@ export const DOCS = [
         t: 'Camada 2 · Atenção',
         campos: [
           {
-            id: 'm2', rot: 'Métricas', tipo: 'lista', linhas: 4,
-            dica: 'O criativo prendeu? Retenção nos 3s, tempo médio, skip rate, conclusão de Stories.',
+            id: 'm2', rot: 'Métricas', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Skip rate já vem marcado como "cair é bom".',
             cols: [
-              { id: 'n', rot: 'Métrica' }, { id: 'a', rot: 'Anterior' }, { id: 'b', rot: 'Atual' },
-              { id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'] },
+              { id: 'n', rot: 'Métrica', padrao: ['Tempo médio de visualização', 'Retenção nos 3s', 'Skip rate', 'Conclusão de Stories'] },
+              { id: 'a', rot: 'Mês anterior' },
+              { id: 'b', rot: 'Mês atual' },
+              {
+                id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'], extra: true,
+                padrao: ['↑ melhor', '↑ melhor', '↓ melhor', '↑ melhor'],
+              },
             ],
           },
           { id: 'l2', rot: 'O que aconteceu e por quê', tipo: 'area' },
@@ -453,11 +470,16 @@ export const DOCS = [
         t: 'Camada 3 · Ação',
         campos: [
           {
-            id: 'm3', rot: 'Métricas', tipo: 'lista', linhas: 4,
-            dica: 'Motivou reação? Envios por DM, salvamentos, comentários, contas engajadas.',
+            id: 'm3', rot: 'Métricas', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Compartilhamento por DM é o sinal mais forte do algoritmo hoje.',
             cols: [
-              { id: 'n', rot: 'Métrica' }, { id: 'a', rot: 'Anterior' }, { id: 'b', rot: 'Atual' },
-              { id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'] },
+              { id: 'n', rot: 'Métrica', padrao: ['Compartilhamentos (envios)', 'Salvamentos', 'Comentários', 'Contas engajadas'] },
+              { id: 'a', rot: 'Mês anterior' },
+              { id: 'b', rot: 'Mês atual' },
+              {
+                id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'], extra: true,
+                padrao: ['↑ melhor', '↑ melhor', '↑ melhor', '↑ melhor'],
+              },
             ],
           },
           {
@@ -473,11 +495,16 @@ export const DOCS = [
         t: 'Camada 4 · Negócio',
         campos: [
           {
-            id: 'm4', rot: 'Métricas', tipo: 'lista', linhas: 4,
-            dica: 'Virou resultado? Visitas ao perfil, cliques, conversas no direct, leads, CPL.',
+            id: 'm4', rot: 'Métricas', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Conversas no direct exige contagem manual. Combine isso com o cliente no início do contrato.',
             cols: [
-              { id: 'n', rot: 'Métrica' }, { id: 'a', rot: 'Anterior' }, { id: 'b', rot: 'Atual' },
-              { id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'] },
+              { id: 'n', rot: 'Métrica', padrao: ['Visitas ao perfil', 'Cliques no link', 'Conversas no direct', 'Leads'] },
+              { id: 'a', rot: 'Mês anterior' },
+              { id: 'b', rot: 'Mês atual' },
+              {
+                id: 'dir', rot: 'Direção', tipo: 'opcao', opcoes: ['↑ melhor', '↓ melhor'], extra: true,
+                padrao: ['↑ melhor', '↑ melhor', '↑ melhor', '↑ melhor'],
+              },
             ],
           },
           { id: 'l4', rot: 'O que aconteceu e por quê', tipo: 'area' },
@@ -506,28 +533,28 @@ export const DOCS = [
             dica: 'Slide obrigatório. Relatório que só mostra acerto perde credibilidade no primeiro mês ruim.',
             cols: [{ id: 't', rot: 'Peça' }, { id: 'v', rot: 'Número' }, { id: 'd', rot: 'Hipótese do que falhou' }],
           },
-          { id: 'flopNota', rot: 'O que isso muda na produção', tipo: 'area' },
+          { id: 'flopNota', rot: 'O que isso muda na produção', tipo: 'area', extra: true },
         ],
       },
       {
         t: 'Entrega x planejado',
         campos: [
           {
-            id: 'entrega', rot: 'Volume por formato', tipo: 'lista', linhas: 5,
+            id: 'entrega', rot: 'Volume por formato', tipo: 'lista', linhas: 5, linhasEss: 3,
             cols: [
-              { id: 'f', rot: 'Formato', ph: 'Reels' },
+              { id: 'f', rot: 'Formato', padrao: ['Reels', 'Carrossel', 'Estático', 'Stories', ''] },
               { id: 'p', rot: 'Planejado', ph: '8' },
               { id: 'e', rot: 'Entregue', ph: '6' },
-              { id: 'o', rot: 'Observação', ph: 'Duas gravações remarcadas.' },
+              { id: 'o', rot: 'Observação', ph: 'Duas gravações remarcadas.', extra: true },
             ],
           },
           {
             id: 'funil', rot: 'Distribuição por etapa do funil', tipo: 'lista', linhas: 3,
             dica: 'Puxe do mockup da pré-estratégia. Mês inteiro de topo explica alcance alto com conversa parada.',
             cols: [
-              { id: 'e', rot: 'Etapa', tipo: 'opcao', opcoes: ['Topo', 'Meio', 'Fundo'] },
+              { id: 'e', rot: 'Etapa', tipo: 'opcao', opcoes: ['Topo', 'Meio', 'Fundo'], padrao: ['Topo', 'Meio', 'Fundo'] },
               { id: 'q', rot: 'Peças' },
-              { id: 'o', rot: 'Leitura' },
+              { id: 'o', rot: 'Leitura', extra: true },
             ],
           },
         ],
@@ -554,8 +581,8 @@ export const DOCS = [
         t: 'Plano do próximo mês',
         campos: [
           {
-            id: 'plano', rot: 'Ações', tipo: 'lista', linhas: 4,
-            cols: [{ id: 't', rot: 'Ação' }, { id: 'r', rot: 'Responsável' }, { id: 'q', rot: 'Quando' }],
+            id: 'plano', rot: 'Ações', tipo: 'lista', linhas: 4, linhasEss: 3,
+            cols: [{ id: 't', rot: 'Ação' }, { id: 'r', rot: 'Responsável', extra: true }, { id: 'q', rot: 'Quando', extra: true }],
           },
           {
             id: 'pedido', rot: 'O que precisamos do cliente', tipo: 'area',
@@ -570,6 +597,10 @@ export const DOCS = [
       const S = [];
       const B = (id, nome, html) => S.push({ id, nome, html });
       const linhas = (arr) => lista(arr).filter((r) => r && (r.n || r.t || r.f || r.e));
+      // Leitura rápida é derivada: a 1ª métrica preenchida de cada camada.
+      const destaque = [d.m1, d.m2, d.m3, d.m4]
+        .map((m) => lista(m).find((r) => r && r.n && (r.a || r.b)))
+        .filter(Boolean);
 
       const tabela = (arr) => `<table><thead><tr><th>Métrica</th><th>Anterior</th><th>Atual</th><th>Variação</th></tr></thead>
         <tbody>${(linhas(arr).length ? linhas(arr) : [{}]).map((r) => `<tr>
@@ -602,7 +633,7 @@ export const DOCS = [
       B('resumo', 'Leitura rápida', `<section class="slide mascote-canto"><span class="pg"></span>
         <div class="eyebrow">Leitura rápida</div><h2>O mês<br>em números</h2><div class="bar"></div>
         <div class="grid g4" style="margin-bottom:2cqw">${
-  (linhas(d.kpis).length ? linhas(d.kpis) : [{}, {}, {}, {}]).map((r) => `<div class="card kpi">
+  (destaque.length ? destaque : [{}, {}, {}, {}]).map((r) => `<div class="card kpi">
             <span class="rotulo">${v(r.n, 'métrica')}</span>
             <span class="valor">${v(r.b, '—')}</span>
             <span class="antes">antes ${v(r.a, '—')}</span>

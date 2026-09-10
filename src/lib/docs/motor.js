@@ -49,6 +49,55 @@ export function delta(ant, atual, dir) {
   return `<span class="delta ${bom ? 'alta' : 'queda'}">${p > 0 ? '▲' : '▼'} ${fmt}</span>`;
 }
 
+// ─── REGRA 3.11 — valores padrão das listas ───────────────────
+// Semeia os `padrao` declarados nas colunas. Só preenche célula que
+// nunca foi tocada (undefined): célula apagada pela pessoa fica ''
+// e é respeitada. Devolve o mesmo objeto quando não há o que semear,
+// para quem chama saber se precisa gravar.
+export function semearPadroes(doc, dados) {
+  if (!doc || !doc.secoes) return dados || {};
+  let novo = null;
+  doc.secoes.forEach((sec) => sec.campos.forEach((c) => {
+    if (c.tipo !== 'lista') return;
+    c.cols.filter((col) => Array.isArray(col.padrao)).forEach((col) => {
+      col.padrao.forEach((valor, i) => {
+        if (i >= c.linhas || !valor) return;
+        const base = novo || dados || {};
+        const linha = lista(base[c.id])[i];
+        if (linha && linha[col.id] !== undefined) return;
+        if (!novo) novo = { ...(dados || {}) };
+        const linhas = [...lista(novo[c.id])];
+        for (let k = 0; k < c.linhas; k += 1) linhas[k] = linhas[k] || {};
+        linhas[i] = { ...linhas[i], [col.id]: valor };
+        novo[c.id] = linhas;
+      });
+    });
+  }));
+  return novo || dados || {};
+}
+
+// Seções opcionais que nascem desligadas (`iniciaDesligada`).
+// Usado só na criação: documento antigo mantém o que já tinha.
+export function opcionaisIniciais(doc) {
+  if (!doc || !doc.secoes) return {};
+  return Object.fromEntries(
+    doc.secoes.filter((s) => s.opcional && s.iniciaDesligada).map((s) => [s.t, false]),
+  );
+}
+
+// ─── REGRA 3.10 — modo essencial ──────────────────────────────
+// O que o formulário mostra em cada nível. Esconde, nunca apaga:
+// o dado continua no documento e no slide.
+export const colunasVisiveis = (campo, essencial) => (
+  essencial ? campo.cols.filter((c) => !c.extra) : campo.cols
+);
+
+export const linhasVisiveis = (campo, essencial) => (
+  essencial && campo.linhasEss ? Math.min(campo.linhasEss, campo.linhas) : campo.linhas
+);
+
+export const campoVisivel = (campo, essencial) => !(essencial && campo.extra);
+
 // ─── Montagem do deck ─────────────────────────────────────────
 // Junta os slides fixos do documento com os slides extras, cada um
 // na posição declarada em `depois`.
