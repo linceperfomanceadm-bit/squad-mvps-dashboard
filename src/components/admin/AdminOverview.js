@@ -1,7 +1,8 @@
 import React from 'react';
 import { differenceInDays, subDays, startOfWeek } from 'date-fns';
 import { Target, CheckCircle2, XCircle, Users, LayoutGrid, Package, AlertTriangle } from 'lucide-react';
-import { SECTORS, stageOf } from '../../lib/firebase';
+import { SECTORS, stageOf, WD_SERVICE_CONFIG } from '../../lib/firebase';
+import { wdCardsOf } from '../../lib/wdJobs';
 import { PageHeader, Card, Grid, Kpi, Breakdown, MiniBars, Goal, Pills, Trio, Tag, Row } from '../shared/ui';
 
 // ─── Visão Geral do Admin (Layout 01) ─────────────────────────
@@ -64,16 +65,17 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
   const newMonth = active.filter(c => sameMonth(toDate(c.createdAt), now)).length;
 
   // ── time ──
-  const team = collaborators.filter(c => c.active);
+  const team = collaborators.filter(c => c.active !== false);
   const heroes = Object.values(SECTORS).filter(s => doneThis.some(t => (t.deliveredBySector || t.responsibleSector) === s.id));
 
   // ── alertas ──
-  const wdOverdue = active.filter(c => c.wd?.status === 'onboarding' && c.wd.onboardingStartedAt && differenceInDays(now, toDate(c.wd.onboardingStartedAt)) > 7);
+  // Um alerta por serviço de Web (o cliente pode ter mais de um).
+  const wdOverdue = wdCardsOf(active).filter(({ job }) => job.status === 'onboarding' && job.onboardingStartedAt && differenceInDays(now, toDate(job.onboardingStartedAt)) > 7);
   const staffing = active.filter(c => stageOf(c) === 'staffing');
   const alerts = [
     rework.length > 0 && { key: 'rework', title: `${rework.length} task${rework.length > 1 ? 's' : ''} em ajuste/refação`, sub: 'Kanban', tone: 'bad', go: 'kanban' },
     staffing.length > 0 && { key: 'staff', title: `${staffing.length} cliente${staffing.length > 1 ? 's' : ''} aguardando responsáveis`, sub: 'Onboarding · staffing', tone: 'warn', go: 'onboarding' },
-    ...wdOverdue.map(c => ({ key: c.id, title: c.name, sub: `WebDesign · onboarding há ${differenceInDays(now, toDate(c.wd.onboardingStartedAt))} dias`, tone: 'warn', go: 'clients' })),
+    ...wdOverdue.map(({ key, client: c, job }) => ({ key, title: c.name, sub: `WebDesign · ${WD_SERVICE_CONFIG[job.service]?.label || job.service} · onboarding há ${differenceInDays(now, toDate(job.onboardingStartedAt))} dias`, tone: 'warn', go: 'clients' })),
   ].filter(Boolean);
 
   const dEntregas = deltaOf(doneThis.length, doneLast.length);

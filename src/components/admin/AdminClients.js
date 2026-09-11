@@ -255,6 +255,12 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                   </td>
                   <td style={{ padding: '12px 14px', fontSize: 12, color: 'var(--muted)' }}>
                     {c.wd?.service ? WD_SERVICE_CONFIG[c.wd.service]?.label : '—'}
+                    {(c.wdJobs || []).length > 0 && (
+                      <span title={(c.wdJobs || []).map(j => WD_SERVICE_CONFIG[j.service]?.label || j.service).join(', ')}
+                        style={{ fontSize: 10, fontWeight: 700, marginLeft: 6, padding: '1px 6px', borderRadius: 5, background: 'var(--neon-dim)', color: 'var(--neon)', fontFamily: 'var(--fm)', cursor: 'help' }}>
+                        +{c.wdJobs.length}
+                      </span>
+                    )}
                   </td>
                   {Object.values(SECTORS).map(s => {
                     const names = asArray(c.responsibles?.[s.id]);
