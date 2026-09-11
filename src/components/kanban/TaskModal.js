@@ -7,7 +7,7 @@ import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
 import { updateTaskResponsibles } from '../../hooks/useTasks';
 import {
   parseLocalDate, resolveTimeStats, taskTimeStats, deadlineState,
-  formatBusinessDuration, businessMsBetween,
+  formatBusinessDuration, businessMsBetween, taskCreatedAt,
 } from '../../lib/taskTime';
 
 // ─── Success popup ────────────────────────────────────────────
@@ -255,6 +255,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', marginBottom: 4 }}>{task.name}</h2>
             <p style={{ fontSize: 12, color: 'var(--muted)' }}>
               👤 {task.clientName} · Solicitado por <strong style={{ color: 'var(--muted)' }}>{task.requestedBy}</strong>
+              {taskCreatedAt(task) && <> em <strong style={{ color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600 }}>{format(taskCreatedAt(task), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong></>}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>

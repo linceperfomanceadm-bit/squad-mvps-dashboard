@@ -4,7 +4,7 @@ import { ptBR } from 'date-fns/locale';
 import { Clock, AlertTriangle, MessageSquare, RefreshCw, Link, PauseCircle } from 'lucide-react';
 import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
 import {
-  parseLocalDate, deadlineState, businessMsBetween, formatBusinessDuration,
+  parseLocalDate, deadlineState, businessMsBetween, formatBusinessDuration, taskCreatedAt,
 } from '../../lib/taskTime';
 
 // Reexportado porque outras telas já importavam daqui.
@@ -18,6 +18,7 @@ export default function TaskCard({ task, onClick }) {
   const state = deadlineState(task, now);
   const isLate = state?.kind === 'late';
   const isFrozen = state?.kind === 'frozen';
+  const createdAt = taskCreatedAt(task);
 
   // Há quanto tempo (útil) esta task está parada na mão do aprovador.
   const waitingMs = task.status === 'approval' && task.approvalStartedAt
@@ -75,6 +76,12 @@ export default function TaskCard({ task, onClick }) {
       {/* Client */}
       <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
         👤 {task.clientName}
+        {createdAt && (
+          <span title={`Criada em ${format(createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}${task.requestedBy ? ` por ${task.requestedBy}` : ''}`}
+            style={{ fontFamily: 'var(--fm)', fontSize: 10, color: 'var(--dim)' }}>
+            {' · criada '}{format(createdAt, 'dd/MM', { locale: ptBR })}
+          </span>
+        )}
       </p>
 
       {/* Prazo — congelado enquanto a task está em aprovação */}
