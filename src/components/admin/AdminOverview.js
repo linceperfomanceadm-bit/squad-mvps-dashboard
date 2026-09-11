@@ -60,9 +60,16 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
 
   // ── clientes ──
   // Ordem real do ciclo desde o lote 2: Kick Off vem antes do staffing.
-  const stages = ['kickoff', 'staffing', 'onboarding', 'live'].map(k => ({ k, n: active.filter(c => stageOf(c) === k).length }));
-  const newWeek = active.filter(c => { const d = toDate(c.createdAt); return d && differenceInDays(now, d) < 7; }).length;
-  const newMonth = active.filter(c => sameMonth(toDate(c.createdAt), now)).length;
+  // O ciclo NÃO pode partir de `active`: cliente em kick off, staffing
+  // e onboarding ainda não agendado grava `active: false` de propósito
+  // (é o que o esconde dos setores). Filtrando por `active`, esses
+  // estágios zeravam. A carteira = quem está no fluxo de entrada
+  // (qualquer `active`) + quem já está live e ativo.
+  const pipeline = clients.filter(c => stageOf(c) !== 'live');
+  const carteira = [...pipeline, ...active.filter(c => stageOf(c) === 'live')];
+  const stages = ['kickoff', 'staffing', 'onboarding', 'live'].map(k => ({ k, n: carteira.filter(c => stageOf(c) === k).length }));
+  const newWeek = carteira.filter(c => { const d = toDate(c.createdAt); return d && differenceInDays(now, d) < 7; }).length;
+  const newMonth = carteira.filter(c => sameMonth(toDate(c.createdAt), now)).length;
 
   // ── time ──
   const team = collaborators.filter(c => c.active !== false);
@@ -71,7 +78,7 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
   // ── alertas ──
   // Um alerta por serviço de Web (o cliente pode ter mais de um).
   const wdOverdue = wdCardsOf(active).filter(({ job }) => job.status === 'onboarding' && job.onboardingStartedAt && differenceInDays(now, toDate(job.onboardingStartedAt)) > 7);
-  const staffing = active.filter(c => stageOf(c) === 'staffing');
+  const staffing = pipeline.filter(c => stageOf(c) === 'staffing');
   const alerts = [
     rework.length > 0 && { key: 'rework', title: `${rework.length} task${rework.length > 1 ? 's' : ''} em ajuste/refação`, sub: 'Kanban', tone: 'bad', go: 'kanban' },
     staffing.length > 0 && { key: 'staff', title: `${staffing.length} cliente${staffing.length > 1 ? 's' : ''} aguardando responsáveis`, sub: 'Onboarding · staffing', tone: 'warn', go: 'onboarding' },
@@ -139,7 +146,7 @@ export default function AdminOverview({ clients = [], collaborators = [], tasks 
                 <div style={{ color: 'var(--muted)', fontSize: 12, textTransform: 'capitalize' }}>{s.k === 'kickoff' ? 'Kick Off' : s.k}</div>
                 <b style={{ display: 'block', fontSize: 26, fontWeight: 500, marginTop: 8, color: s.k === 'staffing' && s.n > 0 ? 'var(--amber)' : 'var(--text)' }}>{s.n}</b>
                 <div style={{ marginTop: 10 }}>
-                  <Tag tone={s.k === 'live' ? 'good' : s.k === 'staffing' && s.n > 0 ? 'warn' : undefined}>{pct(s.n, active.length)}% da carteira</Tag>
+                  <Tag tone={s.k === 'live' ? 'good' : s.k === 'staffing' && s.n > 0 ? 'warn' : undefined}>{pct(s.n, carteira.length)}% da carteira</Tag>
                 </div>
               </div>
             ))}

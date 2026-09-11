@@ -12,7 +12,7 @@ export function asArray(val) {
 
 // Seletor de múltiplos responsáveis (chips clicáveis) de um setor.
 function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
-  const sectorCollabs = collaborators.filter(c => c.sector === sector.id && c.active);
+  const sectorCollabs = collaborators.filter(c => c.sector === sector.id && c.active !== false);
   const sel = asArray(selected);
   const toggle = (name) => {
     if (sel.includes(name)) onChange(sel.filter(n => n !== name));
@@ -214,7 +214,7 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Clientes</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {clients.filter(c => c.active).length} ativos · {clients.filter(c => c.stage === 'staffing').length} aguardando responsáveis · {clients.length} total
+            {clients.filter(c => c.active !== false).length} ativos · {clients.filter(c => c.stage === 'staffing').length} aguardando responsáveis · {clients.length} total
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
