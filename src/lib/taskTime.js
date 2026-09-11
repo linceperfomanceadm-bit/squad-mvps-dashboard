@@ -446,3 +446,22 @@ export function isDeliveryOnTime(task, at = new Date()) {
   if (!deadline) return true;
   return toDate(at) <= deadline;
 }
+
+// ─── Data de criação ──────────────────────────────────────────
+// Toda task grava a criação duas vezes: `timeline[0]` (ISO, na hora)
+// e `createdAt` (serverTimestamp). A timeline vem primeiro porque o
+// serverTimestamp chega nulo no snapshot local logo após criar.
+export function taskCreatedAt(task) {
+  const tl = (task?.timeline || []).find(t => t.action === 'created');
+  if (tl?.at) {
+    const d = new Date(tl.at);
+    if (!isNaN(d)) return d;
+  }
+  const c = task?.createdAt;
+  if (c?.toDate) return c.toDate();
+  if (c) {
+    const d = new Date(c);
+    if (!isNaN(d)) return d;
+  }
+  return null;
+}
