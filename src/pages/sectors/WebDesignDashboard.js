@@ -9,12 +9,14 @@ import { useToast } from '../../components/shared/Toast';
 import AppShell from '../../components/shared/AppShell';
 import WDOverview from '../../components/sectors/webdesign/WDOverview';
 import WDClientList from '../../components/sectors/webdesign/WDClientList';
-import WDAddClientModal from '../../components/sectors/webdesign/WDAddClientModal';
+import WDAddServiceModal from '../../components/sectors/webdesign/WDAddServiceModal';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
+import { wdCardsOf } from '../../lib/wdJobs';
+import { WD_SERVICE_CONFIG } from '../../lib/firebase';
 
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',  icon: LayoutDashboard },
@@ -33,7 +35,7 @@ const NAV = [
 export default function WebDesignDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, addClient, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, deleteClient } = useClients();
+  const { clients, loading, wdAddService, wdRemoveService, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus } = useClients();
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
@@ -45,19 +47,22 @@ export default function WebDesignDashboard() {
   // Só clientes já liberados (live). Fora de `live` o doc grava
   // `active: false` — sem esse filtro, cliente em kick off/staffing
   // com serviço WD entrava em "Ativos", nos badges e nas listas.
-  const wdClients = clients.filter(c => c.active !== false && c.wd?.status);
+  const liveClients = clients.filter(c => c.active !== false);
+  const wdCards = wdCardsOf(liveClients);
+  const wdClients = liveClients.filter(c => wdCards.some(k => k.client.id === c.id));
 
+  // Contagens por serviço (um cliente com E-commerce + LP aparece nas duas).
   const counts = {
-    onboarding: wdClients.filter(c => c.wd.status === 'onboarding').length,
-    production: wdClients.filter(c => c.wd.status === 'production').length,
-    inactive: wdClients.filter(c => c.wd.status === 'inactive').length,
-    recurrence: wdClients.filter(c => c.wd.status === 'recurrence').length,
-    finished: wdClients.filter(c => c.wd.status === 'finished').length,
+    onboarding: wdCards.filter(k => k.job.status === 'onboarding').length,
+    production: wdCards.filter(k => k.job.status === 'production').length,
+    inactive: wdCards.filter(k => k.job.status === 'inactive').length,
+    recurrence: wdCards.filter(k => k.job.status === 'recurrence').length,
+    finished: wdCards.filter(k => k.job.status === 'finished').length,
   };
 
-  const overdueOnboarding = wdClients.filter(c => {
-    if (c.wd.status !== 'onboarding' || !c.wd.onboardingStartedAt) return false;
-    return (Date.now() - new Date(c.wd.onboardingStartedAt)) / 86400000 > 7;
+  const overdueOnboarding = wdCards.filter(({ job }) => {
+    if (job.status !== 'onboarding' || !job.onboardingStartedAt) return false;
+    return (Date.now() - new Date(job.onboardingStartedAt)) / 86400000 > 7;
   }).length;
 
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
@@ -76,9 +81,9 @@ export default function WebDesignDashboard() {
       || (n.key === 'requests' && openRequests > 0),
   }));
 
-  const handleAdd = async (data) => {
-    const res = await addClient(data);
-    if (res.success) toast(`${data.name} cadastrado!`);
+  const handleAddService = async (clientId, data, clientName) => {
+    const res = await wdAddService(clientId, data, user?.name);
+    if (res.success) toast(`${WD_SERVICE_CONFIG[data.service]?.label || 'Serviço'} adicionado a ${clientName}!`);
     return res;
   };
 
@@ -97,7 +102,7 @@ export default function WebDesignDashboard() {
   };
 
   return (
-    <AppShell sectorId="webdesign" navItems={navItems} activeKey={page} onNav={setPage} onAddClient={() => setShowAddModal(true)}>
+    <AppShell sectorId="webdesign" navItems={navItems} activeKey={page} onNav={setPage} onAddClient={() => setShowAddModal(true)} addClientLabel="Adicionar Serviço">
         {loading || loadingTasks ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -149,13 +154,13 @@ export default function WebDesignDashboard() {
             onMoveBackToOnboarding={wrap(wdMoveBackToOnboarding)}
             onUpdateChecklist={wdUpdateChecklist}
             onUpdateNotes={wdUpdateNotes}
-            onMoveStatus={(id, status, extra) => wrap(wdMoveStatus)(id, status, extra)}
-            onDelete={wrap(deleteClient, 'Cliente removido.')}
+            onMoveStatus={wrap(wdMoveStatus)}
+            onDelete={wrap(wdRemoveService, 'Serviço removido.')}
             onAddClient={() => setShowAddModal(true)}
           />
         )}
       {showAddModal && (
-        <WDAddClientModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} collaborators={collaborators.filter(c => c.sector === 'webdesign')} />
+        <WDAddServiceModal onClose={() => setShowAddModal(false)} onAdd={handleAddService} clients={liveClients} collaborators={collaborators.filter(c => c.sector === 'webdesign')} />
       )}
     </AppShell>
   );
