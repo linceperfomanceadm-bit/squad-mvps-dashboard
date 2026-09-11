@@ -42,7 +42,10 @@ export default function WebDesignDashboard() {
   const [prodSubTab, setProdSubTab] = useState('ecommerce');
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const wdClients = clients.filter(c => c.wd?.status);
+  // Só clientes já liberados (live). Fora de `live` o doc grava
+  // `active: false` — sem esse filtro, cliente em kick off/staffing
+  // com serviço WD entrava em "Ativos", nos badges e nas listas.
+  const wdClients = clients.filter(c => c.active !== false && c.wd?.status);
 
   const counts = {
     onboarding: wdClients.filter(c => c.wd.status === 'onboarding').length,
