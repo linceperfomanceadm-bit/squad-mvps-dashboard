@@ -4,6 +4,9 @@ import { differenceInDays } from 'date-fns';
 import { Activity, AlertTriangle, RefreshCw, CheckCircle, Users } from 'lucide-react';
 import { WD_SERVICE_CONFIG } from '../../../lib/firebase';
 
+// Responsável pode estar salvo como string (docs antigos) ou array.
+const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+
 function StatCard({ label, value, sub, color }) {
   const tone = color === 'var(--green)' ? 'good' : color === 'var(--amber)' ? 'warn' : (color === 'var(--neon)' || color === 'var(--red)') ? 'bad' : undefined;
   return <Kpi value={value} label={label} tone={tone}>{sub ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{sub}</span> : null}</Kpi>;
@@ -100,13 +103,13 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
         </div>
       </div>
 
-      {/* Collaborator workload */}
-      {collaborators.filter(c => c.active).length > 0 && (
+      {/* Carga por colaborador — o cliente conta para TODOS os responsáveis de Web marcados */}
+      {collaborators.filter(c => c.active !== false).length > 0 && (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' }}>
           <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 16 }}>Carga por Colaborador</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
-            {collaborators.filter(c => c.active).map(co => {
-              const count = active.filter(c => c.responsibles?.webdesign === co.name).length;
+            {collaborators.filter(c => c.active !== false).map(co => {
+              const count = active.filter(c => asArray(c.responsibles?.webdesign).includes(co.name)).length;
               return (
                 <div key={co.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{co.name}</p>

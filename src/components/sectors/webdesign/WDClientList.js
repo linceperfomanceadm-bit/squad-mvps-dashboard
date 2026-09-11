@@ -4,6 +4,9 @@ import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, Tra
 import { WD_SERVICE_CONFIG, RECURRENCE_SERVICES } from '../../../lib/firebase';
 import Countdown from '../../shared/Countdown';
 
+// Responsável pode estar salvo como string (docs antigos) ou array.
+const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+
 // ─── Progress Ring ─────────────────────────────────────────────
 function Ring({ checked, total }) {
   const r = 14, circ = 2 * Math.PI * r;
@@ -67,7 +70,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
           <div style={S.hdLeft}>
             <span style={S.tag}>{cfg.label || wd.service}</span>
             <div style={S.name}>{client.name}</div>
-            <div style={S.resp}>👤 {client.responsibles?.webdesign || '—'}
+            <div style={S.resp}>👤 {asArray(client.responsibles?.webdesign).join(', ') || '—'}
               {wd.recurrenceService && <span style={S.recBadge}>↻ {wd.recurrenceService}</span>}
             </div>
           </div>
