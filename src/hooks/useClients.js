@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState } from '../lib/firebase';
+import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -175,49 +176,144 @@ export function useClients() {
   };
 
   // ── WebDesign actions ──────────────────────────────────────
-  const wdMoveToProduction = async (clientId) => {
+  // Todas recebem `jobId` por último (opcional). 'main' (padrão) é o
+  // bloco `wd`; qualquer outro id é um item de `wdJobs[]`. Chamadas
+  // antigas sem jobId continuam mexendo no serviço principal.
+  const wdPatch = async (clientId, jobId, fields) => {
+    const ref = doc(db, 'clients', clientId);
+    if (!jobId || jobId === 'main') {
+      const upd = {};
+      Object.entries(fields).forEach(([k, v]) => { upd[`wd.${k}`] = v; });
+      await updateDoc(ref, upd);
+      return;
+    }
+    // Array inteiro reescrito dentro de transação: não atropela
+    // outro serviço do mesmo cliente editado ao mesmo tempo.
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error('Cliente não encontrado');
+      const jobs = snap.data().wdJobs || [];
+      if (!jobs.some(j => j.id === jobId)) throw new Error('Serviço não encontrado');
+      tx.update(ref, { wdJobs: jobs.map(j => (j.id === jobId ? { ...j, ...fields } : j)) });
+    });
+  };
+
+  // Aceita chaves no formato antigo ('wd.status') ou simples ('status').
+  const stripWd = (extra) => Object.fromEntries(Object.entries(extra || {}).map(([k, v]) => [k.replace(/^wd\./, ''), v]));
+
+  const wdMoveToProduction = async (clientId, jobId = 'main') => {
     try {
       const client = clients.find(c => c.id === clientId);
       if (!client) throw new Error('Cliente não encontrado');
-      const cfg = WD_SERVICE_CONFIG[client.wd.service];
+      const job = wdJobsOf(client).find(j => j.id === jobId);
+      const cfg = WD_SERVICE_CONFIG[job?.service];
+      if (!cfg) throw new Error('Serviço sem configuração de checklist');
       const checklist = cfg.checklist.map((label, i) => ({ id: `item_${i}`, label, checked: false, checkedAt: null }));
-      await updateDoc(doc(db, 'clients', clientId), {
-        'wd.status': 'production',
-        'wd.onboardingCompletedAt': new Date().toISOString(),
-        'wd.productionStartedAt': new Date().toISOString(),
-        'wd.checklist': checklist,
+      await wdPatch(clientId, jobId, {
+        status: 'production',
+        onboardingCompletedAt: new Date().toISOString(),
+        productionStartedAt: new Date().toISOString(),
+        checklist,
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  const wdMoveBackToOnboarding = async (clientId) => {
+  const wdMoveBackToOnboarding = async (clientId, jobId = 'main') => {
     try {
-      await updateDoc(doc(db, 'clients', clientId), {
-        'wd.status': 'onboarding',
-        'wd.onboardingStartedAt': new Date().toISOString(),
-        'wd.productionStartedAt': null,
-        'wd.checklist': [],
+      await wdPatch(clientId, jobId, {
+        status: 'onboarding',
+        onboardingStartedAt: new Date().toISOString(),
+        productionStartedAt: null,
+        checklist: [],
       });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  const wdUpdateChecklist = async (clientId, updatedChecklist) => {
+  const wdUpdateChecklist = async (clientId, updatedChecklist, jobId = 'main') => {
     try {
-      await updateDoc(doc(db, 'clients', clientId), { 'wd.checklist': updatedChecklist });
+      await wdPatch(clientId, jobId, { checklist: updatedChecklist });
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  const wdUpdateNotes = async (clientId, notes) => {
-    try { await updateDoc(doc(db, 'clients', clientId), { 'wd.notes': notes }); return { success: true }; }
+  const wdUpdateNotes = async (clientId, notes, jobId = 'main') => {
+    try { await wdPatch(clientId, jobId, { notes }); return { success: true }; }
     catch (err) { return { success: false, error: err.message }; }
   };
 
-  const wdMoveStatus = async (clientId, newStatus, extra = {}) => {
+  const wdMoveStatus = async (clientId, newStatus, extra = {}, jobId = 'main') => {
     try {
-      await updateDoc(doc(db, 'clients', clientId), { 'wd.status': newStatus, ...extra });
+      await wdPatch(clientId, jobId, { ...stripWd(extra), status: newStatus });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Novo serviço de Web para um cliente que JÁ está na base.
+  // Sem serviço de Web ainda → preenche o `wd`. Já tem → entra em
+  // `wdJobs[]`. Os responsáveis também são somados ao
+  // `responsibles.webdesign` do cliente (CS e tasks enxergam quem está nele).
+  const wdAddService = async (clientId, { service, responsibles } = {}, byName = null) => {
+    try {
+      if (!WD_SERVICE_CONFIG[service]) throw new Error('Selecione o serviço.');
+      const names = asArray(responsibles);
+      if (!names.length) throw new Error('Selecione ao menos um responsável.');
+      const ref = doc(db, 'clients', clientId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado');
+        const data = snap.data();
+        const current = wdJobsOf({ id: clientId, ...data });
+        if (current.some(j => j.service === service && WD_ACTIVE_STATUSES.includes(j.status))) {
+          throw new Error(`${data.name} já tem ${WD_SERVICE_CONFIG[service].label} em andamento.`);
+        }
+        const now = new Date().toISOString();
+        const base = {
+          service,
+          status: 'onboarding',
+          onboardingStartedAt: now,
+          productionStartedAt: null,
+          checklist: [],
+          notes: '',
+          recurrenceService: '',
+          responsibles: names,
+          addedBy: byName || null,
+          addedAt: now,
+        };
+        const clientResp = asArray(data.responsibles?.webdesign);
+        const upd = {
+          'responsibles.webdesign': [...new Set([...clientResp, ...names])],
+        };
+        if (!data.wd?.status) {
+          upd.wd = base;
+        } else {
+          // O principal legado passa a guardar os próprios responsáveis,
+          // senão herdaria as pessoas do serviço novo.
+          if (data.wd.responsibles === undefined) upd['wd.responsibles'] = clientResp;
+          upd.wdJobs = [...(data.wdJobs || []), { ...base, id: `job_${Date.now()}` }];
+        }
+        tx.update(ref, upd);
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Remove UM serviço de Web — o cliente continua na base.
+  const wdRemoveService = async (clientId, jobId = 'main') => {
+    try {
+      const ref = doc(db, 'clients', clientId);
+      if (!jobId || jobId === 'main') {
+        await updateDoc(ref, {
+          wd: { service: null, status: null, onboardingStartedAt: null, productionStartedAt: null, checklist: [], notes: '', recurrenceService: '' },
+        });
+      } else {
+        await runTransaction(db, async (tx) => {
+          const snap = await tx.get(ref);
+          if (!snap.exists()) throw new Error('Cliente não encontrado');
+          tx.update(ref, { wdJobs: (snap.data().wdJobs || []).filter(j => j.id !== jobId) });
+        });
+      }
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
@@ -736,6 +832,7 @@ export function useClients() {
     clients, loading, addClient, updateClient, deleteClient,
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
+    wdAddService, wdRemoveService,
     idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
