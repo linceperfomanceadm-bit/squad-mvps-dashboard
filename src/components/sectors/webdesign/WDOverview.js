@@ -3,9 +3,7 @@ import { Kpi } from '../../shared/ui';
 import { differenceInDays } from 'date-fns';
 import { Activity, AlertTriangle, RefreshCw, CheckCircle, Users } from 'lucide-react';
 import { WD_SERVICE_CONFIG } from '../../../lib/firebase';
-
-// Responsável pode estar salvo como string (docs antigos) ou array.
-const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+import { wdCardsOf, wdJobsOf, WD_ACTIVE_STATUSES } from '../../../lib/wdJobs';
 
 function StatCard({ label, value, sub, color }) {
   const tone = color === 'var(--green)' ? 'good' : color === 'var(--amber)' ? 'warn' : (color === 'var(--neon)' || color === 'var(--red)') ? 'bad' : undefined;
@@ -14,28 +12,32 @@ function StatCard({ label, value, sub, color }) {
 
 export default function WDOverview({ clients, collaborators, onNavigate }) {
   const now = new Date();
-  const onboarding = clients.filter(c => c.wd?.status === 'onboarding');
-  const production = clients.filter(c => c.wd?.status === 'production');
-  const inactive = clients.filter(c => c.wd?.status === 'inactive');
-  const recurrence = clients.filter(c => c.wd?.status === 'recurrence');
-  const finished = clients.filter(c => c.wd?.status === 'finished');
-  const active = [...onboarding, ...production];
+  // Pipeline conta por SERVIÇO; "Ativos" e a carga contam por CLIENTE.
+  const cards = wdCardsOf(clients);
+  const byStatus = (st) => cards.filter(k => k.job.status === st);
+  const onboarding = byStatus('onboarding');
+  const production = byStatus('production');
+  const inactive = byStatus('inactive');
+  const recurrence = byStatus('recurrence');
+  const finished = byStatus('finished');
+  const activeJobsOf = (c) => wdJobsOf(c).filter(j => WD_ACTIVE_STATUSES.includes(j.status));
+  const activeClients = clients.filter(c => activeJobsOf(c).length > 0);
 
-  const overdueOnboarding = onboarding.filter(c => {
-    if (!c.wd.onboardingStartedAt) return false;
-    return differenceInDays(now, new Date(c.wd.onboardingStartedAt)) > 7;
+  const overdueOnboarding = onboarding.filter(({ job }) => {
+    if (!job.onboardingStartedAt) return false;
+    return differenceInDays(now, new Date(job.onboardingStartedAt)) > 7;
   });
 
-  const overdueProduction = production.filter(c => {
-    if (!c.wd.productionStartedAt || !c.wd.service) return false;
-    const days = WD_SERVICE_CONFIG[c.wd.service]?.days || 30;
-    return differenceInDays(now, new Date(c.wd.productionStartedAt)) > days;
+  const overdueProduction = production.filter(({ job }) => {
+    if (!job.productionStartedAt || !job.service) return false;
+    const days = WD_SERVICE_CONFIG[job.service]?.days || 30;
+    return differenceInDays(now, new Date(job.productionStartedAt)) > days;
   });
 
   const late = [...overdueOnboarding, ...overdueProduction];
 
   const svcCounts = {};
-  Object.keys(WD_SERVICE_CONFIG).forEach(k => { svcCounts[k] = production.filter(c => c.wd.service === k).length; });
+  Object.keys(WD_SERVICE_CONFIG).forEach(k => { svcCounts[k] = production.filter(({ job }) => job.service === k).length; });
 
   return (
     <div className="fade-up">
@@ -45,9 +47,9 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 14, marginBottom: 14 }}>
-        <StatCard icon={Activity} label="Ativos" value={active.length} sub={`${onboarding.length} onboarding · ${production.length} produção`} color="var(--neon)" />
+        <StatCard icon={Activity} label="Clientes Ativos" value={activeClients.length} sub={`Serviços: ${onboarding.length} onboarding · ${production.length} produção`} color="var(--neon)" />
         <StatCard icon={AlertTriangle} label="Em Atraso" value={late.length} sub={late.length > 0 ? 'Requerem atenção' : 'Tudo no prazo ✓'} color={late.length > 0 ? 'var(--neon)' : 'var(--green)'} />
-        <StatCard icon={RefreshCw} label="Recorrência" value={recurrence.length} sub="Contratos ativos" color="var(--purple)" />
+        <StatCard icon={RefreshCw} label="Recorrência" value={recurrence.length} sub="Serviços em recorrência" color="var(--purple)" />
         <StatCard icon={CheckCircle} label="Finalizados" value={finished.length} sub="Total histórico" color="var(--green)" />
         <StatCard icon={Users} label="Inativos" value={inactive.length} sub="Pausados" color="var(--amber)" />
       </div>
@@ -57,7 +59,7 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' }}>
           <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 16 }}>Produção por Serviço</h2>
           {production.length === 0
-            ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>Nenhum cliente em produção.</p>
+            ? <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '12px 0' }}>Nenhum serviço em produção.</p>
             : Object.entries(WD_SERVICE_CONFIG).map(([k, v]) => {
               const count = svcCounts[k] || 0;
               const pct = production.length > 0 ? (count / production.length) * 100 : 0;
@@ -83,16 +85,17 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
             {late.length > 0 ? `${late.length} em Atraso` : 'Sem Atrasos'}
           </h2>
           {late.length === 0
-            ? <p style={{ fontSize: 13, color: 'var(--green)', textAlign: 'center', padding: '12px 0' }}>✓ Todos os clientes estão no prazo.</p>
-            : late.slice(0, 5).map(c => {
-              const isOnb = c.wd.status === 'onboarding';
-              const startDate = isOnb ? c.wd.onboardingStartedAt : c.wd.productionStartedAt;
+            ? <p style={{ fontSize: 13, color: 'var(--green)', textAlign: 'center', padding: '12px 0' }}>✓ Todos os serviços estão no prazo.</p>
+            : late.slice(0, 5).map(({ key, client: c, job }) => {
+              const isOnb = job.status === 'onboarding';
+              const startDate = isOnb ? job.onboardingStartedAt : job.productionStartedAt;
               const days = startDate ? differenceInDays(now, new Date(startDate)) : 0;
+              const svc = WD_SERVICE_CONFIG[job.service]?.label || job.service;
               return (
-                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderRadius: 8, background: 'var(--red-dim)', border: '1px solid var(--red-dim)', marginBottom: 7 }}>
+                <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 12px', borderRadius: 8, background: 'var(--red-dim)', border: '1px solid var(--red-dim)', marginBottom: 7 }}>
                   <div>
                     <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{c.name}</p>
-                    <p style={{ fontSize: 11, color: 'var(--muted)' }}>{isOnb ? 'Onboarding' : `Produção · ${WD_SERVICE_CONFIG[c.wd.service]?.label}`}</p>
+                    <p style={{ fontSize: 11, color: 'var(--muted)' }}>{isOnb ? `Onboarding · ${svc}` : `Produção · ${svc}`}</p>
                   </div>
                   <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--neon)', background: 'var(--red-dim)', padding: '2px 8px', borderRadius: 6, fontFamily: 'var(--fm)', whiteSpace: 'nowrap' }}>{days}d</span>
                 </div>
@@ -103,13 +106,14 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
         </div>
       </div>
 
-      {/* Carga por colaborador — o cliente conta para TODOS os responsáveis de Web marcados */}
+      {/* Carga por colaborador — conta por CLIENTE: +1 para cada responsável
+          marcado em algum serviço ativo dele (dois serviços não somam 2). */}
       {collaborators.filter(c => c.active !== false).length > 0 && (
         <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)' }}>
           <h2 style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', marginBottom: 16 }}>Carga por Colaborador</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>
             {collaborators.filter(c => c.active !== false).map(co => {
-              const count = active.filter(c => asArray(c.responsibles?.webdesign).includes(co.name)).length;
+              const count = activeClients.filter(c => activeJobsOf(c).some(j => j.responsibles.includes(co.name))).length;
               return (
                 <div key={co.id} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '14px 16px' }}>
                   <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{co.name}</p>

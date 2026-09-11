@@ -3,9 +3,7 @@ import { differenceInDays } from 'date-fns';
 import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, Trash2, FileText, Layers, Plus } from 'lucide-react';
 import { WD_SERVICE_CONFIG, RECURRENCE_SERVICES } from '../../../lib/firebase';
 import Countdown from '../../shared/Countdown';
-
-// Responsável pode estar salvo como string (docs antigos) ou array.
-const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
+import { wdCardsOf } from '../../../lib/wdJobs';
 
 // ─── Progress Ring ─────────────────────────────────────────────
 function Ring({ checked, total }) {
@@ -27,7 +25,8 @@ function Ring({ checked, total }) {
 }
 
 // ─── Single Card ───────────────────────────────────────────────
-function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateChecklist, onUpdateNotes, onMoveStatus, onDelete }) {
+// Um card por SERVIÇO: o mesmo cliente pode ter E-commerce e LP.
+function WDCard({ client, job, onMoveToProduction, onMoveBackToOnboarding, onUpdateChecklist, onUpdateNotes, onMoveStatus, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [delConfirm, setDelConfirm] = useState(false);
   const [showRecModal, setShowRecModal] = useState(false);
@@ -35,7 +34,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
   const [recCustom, setRecCustom] = useState('');
   const notesTimer = useRef(null);
 
-  const wd = client.wd || {};
+  const wd = job || {};
   const cfg = WD_SERVICE_CONFIG[wd.service] || {};
   const checklist = wd.checklist || [];
   const checked = checklist.filter(i => i.checked).length;
@@ -48,18 +47,18 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
 
   const handleCheck = (itemId, val) => {
     const updated = checklist.map(i => i.id === itemId ? { ...i, checked: !val, checkedAt: !val ? new Date().toISOString() : null } : i);
-    onUpdateChecklist(client.id, updated);
+    onUpdateChecklist(client.id, updated, job.id);
   };
 
   const handleNotes = (value) => {
     clearTimeout(notesTimer.current);
-    notesTimer.current = setTimeout(() => onUpdateNotes(client.id, value), 700);
+    notesTimer.current = setTimeout(() => onUpdateNotes(client.id, value, job.id), 700);
   };
 
   const handleMoveRec = () => {
     const svc = recChoice === 'Outro' ? recCustom : recChoice;
     if (!svc.trim()) return;
-    onMoveStatus(client.id, 'recurrence', { 'wd.recurrenceService': svc });
+    onMoveStatus(client.id, 'recurrence', { recurrenceService: svc }, job.id);
     setShowRecModal(false); setRecChoice(''); setRecCustom('');
   };
 
@@ -70,7 +69,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
           <div style={S.hdLeft}>
             <span style={S.tag}>{cfg.label || wd.service}</span>
             <div style={S.name}>{client.name}</div>
-            <div style={S.resp}>👤 {asArray(client.responsibles?.webdesign).join(', ') || '—'}
+            <div style={S.resp}>👤 {(wd.responsibles || []).join(', ') || '—'}
               {wd.recurrenceService && <span style={S.recBadge}>↻ {wd.recurrenceService}</span>}
             </div>
           </div>
@@ -85,12 +84,12 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
         {expanded && (
           <div style={S.body} className="fade-in">
             {isOnboarding && (
-              <button style={S.moveProdBtn} onClick={() => onMoveToProduction(client.id)}>
+              <button style={S.moveProdBtn} onClick={() => onMoveToProduction(client.id, job.id)}>
                 <ArrowRight size={14} /> Call realizada — Mover para Produção
               </button>
             )}
             {isProduction && (
-              <button style={S.backBtn} onClick={() => onMoveBackToOnboarding(client.id)}>
+              <button style={S.backBtn} onClick={() => onMoveBackToOnboarding(client.id, job.id)}>
                 <RotateCcw size={13} /> Voltou para Onboarding por engano?
               </button>
             )}
@@ -114,25 +113,25 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
             {allChecked && isProduction && (
               <div style={S.doneBox}>
                 <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)' }}>✓ Todos os itens concluídos!</p>
-                <p style={{ fontSize: 12, color: 'rgba(34,197,94,.7)', marginTop: 2 }}>Para onde mover o cliente?</p>
+                <p style={{ fontSize: 12, color: 'rgba(34,197,94,.7)', marginTop: 2 }}>Para onde mover este serviço?</p>
                 <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
-                  <button style={S.btnFin} onClick={() => onMoveStatus(client.id, 'finished', { 'wd.status': 'finished' })}>✓ Finalizado</button>
+                  <button style={S.btnFin} onClick={() => onMoveStatus(client.id, 'finished', {}, job.id)}>✓ Finalizado</button>
                   <button style={S.btnRec} onClick={() => setShowRecModal(true)}>↻ Recorrência</button>
                 </div>
               </div>
             )}
             <div style={S.arow}>
-              {isProduction && <button style={S.asec} onClick={() => onMoveStatus(client.id, 'inactive', { 'wd.status': 'inactive' })}>Mover p/ Inativos</button>}
+              {isProduction && <button style={S.asec} onClick={() => onMoveStatus(client.id, 'inactive', {}, job.id)}>Mover p/ Inativos</button>}
               {['inactive','recurrence','finished'].includes(wd.status) && (
-                <button style={S.asec} onClick={() => onMoveStatus(client.id, 'onboarding', { 'wd.status': 'onboarding', 'wd.onboardingStartedAt': new Date().toISOString(), 'wd.productionStartedAt': null, 'wd.checklist': [] })}>
+                <button style={S.asec} onClick={() => onMoveStatus(client.id, 'onboarding', { onboardingStartedAt: new Date().toISOString(), productionStartedAt: null, checklist: [] }, job.id)}>
                   ↺ Reativar
                 </button>
               )}
               <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
                 {!delConfirm
-                  ? <button style={S.delBtn} onClick={() => setDelConfirm(true)}><Trash2 size={13} /></button>
-                  : <><span style={{ fontSize: 11, color: 'var(--muted)' }}>Excluir?</span>
-                      <button style={S.confDel} onClick={() => onDelete(client.id)}>Sim</button>
+                  ? <button style={S.delBtn} title="Remover serviço (o cliente continua na base)" onClick={() => setDelConfirm(true)}><Trash2 size={13} /></button>
+                  : <><span style={{ fontSize: 11, color: 'var(--muted)' }}>Remover este serviço?</span>
+                      <button style={S.confDel} onClick={() => onDelete(client.id, job.id)}>Sim</button>
                       <button style={S.cancDel} onClick={() => setDelConfirm(false)}>Não</button></>
                 }
               </div>
@@ -145,7 +144,7 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
         <div style={S.overlay} onClick={() => setShowRecModal(false)}>
           <div style={S.recModal} onClick={e => e.stopPropagation()} className="fade-up">
             <h3 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>Qual serviço na Recorrência?</h3>
-            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Para <strong style={{ color: 'var(--text)' }}>{client.name}</strong></p>
+            <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Para <strong style={{ color: 'var(--text)' }}>{client.name}</strong> · {cfg.label || wd.service}</p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {RECURRENCE_SERVICES.map(s => (
                 <button key={s} style={{ ...S.recOpt, ...(recChoice === s ? S.recOptSel : {}) }} onClick={() => setRecChoice(s)}>{s}</button>
@@ -167,18 +166,16 @@ function WDCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateCh
 const PROD_SUBTABS = Object.entries(WD_SERVICE_CONFIG).map(([key, v]) => ({ key, label: v.label }));
 
 export default function WDClientList({ clients, collaborators, page, prodSubTab, setProdSubTab, onMoveToProduction, onMoveBackToOnboarding, onUpdateChecklist, onUpdateNotes, onMoveStatus, onDelete, onAddClient }) {
+  const cards = wdCardsOf(clients);
   const getDisplay = () => {
-    if (page === 'inactive') return clients.filter(c => c.wd?.status === 'inactive');
-    if (page === 'recurrence') return clients.filter(c => c.wd?.status === 'recurrence');
-    if (page === 'finished') return clients.filter(c => c.wd?.status === 'finished');
-    if (page === 'onboarding') return clients.filter(c => c.wd?.status === 'onboarding');
-    return clients.filter(c => c.wd?.status === 'production' && c.wd?.service === prodSubTab);
+    if (page === 'production') return cards.filter(k => k.job.status === 'production' && k.job.service === prodSubTab);
+    return cards.filter(k => k.job.status === page);
   };
   const display = getDisplay();
   const prodCounts = {};
-  Object.keys(WD_SERVICE_CONFIG).forEach(k => { prodCounts[k] = clients.filter(c => c.wd?.status === 'production' && c.wd?.service === k).length; });
+  Object.keys(WD_SERVICE_CONFIG).forEach(k => { prodCounts[k] = cards.filter(c => c.job.status === 'production' && c.job.service === k).length; });
   const PAGE_LABELS = { onboarding: 'Onboarding', production: 'Produção', inactive: 'Inativos', recurrence: 'Recorrência', finished: 'Finalizados' };
-  const overdueOnb = clients.filter(c => c.wd?.status === 'onboarding' && c.wd?.onboardingStartedAt && differenceInDays(new Date(), new Date(c.wd.onboardingStartedAt)) > 7).length;
+  const overdueOnb = cards.filter(({ job }) => job.status === 'onboarding' && job.onboardingStartedAt && differenceInDays(new Date(), new Date(job.onboardingStartedAt)) > 7).length;
 
   return (
     <div>
@@ -186,12 +183,12 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 3 }}>{PAGE_LABELS[page]}</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {display.length} cliente{display.length !== 1 ? 's' : ''}
+            {display.length} serviço{display.length !== 1 ? 's' : ''}
             {page === 'onboarding' && overdueOnb > 0 && <span style={{ color: 'var(--neon)' }}> · {overdueOnb} em atraso</span>}
           </p>
         </div>
         <button onClick={onAddClient} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
-          <Plus size={15} /> Novo Cliente
+          <Plus size={15} /> Adicionar Serviço
         </button>
       </div>
 
@@ -211,14 +208,14 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
       {display.length === 0
         ? <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, paddingTop: 80, textAlign: 'center' }}>
             <div style={{ fontSize: 40, opacity: .25 }}>📋</div>
-            <p style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 600 }}>Nenhum cliente aqui</p>
+            <p style={{ fontSize: 16, color: 'var(--muted)', fontWeight: 600 }}>Nenhum serviço aqui</p>
             <p style={{ fontSize: 12, color: 'var(--muted)', opacity: .6, maxWidth: 280 }}>
-              {page === 'onboarding' ? 'Cadastre um novo cliente para iniciar o onboarding.' : 'Mova clientes para esta aba quando necessário.'}
+              {page === 'onboarding' ? 'Adicione um serviço a um cliente da base para iniciar o onboarding.' : 'Mova serviços para esta aba quando necessário.'}
             </p>
           </div>
         : <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(330px,1fr))', gap: 12 }}>
-            {display.map(c => (
-              <WDCard key={c.id} client={c}
+            {display.map(({ key, client, job }) => (
+              <WDCard key={key} client={client} job={job}
                 onMoveToProduction={onMoveToProduction}
                 onMoveBackToOnboarding={onMoveBackToOnboarding}
                 onUpdateChecklist={onUpdateChecklist}
