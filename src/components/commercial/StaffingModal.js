@@ -45,6 +45,14 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
 
   const temIdVisual = !!contrato.hasIdVisual;
 
+  // Quadro do projeto fora dos setores que esta pessoa preenche: o
+  // líder enxerga o que os outros líderes já decidiram (e quem ainda
+  // falta), para escolher o time olhando o conjunto.
+  const setoresDoProjeto = Array.from(new Set([
+    ...(client.staffing?.sectors || []),
+    ...Object.keys(client.responsibles || {}).filter(sid => asArray(client.responsibles[sid]).length),
+  ])).filter(sid => !sectors.includes(sid));
+
   const salvar = async (sectorId) => {
     const nomes = sel[sectorId] || [];
     if (!nomes.length) return;
@@ -106,6 +114,33 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                 📎 {anexo.name}
               </a>
             )}
+          </Section>
+        )}
+
+        {setoresDoProjeto.length > 0 && (
+          <Section title="Time do projeto" color="var(--blue)">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {setoresDoProjeto.map(sid => {
+                const s = SECTORS[sid] || { label: sid, color: 'var(--muted)', emoji: '📦' };
+                const nomes = asArray(client.responsibles?.[sid]);
+                return (
+                  <div key={sid} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: s.color, minWidth: 120 }}>{s.emoji} {s.label}</span>
+                    {nomes.length > 0 ? (
+                      <span style={{ display: 'flex', flexWrap: 'wrap', gap: 5, flex: 1 }}>
+                        {nomes.map(n => (
+                          <span key={n} style={{ fontSize: 11, fontWeight: 600, padding: '2px 9px', borderRadius: 10, background: `color-mix(in srgb, ${s.color} 11%, transparent)`, color: s.color, border: `1px solid color-mix(in srgb, ${s.color} 30%, transparent)` }}>
+                            {n}{sid === 'design' && client.idv?.responsible === n && nomes.length > 1 ? ' · ID Visual' : ''}
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 12, color: 'var(--amber)', fontStyle: 'italic' }}>aguardando o líder</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </Section>
         )}
 

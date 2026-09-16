@@ -322,6 +322,9 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
     ? Math.floor((Date.now() - new Date(client.staffing.startedAt).getTime()) / 86400000)
     : null;
   const atrasado = dias != null && dias >= STAFFING_ALERT_DAYS;
+  const definidos = Object.entries(client.responsibles || {})
+    .map(([sid, v]) => [sid, asArray(v)])
+    .filter(([, nomes]) => nomes.length > 0);
 
   return (
     <div style={{ ...CARD, border: `1px solid ${atrasado ? 'var(--neon-border)' : 'var(--amber-b)'}` }}>
@@ -342,6 +345,24 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
           Outros setores também pendentes: {todosPendentes.filter(s => !pendentes.includes(s)).map(s => SECTORS[s]?.label || s).join(', ')}
         </p>
+      )}
+
+      {/* Quem os outros líderes já escolheram. Ajuda a montar o time
+          olhando o conjunto (ex.: não colocar duas pessoas novatas no
+          mesmo cliente) em vez de cada setor decidir no escuro. */}
+      {definidos.length > 0 && (
+        <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' }}>JÁ DEFINIDOS</p>
+          {definidos.map(([sid, nomes]) => (
+            <p key={sid} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.45 }}>
+              <span style={{ color: SECTORS[sid]?.color || 'var(--muted)', fontWeight: 600 }}>{SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}:</span>{' '}
+              {nomes.join(', ')}
+              {sid === 'design' && client.idv?.responsible && nomes.length > 1 && (
+                <span style={{ color: 'var(--muted)' }}> · ID Visual: {client.idv.responsible}</span>
+              )}
+            </p>
+          ))}
+        </div>
       )}
 
       {dias != null && (

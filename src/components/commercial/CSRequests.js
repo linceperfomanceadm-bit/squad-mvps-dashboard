@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Send, Eye, EyeOff, CheckCircle2, Trash2, Search, LayoutGrid, List } from 'lucide-react';
+import { Plus, Send, Eye, EyeOff, CheckCircle2, Trash2, Search, LayoutGrid, List, Check, X, Users } from 'lucide-react';
 import { SECTORS, TASK_PRIORITIES, REQUEST_STATUS, REQUEST_SECTORS, REQUEST_SLA_HOURS, CLIENT_STAGES, stageOf } from '../../lib/firebase';
 import { businessMsBetween, formatBusinessDuration } from '../../lib/taskTime';
 import {
@@ -10,7 +10,8 @@ import {
 /*
  * Reporte da CS — lado da CS.
  *
- * A CS abre uma solicitação para UM colaborador. Enquanto ele não
+ * A CS abre uma solicitação para um ou mais colaboradores (cada um
+ * recebe o seu próprio card, ligado aos outros por `groupId`). Enquanto ele não
  * responde, o card mostra se ele já abriu (visualizado) ou não — é o
  * que evita a solicitação morrer no silêncio. Mesmo que o colaborador
  * marque "resolvi", quem encerra é a CS.
@@ -138,7 +139,10 @@ export default function CSRequests({
 
   const handleCreate = async (data) => {
     const r = await onCreate(data);
-    if (r.success) { toast('Solicitação enviada.'); setShowCreate(false); setStatuses(['open']); }
+    if (r.success) {
+      toast(r.count > 1 ? `Solicitação enviada para ${r.count} colaboradores.` : 'Solicitação enviada.');
+      setShowCreate(false); setStatuses(['open']);
+    }
     else toast(r.error, 'e');
     return r;
   };
@@ -257,7 +261,10 @@ export default function CSRequests({
 
       {openRequest && (
         <RequestDrawer
+          key={openRequest.id}
           request={openRequest}
+          siblings={openRequest.groupId ? requests.filter(x => x.groupId === openRequest.groupId && x.id !== openRequest.id) : []}
+          onOpenSibling={setOpenId}
           currentUser={currentUser}
           currentUserSector={currentUserSector}
           onClose={() => setOpenId(null)}
@@ -310,7 +317,8 @@ function RequestRow({ request, last, onClick }) {
           {request.subject}
         </p>
         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-          {request.clientName} · para <strong style={{ color: sec?.color || 'var(--muted)' }}>{request.toName}</strong> · por {request.createdBy}
+          {request.clientName} · para <strong style={{ color: sec?.color || 'var(--muted)' }}>{request.toName}</strong>
+          {request.groupSize > 1 && <span style={{ fontFamily: 'var(--fm)' }}> (+{request.groupSize - 1})</span>} · por {request.createdBy}
         </p>
       </div>
 
@@ -346,7 +354,7 @@ function RequestCard({ request, onClick }) {
 
       <p style={{ fontSize: 12, color: 'var(--muted)' }}>👤 {request.clientName}</p>
       <p style={{ fontSize: 12, color: sec?.color || 'var(--text)', marginTop: 4 }}>
-        {sec?.emoji} Para {request.toName} · aberta por {request.createdBy}
+        {sec?.emoji} Para {request.toName}{request.groupSize > 1 ? ` (+${request.groupSize - 1})` : ''} · aberta por {request.createdBy}
       </p>
 
       {aging && (
@@ -378,7 +386,7 @@ function RequestCard({ request, onClick }) {
 }
 
 // ── Detalhe ────────────────────────────────────────────────────
-function RequestDrawer({ request, currentUser, currentUserSector, onClose, onReply, onCloseRequest, onDelete }) {
+function RequestDrawer({ request, siblings = [], onOpenSibling, currentUser, currentUserSector, onClose, onReply, onCloseRequest, onDelete }) {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [confirmDel, setConfirmDel] = useState(false);
@@ -428,6 +436,32 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
             ? `${request.seenBy || request.toName} abriu em ${fmt(request.seenAt)}`
             : 'O colaborador ainda não abriu esta solicitação.'}
         </div>
+
+        {/* Mesma solicitação enviada para outras pessoas — cada uma
+            tem card próprio; daqui dá para pular de uma para a outra. */}
+        {siblings.length > 0 && (
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            <p style={{ ...LBL, display: 'flex', alignItems: 'center', gap: 6 }}><Users size={11} /> ENVIADA TAMBÉM PARA</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {siblings.map(sb => {
+                const ss = REQUEST_STATUS[sb.status] || REQUEST_STATUS.open;
+                const sbSec = SECTORS[sb.toSector];
+                return (
+                  <button
+                    key={sb.id}
+                    onClick={() => onOpenSibling?.(sb.id)}
+                    title={`${ss.label}${sb.seenAt ? ' · visualizada' : ' · não aberta'}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, padding: '5px 10px', borderRadius: 14, cursor: 'pointer', background: 'var(--bg3)', border: `1px solid color-mix(in srgb, ${ss.color} 33%, transparent)`, color: sbSec?.color || 'var(--text)' }}
+                  >
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: ss.color, flexShrink: 0 }} />
+                    {sb.toName}
+                    {sb.status === 'open' && (sb.seenAt ? <Eye size={11} color="var(--blue)" /> : <EyeOff size={11} color="var(--muted)" />)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Thread */}
         <p style={LBL}>CONVERSA</p>
@@ -509,8 +543,12 @@ function RequestDrawer({ request, currentUser, currentUserSector, onClose, onRep
 function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
   const [form, setForm] = useState({
     subject: '', clientId: '', urgency: 'medium',
-    toSector: '', toName: '', description: '',
+    toSector: '', description: '',
   });
+  // Destinatários escolhidos: [{ name, sector }]. O setor do select
+  // é só um filtro para achar as pessoas — a seleção sobrevive à troca
+  // de setor, então dá para juntar gente de áreas diferentes.
+  const [recipients, setRecipients] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -535,18 +573,42 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
     .filter(c => c.active !== false && c.sector === form.toSector)
     .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+  const escolhido = (name) => recipients.some(p => p.name === name);
+
+  const togglePessoa = (c) => setRecipients(list => (
+    list.some(p => p.name === c.name)
+      ? list.filter(p => p.name !== c.name)
+      : [...list, { name: c.name, sector: c.sector }]
+  ));
+
+  const todosDoSetor = sectorPeople.length > 0 && sectorPeople.every(c => escolhido(c.name));
+  const toggleSetorInteiro = () => setRecipients(list => (
+    todosDoSetor
+      ? list.filter(p => p.sector !== form.toSector)
+      : [...list, ...sectorPeople.filter(c => !list.some(p => p.name === c.name)).map(c => ({ name: c.name, sector: c.sector }))]
+  ));
+
+  // Sugestão: os responsáveis do cliente escolhido, de qualquer setor
+  // que recebe reporte. É quem normalmente precisa ser acionado.
+  const cliente = activeClients.find(c => c.id === form.clientId);
+  const sugeridos = cliente
+    ? REQUEST_SECTORS.flatMap(sid => {
+        const v = cliente.responsibles?.[sid];
+        const nomes = Array.isArray(v) ? v : (v ? [v] : []);
+        return nomes.map(name => ({ name, sector: sid }));
+      }).filter(p => (collaborators || []).some(c => c.name === p.name && c.active !== false))
+    : [];
+
   const salvar = async () => {
     setError('');
     setBusy(true);
-    const client = activeClients.find(c => c.id === form.clientId);
     const r = await onSave({
       subject: form.subject,
       clientId: form.clientId || null,
-      clientName: client?.name || 'Sem cliente',
+      clientName: cliente?.name || 'Sem cliente',
       urgency: form.urgency,
       description: form.description,
-      toName: form.toName,
-      toSector: form.toSector,
+      recipients,
     });
     setBusy(false);
     if (!r.success) setError(r.error || 'Não foi possível enviar.');
@@ -576,27 +638,83 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
           {activeClients.map(c => <option key={c.id} value={c.id}>{rotuloCliente(c)}</option>)}
         </select>
 
-        <p style={LBL}>SETOR *</p>
+        {sugeridos.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <p style={LBL}>RESPONSÁVEIS DESTE CLIENTE</p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {sugeridos.map(p => {
+                const on = escolhido(p.name);
+                const sc = SECTORS[p.sector];
+                return (
+                  <button
+                    key={`${p.sector}-${p.name}`}
+                    type="button"
+                    onClick={() => togglePessoa(p)}
+                    style={chipStyle(on, sc?.color)}
+                  >
+                    {on && <Check size={11} />} {sc?.emoji} {p.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <p style={LBL}>SETOR</p>
         <select
-          style={{ ...INP, marginTop: 6, marginBottom: 14, cursor: 'pointer' }}
+          style={{ ...INP, marginTop: 6, marginBottom: 10, cursor: 'pointer' }}
           value={form.toSector}
-          onChange={e => setForm(f => ({ ...f, toSector: e.target.value, toName: '' }))}
+          onChange={e => set('toSector', e.target.value)}
         >
-          <option value="">Selecionar setor</option>
+          <option value="">Selecionar setor para buscar pessoas</option>
           {REQUEST_SECTORS.map(id => (
             <option key={id} value={id}>{SECTORS[id]?.emoji} {SECTORS[id]?.label}</option>
           ))}
         </select>
 
         {form.toSector && (
-          <>
-            <p style={LBL}>COLABORADOR *</p>
-            <select style={{ ...INP, marginTop: 6, marginBottom: 14, cursor: 'pointer' }} value={form.toName} onChange={e => set('toName', e.target.value)}>
-              <option value="">Selecionar colaborador</option>
-              {sectorPeople.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-            </select>
-          </>
+          <div style={{ marginBottom: 14 }}>
+            {sectorPeople.length === 0 ? (
+              <p style={{ fontSize: 12, color: 'var(--muted)' }}>Nenhum colaborador ativo neste setor.</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {sectorPeople.map(c => (
+                  <button key={c.id} type="button" onClick={() => togglePessoa(c)} style={chipStyle(escolhido(c.name), SECTORS[c.sector]?.color)}>
+                    {escolhido(c.name) && <Check size={11} />} {c.name}
+                  </button>
+                ))}
+                {sectorPeople.length > 1 && (
+                  <button type="button" onClick={toggleSetorInteiro} style={{ background: 'none', border: 'none', color: 'var(--neon)', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '5px 4px' }}>
+                    {todosDoSetor ? 'Desmarcar setor' : 'Marcar setor inteiro'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         )}
+
+        <p style={LBL}>COLABORADORES * {recipients.length > 0 && <span style={{ color: 'var(--neon)' }}>· {recipients.length}</span>}</p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8, marginBottom: 6, minHeight: 30, alignItems: 'center' }}>
+          {recipients.length === 0 ? (
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Ninguém escolhido ainda.</span>
+          ) : recipients.map(p => {
+            const sc = SECTORS[p.sector];
+            return (
+              <span key={p.name} style={{ ...chipStyle(true, sc?.color), cursor: 'default' }}>
+                {sc?.emoji} {p.name}
+                <button type="button" onClick={() => togglePessoa(p)} title="Remover" style={{ background: 'none', border: 'none', padding: 0, marginLeft: 2, display: 'flex', cursor: 'pointer', color: 'inherit' }}>
+                  <X size={12} />
+                </button>
+              </span>
+            );
+          })}
+        </div>
+        {recipients.length > 1 && (
+          <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>
+            Cada pessoa recebe a própria cópia: visualização, resposta e encerramento são acompanhados individualmente.
+          </p>
+        )}
+        {recipients.length <= 1 && <div style={{ marginBottom: 8 }} />}
 
         <p style={LBL}>GRAU DE URGÊNCIA</p>
         <div style={{ display: 'flex', gap: 6, marginTop: 8, marginBottom: 14, flexWrap: 'wrap' }}>
@@ -633,11 +751,21 @@ function CreateRequestModal({ clients, collaborators, onClose, onSave }) {
             disabled={busy}
             onClick={salvar}
           >
-            {busy ? 'Enviando...' : 'Enviar solicitação'}
+            {busy ? 'Enviando...' : recipients.length > 1 ? `Enviar para ${recipients.length} colaboradores` : 'Enviar solicitação'}
           </button>
           <button style={BTN_CANCEL} onClick={onClose}>Cancelar</button>
         </div>
       </div>
     </Overlay>
   );
+}
+
+function chipStyle(on, color = 'var(--neon)') {
+  return {
+    display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 600,
+    padding: '5px 11px', borderRadius: 14, cursor: 'pointer',
+    background: on ? `color-mix(in srgb, ${color} 13%, transparent)` : 'var(--surface)',
+    color: on ? color : 'var(--muted)',
+    border: `1px solid ${on ? `color-mix(in srgb, ${color} 40%, transparent)` : 'var(--border)'}`,
+  };
 }
