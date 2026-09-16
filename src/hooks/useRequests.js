@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc,
-  query, orderBy, arrayUnion,
+  collection, onSnapshot, updateDoc, deleteDoc, doc,
+  query, orderBy, arrayUnion, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -27,7 +27,16 @@ import { db } from '../lib/firebase';
  *   toName, toSector, createdBy, createdBySector, createdAt,
  *   status, seenAt, seenBy, collaboratorDone,
  *   replies[{ id, author, sector, role, text, done, at }],
- *   closedAt, closedBy
+ *   closedAt, closedBy,
+ *   groupId, groupSize (quando a mesma solicitação foi para várias pessoas)
+ *
+ * VÁRIOS COLABORADORES: a CS pode endereçar a mesma solicitação a mais
+ * de uma pessoa (inclusive de setores diferentes). Cada destinatário
+ * ganha o PRÓPRIO documento, ligado aos outros por `groupId`. Foi
+ * escolhido assim, e não um array `toNames`, porque visualizado,
+ * resposta, "resolvi do meu lado" e encerramento são individuais — um
+ * array obrigaria a reescrever inbox, badges, notificações e filtros,
+ * e ainda assim misturaria o estado de pessoas diferentes num card só.
  */
 export function useRequests() {
   const [requests, setRequests] = useState([]);
@@ -43,31 +52,49 @@ export function useRequests() {
 
   const createRequest = async (data, byName, bySector) => {
     try {
-      const { subject, clientId, clientName, urgency, description, toName, toSector } = data || {};
+      const { subject, clientId, clientName, urgency, description, toName, toSector, recipients } = data || {};
+      // `recipients` é o formato novo; `toName`/`toSector` continua
+      // aceito para quem ainda chama com um destinatário só.
+      const lista = (Array.isArray(recipients) && recipients.length
+        ? recipients
+        : (toName ? [{ name: toName, sector: toSector }] : []))
+        .filter(p => p && p.name)
+        .filter((p, i, arr) => arr.findIndex(x => x.name === p.name) === i);
+
       if (!subject?.trim())     return { success: false, error: 'Escreva o assunto da solicitação.' };
-      if (!toName)              return { success: false, error: 'Escolha o colaborador.' };
+      if (!lista.length)        return { success: false, error: 'Escolha ao menos um colaborador.' };
       if (!description?.trim()) return { success: false, error: 'Descreva o que você precisa.' };
 
-      await addDoc(collection(db, 'requests'), {
-        subject: subject.trim(),
-        clientId: clientId || null,
-        clientName: clientName || 'Sem cliente',
-        urgency: urgency || 'medium',
-        description: description.trim(),
-        toName,
-        toSector: toSector || '',
-        createdBy: byName || 'CS',
-        createdBySector: bySector || 'cs',
-        createdAt: new Date().toISOString(),
-        status: 'open',
-        seenAt: null,
-        seenBy: null,
-        collaboratorDone: false,
-        replies: [],
-        closedAt: null,
-        closedBy: null,
+      const agora = new Date().toISOString();
+      const groupId = lista.length > 1 ? `grp_${Date.now()}_${Math.random().toString(36).substr(2, 5)}` : null;
+
+      // Lote: ou vai para todos, ou não vai para ninguém.
+      const batch = writeBatch(db);
+      lista.forEach(p => {
+        batch.set(doc(collection(db, 'requests')), {
+          subject: subject.trim(),
+          clientId: clientId || null,
+          clientName: clientName || 'Sem cliente',
+          urgency: urgency || 'medium',
+          description: description.trim(),
+          toName: p.name,
+          toSector: p.sector || '',
+          createdBy: byName || 'CS',
+          createdBySector: bySector || 'cs',
+          createdAt: agora,
+          status: 'open',
+          seenAt: null,
+          seenBy: null,
+          collaboratorDone: false,
+          replies: [],
+          closedAt: null,
+          closedBy: null,
+          groupId,
+          groupSize: lista.length,
+        });
       });
-      return { success: true };
+      await batch.commit();
+      return { success: true, count: lista.length };
     } catch (err) { return { success: false, error: err.message }; }
   };
 

@@ -360,6 +360,50 @@ export function useClients() {
     catch (err) { return { success: false, error: err.message }; }
   };
 
+  // Novo ID Visual para um cliente que JÁ está na base — o espelho do
+  // `wdAddService`, só que no bloco `idv`, que tem um dono só.
+  // O bloco é único por cliente: com um ID Visual em andamento, não
+  // abre outro. Se o anterior já foi finalizado, ele vai para
+  // `idvHistory[]` antes de o novo nascer — nada de sobrescrever a
+  // entrega passada, que o Hall da Fama e a CS ainda consultam.
+  // O dono também entra em `responsibles.design`, senão o cliente não
+  // apareceria na carteira do designer (tasks, Brand Hub).
+  const idvAddService = async (clientId, { responsible } = {}, byName = null) => {
+    try {
+      if (!responsible) throw new Error('Selecione o designer responsável.');
+      const ref = doc(db, 'clients', clientId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado');
+        const data = snap.data();
+        const atual = data.idv;
+        if (atual?.status === 'onboarding' || atual?.status === 'production') {
+          throw new Error(`${data.name} já tem ID Visual em andamento (${atual.responsible || 'sem responsável'}).`);
+        }
+        const now = new Date().toISOString();
+        const clientResp = asArray(data.responsibles?.design);
+        const upd = {
+          idv: {
+            responsible,
+            status: 'onboarding',
+            onboardingStartedAt: now,
+            productionStartedAt: null,
+            checklist: [],
+            notes: '',
+            addedBy: byName || null,
+            addedAt: now,
+          },
+          'responsibles.design': [...new Set([...clientResp, responsible])],
+        };
+        if (atual?.status) {
+          upd.idvHistory = [...(data.idvHistory || []), { ...atual, archivedAt: now }];
+        }
+        tx.update(ref, upd);
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   const idvMoveStatus = async (clientId, newStatus) => {
     try {
       const patch = { 'idv.status': newStatus };
@@ -833,7 +877,7 @@ export function useClients() {
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     wdAddService, wdRemoveService,
-    idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
+    idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus, idvAddService,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
     setSectorResponsibles, scheduleOnboarding, cancelStaffing,
