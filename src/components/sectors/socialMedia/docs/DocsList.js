@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, FileText, Trash2, Clock } from 'lucide-react';
+import { Plus, FileText, Trash2, Clock, Play } from 'lucide-react';
 import { docPorId } from '../../../../lib/docs/catalogo';
 import { DOC_STATUS } from '../../../../hooks/useDocuments';
 import NovoDocumentoModal from './NovoDocumentoModal';
+import DocPresenter from './DocPresenter';
 
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — LISTA
@@ -21,9 +22,15 @@ const quando = (ts) => {
 };
 
 export default function DocsList({
-  documents, clients, currentUser, isAdmin, onOpen, onCreate, onDelete,
+  documents, clients, currentUser, isAdmin, onOpen, onCreate, onDelete, onSalvarPDF,
 }) {
   const [criando, setCriando] = useState(false);
+  // Apresenta direto da lista, sem abrir o editor — é o caminho da
+  // reunião com o cliente. Guarda só o id: o documento vem do array
+  // ao vivo, então uma correção feita no editor aparece na hora.
+  const [apresentandoId, setApresentandoId] = useState(null);
+  const apresentando = apresentandoId ? documents.find((d) => d.id === apresentandoId) || null : null;
+  const docApresentando = apresentando ? docPorId(apresentando.tipo) : null;
 
   // Só admin e o social media responsável pelo cliente podem apagar.
   const podeApagar = (d) => {
@@ -80,6 +87,11 @@ export default function DocsList({
                     {d.versionCount > 0 && ` · ${d.versionCount} ${d.versionCount === 1 ? 'versão' : 'versões'}`}
                   </p>
                 </button>
+                {doc && (
+                  <button type="button" style={S.apresentar} onClick={() => setApresentandoId(d.id)} title="Apresentar em tela cheia">
+                    <Play size={12} /> Apresentar
+                  </button>
+                )}
                 {podeApagar(d) && (
                   <button type="button" style={S.lixo} onClick={() => apagar(d)} title="Apagar documento">
                     <Trash2 size={13} color="var(--muted)" />
@@ -89,6 +101,18 @@ export default function DocsList({
             );
           })}
         </div>
+      )}
+
+      {apresentando && docApresentando && (
+        <DocPresenter
+          doc={docApresentando}
+          dados={apresentando.dados || {}}
+          opcionais={apresentando.opcionais || {}}
+          extras={apresentando.extras || []}
+          titulo={`${apresentando.clientName || 'Sem cliente'} · ${docApresentando.nome.split('—')[0].trim()}`}
+          onClose={() => setApresentandoId(null)}
+          onSalvarPDF={onSalvarPDF ? () => onSalvarPDF(apresentando) : undefined}
+        />
       )}
 
       {criando && (
@@ -126,7 +150,7 @@ const S = {
   },
   cardBtn: {
     background: 'transparent', border: 'none', padding: 0, textAlign: 'left',
-    display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0,
+    display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0, paddingBottom: 28,
   },
   cliente: {
     fontSize: 14.5, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px',
@@ -140,6 +164,11 @@ const S = {
   rodape: {
     fontSize: 11, color: 'var(--muted)', display: 'flex', alignItems: 'center',
     gap: 5, marginTop: 4, fontFamily: 'var(--fm)',
+  },
+  apresentar: {
+    position: 'absolute', bottom: 12, right: 44, height: 26, background: 'var(--neon-dim)',
+    border: '1px solid var(--neon-border)', borderRadius: 7, padding: '0 9px',
+    display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 600, color: 'var(--neon)',
   },
   lixo: {
     position: 'absolute', bottom: 12, right: 12, background: 'transparent',
