@@ -19,6 +19,7 @@ import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
+import IdvAddServiceModal from '../../components/sectors/creative/IdvAddServiceModal';
 import AppShell from '../../components/shared/AppShell';
 import { SECTORS } from '../../lib/firebase';
 
@@ -47,9 +48,10 @@ export default function AdminDashboard() {
     updateBrandbook,
     addBrandMaterial,
     removeBrandMaterial,
+    idvAddService,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
-  const { documents, createDocument, deleteDocument } = useDocuments();
+  const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
   const navigate = useNavigate();
   const {
     tasks, loading: loadingTasks,
@@ -60,6 +62,7 @@ export default function AdminDashboard() {
   const [page, setPage] = useState('overview');
   const [taskSectorFilter, setTaskSectorFilter] = useState('');
   const [taskCollabFilter, setTaskCollabFilter] = useState('');
+  const [showAddIdv, setShowAddIdv] = useState(false);
 
   const loading = loadingClients || loadingCollabs || loadingTasks;
 
@@ -104,6 +107,14 @@ export default function AdminDashboard() {
     else toast(res.error, 'e');
   };
 
+  // ID Visual para cliente que já está na casa — decisão da gestão,
+  // por isso só existe aqui no admin (o Design não tem o botão).
+  const handleAddIdv = async (clientId, data, clientName) => {
+    const res = await idvAddService(clientId, data, user?.name);
+    if (res.success) toast(`ID Visual adicionado a ${clientName} · ${data.responsible}`);
+    return res;
+  };
+
   const pendingTasks = tasks.filter(t => t.status === 'approval').length;
   // Clientes cadastrados pela CS que ainda esperam indicação de
   // responsável. O admin destrava quando um líder está ausente.
@@ -116,7 +127,14 @@ export default function AdminDashboard() {
   }));
 
   return (
-    <AppShell sectorId="admin" navItems={navItems} activeKey={page} onNav={setPage}>
+    <AppShell
+      sectorId="admin"
+      navItems={navItems}
+      activeKey={page}
+      onNav={setPage}
+      onAddClient={() => setShowAddIdv(true)}
+      addClientLabel="Adicionar ID Visual"
+    >
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
@@ -190,6 +208,11 @@ export default function AdminDashboard() {
             currentUser={user?.name}
             isAdmin
             onOpen={(id) => navigate(`/documentos/${id}`)}
+            onSalvarPDF={async (documento) => {
+              const res = await saveVersion(documento, user?.name);
+              if (!res.success) toast(res.error, 'e');
+              window.open(`/documentos/${documento.id}/imprimir`, '_blank', 'noopener');
+            }}
             onCreate={async (dados) => {
               const res = await createDocument({
                 ...dados,
@@ -243,6 +266,16 @@ export default function AdminDashboard() {
             onUpdate={handleUpdateCollab}
             onResetPassword={handleResetCollabPassword}
             onDelete={handleDeleteCollab}
+          />
+        )}
+
+        {showAddIdv && (
+          <IdvAddServiceModal
+            onClose={() => setShowAddIdv(false)}
+            onAdd={handleAddIdv}
+            clients={clients.filter(c => c.active !== false)}
+            collaborators={collaborators.filter(c => c.sector === 'design')}
+            currentUser={user?.name}
           />
         )}
     </AppShell>
