@@ -43,7 +43,7 @@ export default function SocialMediaDashboard() {
     approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
   } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
-  const { documents, createDocument, deleteDocument } = useDocuments();
+  const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
   const [page, setPage] = useState('overview');
 
   // `c.active !== false` e responsável em array: cliente antigo ou
@@ -89,6 +89,14 @@ export default function SocialMediaDashboard() {
     if (res.success) navigate(`/documentos/${res.id}`);
     else toast(res.error, 'e');
     return res;
+  };
+
+  // PDF a partir do modo apresentação da lista: grava a versão, como o
+  // editor faz, e abre a rota de impressão.
+  const handleSalvarPDF = async (documento) => {
+    const res = await saveVersion(documento, user?.name);
+    if (!res.success) toast(res.error, 'e');
+    window.open(`/documentos/${documento.id}/imprimir`, '_blank', 'noopener');
   };
 
   const handleDeleteDoc = async (id) => {
@@ -145,6 +153,7 @@ export default function SocialMediaDashboard() {
             currentUser={user?.name}
             isAdmin={!!user?.isAdmin}
             onOpen={(id) => navigate(`/documentos/${id}`)}
+            onSalvarPDF={handleSalvarPDF}
             onCreate={handleCreateDoc}
             onDelete={handleDeleteDoc}
           />

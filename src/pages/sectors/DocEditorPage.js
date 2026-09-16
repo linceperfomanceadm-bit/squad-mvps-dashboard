@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileDown, Check, Layers, Rows, Square } from 'lucide-react';
+import { ArrowLeft, FileDown, Check, Layers, Rows, Square, Play } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useDocuments, DOC_STATUS } from '../../hooks/useDocuments';
@@ -14,6 +14,7 @@ import DocForm from '../../components/sectors/socialMedia/docs/DocForm';
 import DocPreview, { blocosDoDeck } from '../../components/sectors/socialMedia/docs/DocPreview';
 import DocApoio from '../../components/sectors/socialMedia/docs/DocApoio';
 import DocExtras from '../../components/sectors/socialMedia/docs/DocExtras';
+import DocPresenter from '../../components/sectors/socialMedia/docs/DocPresenter';
 import '../../styles/lince-docs.css';
 
 // ─────────────────────────────────────────────────────────────
@@ -76,6 +77,9 @@ export default function DocEditorPage() {
   const [deckCompleto, setDeckCompleto] = useState(false);
   // REGRA 3.10 — modo essencial vem ligado.
   const [essencial, setEssencial] = useState(true);
+  // Modo apresentação — usa o rascunho local, então o que a pessoa
+  // acabou de digitar já aparece, mesmo antes de ir para o Firestore.
+  const [apresentando, setApresentando] = useState(false);
 
   const colMeio = useRef(null);
   const colDeck = useRef(null);
@@ -303,10 +307,26 @@ export default function DocEditorPage() {
           {deckCompleto ? 'Só esta seção' : 'Documento inteiro'}
         </button>
 
+        <button type="button" style={S.btnGhost} onClick={() => setApresentando(true)} title="Apresentar para o cliente em tela cheia">
+          <Play size={14} /> Apresentar
+        </button>
+
         <button type="button" style={S.btn} onClick={gerarPDF}>
           <FileDown size={15} /> Gerar PDF
         </button>
       </header>
+
+      {apresentando && (
+        <DocPresenter
+          doc={doc}
+          dados={dados}
+          opcionais={rascunho.opcionais}
+          extras={rascunho.extras}
+          titulo={`${documento.clientName || 'Sem cliente'} · ${doc.nome.split('—')[0].trim()}`}
+          onClose={() => setApresentando(false)}
+          onSalvarPDF={gerarPDF}
+        />
+      )}
 
       {marcaPendente() && (
         <p style={S.avisoMarca}>
