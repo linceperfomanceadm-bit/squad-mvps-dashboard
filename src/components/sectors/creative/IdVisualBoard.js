@@ -188,7 +188,7 @@ export default function IdVisualBoard({
           <Palette size={30} color="var(--muted)" style={{ opacity: .5 }} />
           <p style={{ fontSize: 15, color: 'var(--muted)', fontWeight: 600 }}>Nenhum cliente nesta fase</p>
           <p style={{ fontSize: 12, color: 'var(--muted)', opacity: .6, maxWidth: 300 }}>
-            O ID Visual chega aqui quando a CS cadastra o cliente e escolhe você como responsável.
+            O ID Visual chega aqui quando o líder te indica num cliente novo ou quando o admin adiciona um ID Visual para um cliente da casa.
           </p>
         </div>
       ) : (
