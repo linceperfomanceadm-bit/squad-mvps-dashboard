@@ -273,7 +273,7 @@ export default function AdminDashboard() {
           <IdvAddServiceModal
             onClose={() => setShowAddIdv(false)}
             onAdd={handleAddIdv}
-            clients={clients.filter(c => c.active !== false)}
+            clients={clients}
             collaborators={collaborators.filter(c => c.sector === 'design')}
             currentUser={user?.name}
           />
