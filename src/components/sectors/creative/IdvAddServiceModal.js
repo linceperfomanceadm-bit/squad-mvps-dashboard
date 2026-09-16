@@ -1,10 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Palette, Search, Check } from 'lucide-react';
-import { ID_VISUAL_CONFIG } from '../../../lib/firebase';
+import { ID_VISUAL_CONFIG, CLIENT_STAGES, stageOf } from '../../../lib/firebase';
 
 const STATUS_LABEL = { onboarding: 'Onboarding', production: 'Produção', finished: 'Finalizado' };
 const emAndamento = (c) => c?.idv?.status === 'onboarding' || c?.idv?.status === 'production';
+
+// Cliente fora de `live` grava `active: false` para sumir dos painéis
+// de produção — mas é justamente em Kick Off/staffing/onboarding que o
+// ID Visual costuma ser vendido. Então entram aqui também, com o
+// estágio no rótulo para ninguém confundir com cliente em rotina.
+const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
+const elegivel = (c) => c.active !== false || EM_FLUXO.includes(stageOf(c));
+const rotuloEstagio = (c) => {
+  const st = stageOf(c);
+  return st === 'live' ? null : (CLIENT_STAGES[st]?.label || st);
+};
 
 // Adiciona um ID Visual a um cliente que JÁ está na base.
 // Espelha o WDAddServiceModal, com uma diferença de regra: ID Visual
@@ -22,15 +33,16 @@ export default function IdvAddServiceModal({ onClose, onAdd, clients, collaborat
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const client = clients.find(c => c.id === clientId) || null;
+  const base = useMemo(() => (clients || []).filter(elegivel), [clients]);
+  const client = base.find(c => c.id === clientId) || null;
   const bloqueado = emAndamento(client);
   const team = collaborators.filter(c => c.active !== false);
 
   const results = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const list = [...clients].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    const list = [...base].sort((a, b) => (a.name || '').localeCompare(b.name || '', 'pt-BR'));
     return (q ? list.filter(c => (c.name || '').toLowerCase().includes(q)) : list).slice(0, 8);
-  }, [clients, search]);
+  }, [base, search]);
 
   const pickClient = (c) => { setClientId(c.id); setError(''); };
 
@@ -67,6 +79,11 @@ export default function IdvAddServiceModal({ onClose, onAdd, clients, collaborat
               <div style={{ ...S.picked, ...(bloqueado ? S.pickedOff : {}) }}>
                 <div style={{ minWidth: 0 }}>
                   <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{client.name}</p>
+                  {rotuloEstagio(client) && (
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
+                      Em {rotuloEstagio(client)} — o ID Visual aparece no quadro do designer quando a CS Operacional agendar a call de onboarding.
+                    </p>
+                  )}
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
                     {!client.idv?.status
                       ? <span style={{ fontSize: 11, color: 'var(--muted)' }}>Nenhum ID Visual ainda</span>
@@ -104,7 +121,10 @@ export default function IdvAddServiceModal({ onClose, onAdd, clients, collaborat
                     ? <p style={{ fontSize: 12, color: 'var(--muted)', padding: '10px 12px' }}>Nenhum cliente encontrado.</p>
                     : results.map(c => (
                         <button type="button" key={c.id} style={S.resultItem} onClick={() => pickClient(c)}>
-                          <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>{c.name}</span>
+                          <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+                            {c.name}
+                            {rotuloEstagio(c) && <span style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 500 }}> · {rotuloEstagio(c)}</span>}
+                          </span>
                           <span style={{ fontSize: 11, color: emAndamento(c) ? 'var(--amber)' : 'var(--muted)', fontFamily: 'var(--fm)' }}>
                             {c.idv?.status ? `ID Visual · ${STATUS_LABEL[c.idv.status] || c.idv.status}` : 'sem ID Visual'}
                           </span>
