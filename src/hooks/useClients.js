@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState } from '../lib/firebase';
+import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
@@ -367,7 +367,12 @@ export function useClients() {
   // `idvHistory[]` antes de o novo nascer — nada de sobrescrever a
   // entrega passada, que o Hall da Fama e a CS ainda consultam.
   // O dono também entra em `responsibles.design`, senão o cliente não
-  // apareceria na carteira do designer (tasks, Brand Hub).
+  // apareceria na carteira do designer (tasks, Brand Hub) — MAS só se
+  // o cliente já passou do staffing. Em Kick Off ou staffing, quem
+  // indica o time do Design é o líder: preencher o setor por aqui
+  // daria o Design como resolvido e poderia travar o fechamento do
+  // quadro. O bloco `idv` já nasce com o dono; o líder, ao indicar,
+  // não sobrescreve (ver `setSectorResponsibles`).
   const idvAddService = async (clientId, { responsible } = {}, byName = null) => {
     try {
       if (!responsible) throw new Error('Selecione o designer responsável.');
@@ -382,6 +387,7 @@ export function useClients() {
         }
         const now = new Date().toISOString();
         const clientResp = asArray(data.responsibles?.design);
+        const estagio = stageOf({ id: clientId, ...data });
         const upd = {
           idv: {
             responsible,
@@ -393,8 +399,10 @@ export function useClients() {
             addedBy: byName || null,
             addedAt: now,
           },
-          'responsibles.design': [...new Set([...clientResp, responsible])],
         };
+        if (estagio === 'live' || estagio === 'onboarding') {
+          upd['responsibles.design'] = [...new Set([...clientResp, responsible])];
+        }
         if (atual?.status) {
           upd.idvHistory = [...(data.idvHistory || []), { ...atual, archivedAt: now }];
         }
