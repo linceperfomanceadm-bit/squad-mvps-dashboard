@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, FileText, Palette } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, FileText, Palette, CalendarClock } from 'lucide-react';
 import { ID_VISUAL_CONFIG } from '../../../lib/firebase';
 import Countdown from '../../shared/Countdown';
 
@@ -11,6 +11,32 @@ import Countdown from '../../shared/Countdown';
  * só o designer responsável pelo ID Visual daquele cliente enxerga
  * este quadro. O time de web não vê nada disso.
  */
+
+// Início do prazo de onboarding do ID Visual.
+//
+// Antes o relógio partia de `idv.onboardingStartedAt`, que é gravado
+// quando o ID Visual é CRIADO — no cadastro ou pelo admin. Para cliente
+// ainda em fluxo, isso deixava o card "atrasado" antes mesmo da call
+// existir. O prazo tem que andar junto com a CS: conta a partir da
+// call de onboarding que a CS Operacional agendou (`kickoff.at` — o
+// nome `kickoff` é legado, é a call 2, ver useClients).
+//
+// Vale a data MAIS RECENTE entre as duas: se o ID Visual foi aberto
+// depois da call (cliente antigo da casa), o prazo começa na abertura,
+// não numa call de meses atrás.
+function inicioOnboarding(client) {
+  const idv = client.idv || {};
+  const datas = [idv.onboardingStartedAt, client.kickoff?.at]
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .filter(d => !Number.isNaN(d.getTime()));
+  if (!datas.length) return null;
+  return new Date(Math.max(...datas.map(d => d.getTime()))).toISOString();
+}
+
+const fmtDataHora = (iso) => new Date(iso).toLocaleString('pt-BR', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+});
 
 const TABS = [
   { key: 'onboarding', label: 'Onboarding' },
@@ -47,8 +73,10 @@ function IdvCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateC
   const allChecked = total > 0 && checked === total;
   const isOnboarding = idv.status === 'onboarding';
   const isProduction = idv.status === 'production';
-  const startDate = isOnboarding ? idv.onboardingStartedAt : (isProduction ? idv.productionStartedAt : null);
+  const startDate = isOnboarding ? inicioOnboarding(client) : (isProduction ? idv.productionStartedAt : null);
   const totalDays = isOnboarding ? ID_VISUAL_CONFIG.onboardingDays : ID_VISUAL_CONFIG.days;
+  // Call marcada para o futuro: o prazo ainda não começou a correr.
+  const aguardandoCall = isOnboarding && startDate && new Date(startDate) > new Date();
 
   const handleCheck = (itemId, val) => {
     const updated = checklist.map(i => i.id === itemId
@@ -78,7 +106,12 @@ function IdvCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateC
         </div>
       </div>
 
-      {startDate && <Countdown startDate={startDate} totalDays={totalDays} />}
+      {aguardandoCall ? (
+        <div style={S.aguardando}>
+          <CalendarClock size={13} />
+          <span>Call de onboarding em <strong>{fmtDataHora(startDate)}</strong> — o prazo de {totalDays}d começa nela.</span>
+        </div>
+      ) : startDate && <Countdown startDate={startDate} totalDays={totalDays} />}
 
       {expanded && (
         <div style={S.body} className="fade-in">
@@ -227,5 +260,6 @@ const S = {
   ta: { width: '100%', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 10px', color: 'var(--text)', fontSize: 13, fontFamily: 'var(--f)', resize: 'vertical', minHeight: 72, outline: 'none' },
   doneBox: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 14, marginBottom: 14 },
   btnFin: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 8, padding: 8, color: 'var(--green)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  aguardando: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--blue) 25%, transparent)', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.45 },
   asec: { display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' },
 };
