@@ -27,7 +27,7 @@ export const DOCS = [
   {
     id: 'pre-estrategia',
     nome: 'Pré-Estratégia — Social Media',
-    desc: 'Diagnóstico, benchmark, pilares, cadência, métricas e fluxo de produção. 12 slides.',
+    desc: 'Diagnóstico, benchmark, tom de voz, pilares, cadência, métricas e fluxo de produção. 12 slides.',
     meta: '12 slides · ~35 campos',
     ativo: true,
     balancoFunil: true, // acompanha o equilíbrio topo/meio/fundo na tela
@@ -38,29 +38,39 @@ export const DOCS = [
       {
         t: 'Capa',
         campos: [
-          { id: 'cliente', rot: 'Cliente', tipo: 'texto', ph: 'ACRIVIA' },
           {
-            id: 'recorte', rot: 'Frase de recorte', tipo: 'area',
-            dica: 'O escopo e o horizonte em uma frase.',
+            id: 'cliente', rot: 'Nome do cliente', tipo: 'texto',
+            dica: 'Escreva como a marca se chama no mercado, do jeito que ela mesma assina.',
+            ph: 'ACRIVIA',
+          },
+          {
+            id: 'recorte', rot: 'O que este plano cobre, em uma frase', tipo: 'area',
+            dica: 'Responda duas coisas: o que vamos fazer e em quanto tempo. Uma frase, sem adjetivo.',
             ph: 'Estratégia de conteúdo para os primeiros 90 dias, com foco em posicionamento, percepção de valor e geração de demanda.',
           },
-          { id: 'autor', rot: 'Apresentado por', tipo: 'texto', ph: 'Eloisa Lira' },
+          {
+            id: 'autor', rot: 'Quem vai apresentar', tipo: 'texto',
+            dica: 'Seu nome. É quem o cliente vai procurar depois da reunião.',
+            ph: 'Eloisa Lira',
+          },
         ],
       },
       {
         t: 'Sobre este documento',
         campos: [
           {
-            id: 'sobre1', rot: 'O que este documento apresenta', tipo: 'area',
-            ph: 'O que o documento cobre e no que o cliente deve se transformar aos olhos do mercado.',
+            id: 'sobre1', rot: 'O que o cliente vai encontrar aqui', tipo: 'area',
+            dica: 'Liste em texto corrido o que o documento cobre (diagnóstico, concorrência, pilares, cadência, métricas) e termine dizendo o que a marca deve virar aos olhos do público.',
+            ph: 'Este plano cobre o diagnóstico do perfil hoje, o mapa da concorrência, os pilares de conteúdo, a cadência de publicação, as métricas que vamos acompanhar e o fluxo de produção. O objetivo é transformar o perfil na referência técnica do setor na região.',
           },
           {
-            id: 'sobre2', rot: 'Em que a análise se baseia', tipo: 'area', extra: true,
-            ph: 'Por que está neste nível de detalhe: benchmark, comportamento das plataformas, objetivos declarados.',
+            id: 'sobre2', rot: 'De onde saiu esta análise', tipo: 'area', extra: true,
+            dica: 'Diga o que você olhou para chegar nas conclusões: perfis analisados, conversa de briefing, dados do próprio perfil.',
+            ph: 'A leitura vem da análise de quatro perfis concorrentes, dos dados dos últimos 90 dias do perfil e da conversa de briefing com a sócia responsável.',
           },
           {
-            id: 'prioridades', rot: 'Prioridades, em ordem', tipo: 'lista', linhas: 4, linhasEss: 3,
-            dica: 'Ordem importa: é o critério de desempate quando duas boas ideias competem.',
+            id: 'prioridades', rot: 'As prioridades do trabalho, da mais importante para a menos', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'A ordem importa: quando duas boas ideias disputarem espaço, é esta lista que decide. Escreva cada prioridade em até seis palavras.',
             cols: [{ id: 't', rot: 'Prioridade', ph: 'Construir autoridade e marca' }],
           },
         ],
@@ -69,18 +79,19 @@ export const DOCS = [
         t: '01 · Diagnóstico',
         campos: [
           {
-            id: 'ativos', rot: 'Os ativos', tipo: 'area',
-            dica: 'Comece pelo que já existe de bom. Cliente que se sente diagnosticado como incompetente entra na defensiva.',
-            ph: 'Identidade visual, porta-voz disponível, estrutura de produção, autoridade real no assunto...',
+            id: 'ativos', rot: 'O que o cliente já tem de bom', tipo: 'area',
+            dica: 'Comece pelo que já existe e funciona: identidade visual, alguém disposto a aparecer, autoridade real no assunto, base de clientes. Cliente que se sente diagnosticado como incompetente entra na defensiva.',
+            ph: 'A marca tem identidade visual pronta, uma sócia confortável em vídeo, quinze anos de mercado e uma base de clientes que indica. A matéria-prima está toda aqui.',
           },
           {
-            id: 'gargalo', rot: 'O gargalo', tipo: 'area',
-            dica: 'UM gargalo. Um só. Se listar quatro, a seção 07 não tem o que resolver.',
-            ph: 'Nomeie sem rodeio, explique por que é fatal neste mercado e mostre que é resolvível por método.',
+            id: 'gargalo', rot: 'O problema que trava o crescimento (apenas um)', tipo: 'area',
+            dica: 'Um gargalo só. Nomeie sem rodeio, explique por que ele é fatal neste mercado e deixe claro que tem solução por método. Se listar quatro, a seção 07 não tem o que resolver.',
+            ph: 'O perfil só publica quando sobra tempo. Sem constância, o algoritmo não entrega e o esforço de cada post se perde — e é justamente a constância que separa os dois concorrentes que crescem dos outros.',
           },
           {
-            id: 'diagFrase', rot: 'Em uma frase', tipo: 'area',
-            ph: 'O cliente tem todos os ingredientes para X. O que falta é o sistema que garante Y sem depender de Z.',
+            id: 'diagFrase', rot: 'O diagnóstico resumido em uma frase', tipo: 'area',
+            dica: 'Modelo pronto: "O cliente tem [ativos] para [objetivo]. O que falta é [o sistema que resolve o gargalo]."',
+            ph: 'A marca tem autoridade e material de sobra para virar referência. O que falta é um sistema que garanta publicação constante sem depender de alguém lembrar.',
           },
         ],
       },
@@ -88,19 +99,19 @@ export const DOCS = [
         t: '02 · Concorrência',
         campos: [
           {
-            id: 'metodo', rot: 'Método do mapeamento', tipo: 'area',
-            dica: 'Declare a limitação dos dados. Essa honestidade compra credibilidade para o resto.',
-            ph: 'Seguidores são públicos; frequência e horário não são auditáveis de fora e foram tratados como leitura de padrão.',
+            id: 'metodo', rot: 'Como você levantou os dados dos concorrentes', tipo: 'area',
+            dica: 'Diga o que é número público e o que é leitura sua. Assumir a limitação compra credibilidade para o resto do documento.',
+            ph: 'Seguidores e formatos são públicos. Frequência e horário não são auditáveis de fora: foram estimados pela leitura dos últimos 30 dias de cada perfil.',
           },
           {
-            id: 'concorrentes', rot: 'Perfis mapeados', tipo: 'lista', linhas: 4, linhasEss: 3,
-            dica: 'Três níveis: referência do setor, par direto e marca pessoal. A quarta linha é o próprio cliente.',
+            id: 'concorrentes', rot: 'Perfis que você analisou', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Use três níveis: a referência do setor, um concorrente do mesmo porte e uma marca pessoal que disputa a mesma atenção. Deixe a última linha para o próprio cliente, para a comparação ficar de pé.',
             cols: [
-              { id: 'perfil', rot: 'Perfil', ph: '@lucasacrilicos' },
-              { id: 'nivel', rot: 'Nível', ph: 'Par direto', extra: true },
+              { id: 'perfil', rot: 'Arroba do perfil', ph: '@lucasacrilicos' },
+              { id: 'nivel', rot: 'É referência, par ou marca pessoal?', ph: 'Par direto', extra: true },
               { id: 'seg', rot: 'Seguidores', ph: '312 mil' },
-              { id: 'fmt', rot: 'Formato dominante', ph: 'Vídeo', extra: true },
-              { id: 'tema', rot: 'Sobre o que fala', ph: 'Produto e bastidor' },
+              { id: 'fmt', rot: 'Formato que mais usa', ph: 'Vídeo', extra: true },
+              { id: 'tema', rot: 'Assunto dos posts', ph: 'Produto e bastidor' },
             ],
           },
         ],
@@ -109,35 +120,48 @@ export const DOCS = [
         t: '02 · Brechas',
         campos: [
           {
-            id: 'brechas', rot: 'Brechas identificadas', tipo: 'lista', linhas: 3,
+            id: 'brechas', rot: 'O que ninguém está fazendo (e o cliente pode fazer)', tipo: 'lista', linhas: 3,
+            dica: 'Brecha é o que falta no mercado, não o que o cliente quer fazer. Dê um nome curto e explique por que está sobrando espaço ali.',
             cols: [
-              { id: 't', rot: 'Nome', ph: 'Humanização com estrutura' },
-              { id: 'd', rot: 'Por que está aberta', ph: 'Os gigantes são impessoais; os influenciadores não têm respaldo.' },
+              { id: 't', rot: 'Nome da brecha', ph: 'Humanização com estrutura' },
+              { id: 'd', rot: 'Por que ninguém ocupou esse espaço', ph: 'Os grandes são impessoais e os influenciadores não têm respaldo técnico. Ninguém junta as duas coisas.' },
             ],
           },
           {
-            id: 'terreno', rot: 'Leitura do terreno', tipo: 'area',
-            ph: 'A combinação que nenhum concorrente reúne — e a vulnerabilidade do mais próximo.',
+            id: 'terreno', rot: 'O que essa leitura significa para o cliente', tipo: 'area',
+            dica: 'Feche a seção dizendo qual combinação só o cliente consegue entregar e onde o concorrente mais próximo é vulnerável.',
+            ph: 'Nenhum concorrente junta técnica e rosto. É essa combinação que o perfil pode ocupar, e o concorrente mais próximo não consegue copiar sem trocar o time.',
           },
         ],
       },
       {
-        t: '03 · Papel do perfil',
+        t: '03 · Tom de voz',
         campos: [
           {
-            id: 'metafora', rot: 'A metáfora e a delimitação', tipo: 'area',
-            ph: 'Pensem no perfil como o centro de uma roda. Cada X é um raio; o perfil é o eixo que recebe e amplifica.',
+            id: 'vozResumo', rot: 'Como a marca soa quando fala', tipo: 'area',
+            dica: 'Descreva o jeito de falar em uma ou duas frases, como se explicasse para alguém que vai escrever a legenda amanhã. Fale de postura, não de assunto.',
+            ph: 'A marca fala como especialista que explica sem palestrar: direta, sem jargão e sem prometer milagre. Explica o porquê antes de dar a solução.',
           },
           {
-            id: 'funcoes', rot: 'Funções que só este perfil cumpre', tipo: 'lista', linhas: 3,
+            id: 'voz', rot: 'Características do tom de voz', tipo: 'lista', linhas: 3,
+            dica: 'Escolha três características e diga o que cada uma muda na hora de escrever. Sem isso, "profissional" e "próximo" viram opinião de quem está com o teclado na mão.',
             cols: [
-              { id: 't', rot: 'Função', ph: 'Carregar a marca' },
-              { id: 'd', rot: 'Descrição', ph: 'O que quem chega por indicação precisa entender em segundos.' },
+              { id: 't', rot: 'Característica', ph: 'Direto' },
+              { id: 'd', rot: 'O que isso muda na escrita', ph: 'Frase curta, resposta na primeira linha, nada de introdução antes do assunto.' },
             ],
           },
           {
-            id: 'principio', rot: 'Princípio que costura tudo', tipo: 'area',
-            ph: 'O perfil nunca disputa com X. Ele fortalece. O conteúdo trabalha duas vezes.',
+            id: 'vozEvitar', rot: 'O que a marca nunca faz', tipo: 'lista', linhas: 3,
+            dica: 'Liste o que está proibido: gíria, emoji, promessa de resultado, polêmica, meme do momento. Serve tanto para a equipe quanto para alinhar expectativa com o cliente.',
+            cols: [
+              { id: 't', rot: 'Evitar', ph: 'Promessa de resultado' },
+              { id: 'd', rot: 'Por quê', ph: 'O setor é regulado e promessa numérica queima a confiança construída pelo restante do conteúdo.', extra: true },
+            ],
+          },
+          {
+            id: 'vozExemplo', rot: 'Um exemplo de frase no tom certo', tipo: 'area', extra: true,
+            dica: 'Escreva uma frase que poderia abrir um post. É a forma mais rápida de o cliente entender o tom sem discutir adjetivo.',
+            ph: '"Antes de trocar a embalagem, olhe o custo por peça. Na maioria dos casos, o problema não é o material."',
           },
         ],
       },
@@ -145,18 +169,18 @@ export const DOCS = [
         t: '04 · Pilares',
         campos: [
           {
-            id: 'pilaresIntro', rot: 'Por que os pesos são desiguais', tipo: 'area',
-            dica: 'O pilar mais pesado tem que ser o que ocupa a brecha da seção 02.',
-            ph: 'Os pesos não são iguais, e isso é proposital. O maior peso fica em...',
+            id: 'pilaresIntro', rot: 'Por que um pilar pesa mais que o outro', tipo: 'area',
+            dica: 'Explique qual pilar leva a maior fatia e por quê. O mais pesado tem que ser o que ocupa a brecha da seção 02.',
+            ph: 'O maior peso fica em autoridade técnica: é a brecha aberta no mercado e o que sustenta o preço praticado. Bastidor entra como apoio, não como base.',
           },
           {
-            id: 'pilares', rot: 'Pilares', tipo: 'lista', linhas: 4, linhasEss: 3,
-            dica: 'A etapa do funil não é enfeite: é o que impede um mês inteiro de descoberta sem nenhuma peça que ajude alguém a decidir.',
+            id: 'pilares', rot: 'Os pilares de conteúdo e o peso de cada um', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Os pesos somam 100%. A etapa do funil não é enfeite: é o que impede um mês inteiro de conteúdo de descoberta sem nenhuma peça que ajude alguém a decidir.',
             cols: [
-              { id: 'n', rot: 'Nome', ph: 'Autoridade institucional' },
-              { id: 'p', rot: 'Peso %', ph: '40' },
-              { id: 'f', rot: 'Funil', tipo: 'opcao', opcoes: ['Topo', 'Meio', 'Fundo'] },
-              { id: 'd', rot: 'O que entra aqui', ph: 'Análises de mudanças na legislação, traduzidas para o impacto no negócio.' },
+              { id: 'n', rot: 'Nome do pilar', ph: 'Autoridade técnica' },
+              { id: 'p', rot: 'Peso (%)', ph: '40' },
+              { id: 'f', rot: 'Etapa do funil', tipo: 'opcao', opcoes: ['Topo', 'Meio', 'Fundo'] },
+              { id: 'd', rot: 'Que tipo de post entra aqui', ph: 'Análise de mudanças do setor traduzidas para o impacto no bolso do cliente.' },
             ],
           },
         ],
@@ -165,12 +189,13 @@ export const DOCS = [
         t: '05 · Cadência',
         campos: [
           {
-            id: 'criterio', rot: 'Critério dos dias e horários', tipo: 'area',
-            ph: 'Referência 2026: 3 a 5 posts/semana + stories quase diários. Quarta ao meio-dia e quinta às 9h concentram engajamento.',
+            id: 'criterio', rot: 'Por que esses dias e horários', tipo: 'area',
+            dica: 'Justifique a frequência e os horários escolhidos. Se o motivo for referência de mercado, diga isso — não invente dado do perfil que você ainda não tem.',
+            ph: 'Três posts por semana mais stories quase diários é o piso para o algoritmo entregar com regularidade. Quarta ao meio-dia e quinta às 9h concentram o público do cliente.',
           },
           {
-            id: 'grade', rot: 'Grade de publicação', tipo: 'lista', linhas: 5, linhasEss: 3,
-            dica: 'Inclua Stories como linha própria, mesmo que fora do contrato — o que some da grade some da conversa.',
+            id: 'grade', rot: 'Grade da semana', tipo: 'lista', linhas: 5, linhasEss: 3,
+            dica: 'Uma linha por publicação da semana. Inclua Stories como linha própria mesmo que esteja fora do contrato: o que some da grade some da conversa.',
             cols: [
               { id: 'dia', rot: 'Dia', ph: 'Terça' },
               { id: 'pilar', rot: 'Pilar', ph: 'Autoridade', extra: true },
@@ -179,8 +204,9 @@ export const DOCS = [
             ],
           },
           {
-            id: 'obs', rot: 'Observações', tipo: 'area', extra: true,
-            ph: 'Estes horários são ponto de partida. Depois de 4 a 6 semanas, os dados do próprio perfil passam a mandar.',
+            id: 'obs', rot: 'Avisos sobre a grade', tipo: 'area', extra: true,
+            dica: 'Use para combinar o que muda depois. Exemplo: em quatro a seis semanas os dados do próprio perfil passam a mandar nos horários.',
+            ph: 'Estes horários são ponto de partida. Depois de quatro a seis semanas, os dados do próprio perfil substituem a referência de mercado.',
           },
         ],
       },
@@ -190,12 +216,12 @@ export const DOCS = [
         iniciaDesligada: true,
         campos: [
           {
-            id: 'mockup', rot: 'Peças do mês', tipo: 'lista', linhas: 8, linhasEss: 6,
-            dica: 'E = estático (fazer desejar) · C = carrossel (fazer entender) · V = vídeo (fazer acreditar). T, M e F marcam a etapa do funil — acompanhe o balanço no topo da pré-visualização.',
+            id: 'mockup', rot: 'Temas dos posts do primeiro mês', tipo: 'lista', linhas: 8, linhasEss: 6,
+            dica: 'Formato: E = estático (fazer desejar), C = carrossel (fazer entender), V = vídeo (fazer acreditar). Funil: T = topo, M = meio, F = fundo. O balanço no topo da pré-visualização mostra se o mês ficou torto.',
             cols: [
-              { id: 't', rot: 'Tema', ph: 'Bastidores da produção' },
+              { id: 't', rot: 'Tema do post', ph: 'Bastidores da produção' },
               { id: 'f', rot: 'Formato', tipo: 'opcao', opcoes: ['E', 'C', 'V'], ph: 'V' },
-              { id: 'fn', rot: 'Funil', tipo: 'opcao', opcoes: ['T', 'M', 'F'] },
+              { id: 'fn', rot: 'Etapa do funil', tipo: 'opcao', opcoes: ['T', 'M', 'F'] },
             ],
           },
         ],
@@ -204,25 +230,31 @@ export const DOCS = [
         t: '06 · Métricas',
         campos: [
           {
-            id: 'metricasIntro', rot: 'Por que este conjunto', tipo: 'area',
-            ph: 'Como o objetivo é autoridade e não venda imediata, as métricas de vaidade importam menos.',
+            id: 'metricasIntro', rot: 'Por que vamos olhar estas métricas', tipo: 'area',
+            dica: 'Ligue as métricas ao objetivo do cliente e diga o que deixou de fora. É aqui que você combina, antes de começar, o que vai contar como resultado.',
+            ph: 'Como o objetivo dos primeiros meses é autoridade e não venda imediata, curtida importa menos do que salvamento e compartilhamento.',
           },
-          { id: 'objetivo', rot: 'Nome do objetivo (aparece no título)', tipo: 'texto', ph: 'autoridade', extra: true },
+          {
+            id: 'objetivo', rot: 'Nome do objetivo (aparece no título do slide)', tipo: 'texto', ph: 'autoridade', extra: true,
+            dica: 'Uma palavra, em minúscula. O slide vai escrever "O que prova [sua palavra]".',
+          },
           {
             id: 'metricas', rot: 'Métricas que provam o objetivo', tipo: 'lista', linhas: 4, linhasEss: 3,
+            dica: 'Para cada métrica, explique o que ela diz sobre o comportamento de quem viu o post. Evite métrica que ninguém sabe ler.',
             cols: [
               { id: 'n', rot: 'Métrica', ph: 'Taxa de salvamento' },
-              { id: 'd', rot: 'Por quê', ph: 'Quem salva está dizendo que o conteúdo é útil e que vai voltar.' },
+              { id: 'd', rot: 'O que ela prova', ph: 'Quem salva está dizendo que o conteúdo é útil e que pretende voltar nele.' },
             ],
           },
           {
-            id: 'base', rot: 'Base de cálculo adotada', tipo: 'texto',
-            dica: 'Trave agora e nunca mude. ÷ seguidores, ÷ alcance e ÷ views dão números muito diferentes.',
+            id: 'base', rot: 'Base de cálculo dos percentuais', tipo: 'texto',
+            dica: 'Escolha agora e não mude mais: dividir por seguidores, por alcance ou por visualizações dá números muito diferentes, e trocar no meio invalida a comparação com todos os relatórios anteriores.',
             ph: 'interações ÷ alcance',
           },
           {
-            id: 'regua', rot: 'Régua mensal', tipo: 'area',
-            ph: 'As três perguntas que o relatório responde todo mês. E o que é consequência, não meta.',
+            id: 'regua', rot: 'O que o relatório mensal vai responder', tipo: 'area',
+            dica: 'Escreva as três perguntas que todo relatório vai responder e diga o que é consequência, não meta (seguidor costuma ser consequência).',
+            ph: 'Todo mês o relatório responde: alcançamos gente nova? Quem chegou ficou? Alguém saiu do perfil e falou com a empresa? Seguidor é consequência disso, não meta.',
           },
         ],
       },
@@ -230,20 +262,22 @@ export const DOCS = [
         t: '07 · Fluxo de produção',
         campos: [
           {
-            id: 'logica', rot: 'A lógica em uma linha', tipo: 'area',
-            ph: 'Trabalhar por estoque, e não por urgência. O conteúdo nunca depende de alguém lembrar de postar.',
+            id: 'logica', rot: 'A lógica do fluxo em uma linha', tipo: 'area',
+            dica: 'Diga o princípio que faz o conteúdo sair mesmo em semana ruim. Normalmente é trabalhar por estoque, e não por urgência.',
+            ph: 'Trabalhamos com estoque: o que é publicado esta semana foi gravado no mês passado. Assim o conteúdo não depende de alguém lembrar de postar.',
           },
           {
-            id: 'etapas', rot: 'Etapas do ciclo', tipo: 'lista', linhas: 4,
+            id: 'etapas', rot: 'Etapas do ciclo, na ordem', tipo: 'lista', linhas: 4,
+            dica: 'Uma etapa por linha, do planejamento à publicação. Diga em cada uma quem faz e quando — inclusive o que é do cliente.',
             cols: [
               { id: 'n', rot: 'Etapa', ph: 'Gravação' },
-              { id: 'd', rot: 'Quem e quando', ph: 'Os quatro sócios gravam em lote, num único dia.' },
+              { id: 'd', rot: 'Quem faz e quando', ph: 'Os dois sócios gravam em lote, num único dia por mês, com roteiro enviado antes.' },
             ],
           },
           {
-            id: 'resultado', rot: 'Resultado prático', tipo: 'area',
-            dica: 'Verificação obrigatória: este texto precisa eliminar o gargalo que você nomeou na seção 01.',
-            ph: 'Com esse ciclo, o perfil deixa de depender de X. A constância, que é o gargalo de hoje, passa a ser automática.',
+            id: 'resultado', rot: 'O que muda quando o fluxo roda', tipo: 'area',
+            dica: 'Este texto precisa eliminar o gargalo que você nomeou na seção 01. Se ele não resolve aquele problema, o documento não fecha.',
+            ph: 'Com o ciclo rodando, a publicação deixa de depender de tempo livre. A constância, que é o gargalo de hoje, passa a ser resultado do processo.',
           },
         ],
       },
@@ -295,12 +329,18 @@ export const DOCS = [
         <div class="fecho"><span class="rot">Leitura do terreno</span><p>${v(d.terreno, 'leitura do terreno')}</p></div>
         <div class="logo"></div></section>`);
 
-      B('papel', '03 · Papel do perfil', `<section class="slide"><span class="pg"></span>
-        <div class="eyebrow">Seção 03</div><h2>O papel do perfil</h2><div class="bar"></div>
-        <p style="margin-bottom:1.8cqw">${v(d.metafora, 'a metáfora e a delimitação')}</p>
-        <div class="grid g3">${lista(d.funcoes).map((r, i) => `<div class="card solid">
-          <span class="num">${i + 1}</span><h3>${v(r.t, 'função')}</h3><p>${v(r.d, 'descrição')}</p></div>`).join('')}</div>
-        <div class="fecho"><span class="rot">Princípio que costura tudo</span><p>${v(d.principio, 'princípio')}</p></div>
+      B('papel', '03 · Tom de voz', `<section class="slide"><span class="pg"></span>
+        <div class="eyebrow">Seção 03</div><h2>Tom de voz</h2><div class="bar"></div>
+        <p style="margin-bottom:1.8cqw">${v(d.vozResumo, 'como a marca soa quando fala')}</p>
+        <div class="grid g3">${lista(d.voz).map((r, i) => `<div class="card solid">
+          <span class="num">${i + 1}</span><h3>${v(r.t, 'característica')}</h3><p>${v(r.d, 'o que muda na escrita')}</p></div>`).join('')}</div>
+        <div class="grid g2" style="align-items:start;margin-top:1.6cqw">
+          <div class="card claro"><h3>O que a marca nunca faz</h3>
+            <ul class="ast" style="margin-top:1cqw">${lista(d.vozEvitar).map((r) =>
+    `<li><strong>${v(r.t, 'evitar')}${r.t ? '.' : ''}</strong> ${r.d ? esc(r.d) : ''}</li>`).join('')}</ul></div>
+          <div class="fecho" style="margin:0"><span class="rot">No tom certo, soa assim</span>
+            <p>${v(d.vozExemplo, 'exemplo de frase')}</p></div>
+        </div>
         <div class="logo"></div></section>`);
 
       const pil = lista(d.pilares);
@@ -353,7 +393,7 @@ export const DOCS = [
         <div class="grid g2" style="align-items:start">
           <div class="card"><h3>O que prova ${v(d.objetivo, 'o objetivo')}</h3>
             <ul class="ast" style="margin-top:1cqw">${lista(d.metricas).map((r) =>
-    `<li><strong>${v(r.n, 'métrica')}.</strong> ${v(r.d, 'por quê')}</li>`).join('')}</ul></div>
+    `<li><strong>${v(r.n, 'métrica')}${r.n ? '.' : ''}</strong> ${v(r.d, 'por quê')}</li>`).join('')}</ul></div>
           <div class="card claro"><h3>O que prova lead</h3>
             <ul class="ast" style="margin-top:1cqw">
               <li>Cliques no link e DMs que partem de um post específico.</li>
