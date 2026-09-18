@@ -20,6 +20,91 @@ export const v = (val, ph) => (val && String(val).trim())
 
 export const lista = (a) => (Array.isArray(a) ? a : []);
 
+// ─── Versão final: sem marcação de campo vazio ────────────────
+// A regra 3.1 (campo vazio aparece entre colchetes) existe para o
+// RASCUNHO — é o que faz a pessoa ver o buraco enquanto preenche.
+// No que vai para o cliente, PDF e apresentação, ela vira o oposto:
+// ninguém deve ler "[frase de recorte]" numa reunião.
+//
+// Então aqui o HTML pronto passa por uma limpeza: tira os marcadores,
+// e depois tira o que ficou sem conteúdo por causa deles — item de
+// lista, linha de tabela, card, fecho. Tabela que perdeu todas as
+// linhas sai inteira; slide que ficou só com título sai do deck
+// (`limparSlide` devolve string vazia, e quem chama descarta).
+//
+// Feito no HTML, e não no catálogo, de propósito: assim vale para
+// todos os documentos e para os slides extras, sem obrigar cada
+// `render` a conhecer duas versões de si mesmo.
+
+// Decoração não conta como conteúdo: numeração do card, rótulo do
+// fecho, etiqueta de funil, número da página e o logo.
+const DECORACAO = '.num, .rot, .tag, .pg, .logo, .bar';
+
+const temConteudo = (el, ignorar = '') => {
+  const copia = el.cloneNode(true);
+  copia.querySelectorAll(ignorar ? `${DECORACAO}, ${ignorar}` : DECORACAO).forEach((d) => d.remove());
+  // Pontuação e separador não são conteúdo: um item que sobrou só
+  // com o ponto final da frase é lixo de template, não informação.
+  const texto = copia.textContent.replace(/[\s·|—–.,;:]/g, '');
+  return texto.length > 0 || !!copia.querySelector('img');
+};
+
+// Card e fecho vivem do corpo, não do título: um card que sobrou só
+// com o `<h3>` é uma caixa vazia com nome bonito.
+const temCorpo = (el) => temConteudo(el, 'h3');
+
+export function limparSlide(html) {
+  if (!html || typeof DOMParser === 'undefined') return html;
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+  const slide = doc.body.firstElementChild;
+  if (!slide) return html;
+
+  // 1 · fora os marcadores de campo vazio
+  slide.querySelectorAll('.ph, .tag.vazio').forEach((el) => el.remove());
+
+  // 2 · fora o que ficou vazio. Do mais interno para o mais externo,
+  //     senão um card sobreviveria por causa de um <p> que ainda vai
+  //     ser removido no passo seguinte.
+  ['li', 'td', 'p', 'h3', 'tr', '.card', '.fecho'].forEach((sel) => {
+    slide.querySelectorAll(sel).forEach((el) => {
+      // Célula vazia não some sozinha: ela quebraria a linha da
+      // tabela. Quem decide é a linha inteira, logo abaixo.
+      if (el.tagName === 'TD') return;
+      const cheio = (sel === '.card' || sel === '.fecho') ? temCorpo(el) : temConteudo(el);
+      if (!cheio) el.remove();
+    });
+  });
+
+  // 3 · tabela sem nenhuma linha preenchida não tem por que existir
+  slide.querySelectorAll('table').forEach((t) => {
+    if (!t.querySelector('tbody tr')) t.remove();
+  });
+
+  // 4 · as barras de peso dos pilares são desenhadas fora dos cards;
+  //     sobra uma barra para cada pilar que acabou de sair.
+  const barras = slide.querySelector('.pesos');
+  if (barras) {
+    const cards = slide.querySelectorAll('.grid .card').length;
+    Array.from(barras.children).slice(cards).forEach((b) => b.remove());
+    if (!barras.children.length) barras.remove();
+  }
+
+  // 5 · slide que ficou só com título não entra. Capa e encerramento
+  //     são exceção: vivem de texto fixo e fecham o deck.
+  const fixo = slide.classList.contains('capa') || slide.classList.contains('fechamento');
+  const restou = ['p', 'li', 'tr', '.card', '.fecho']
+    .some((sel) => Array.from(slide.querySelectorAll(sel))
+      .some((el) => ((sel === '.card' || sel === '.fecho') ? temCorpo(el) : temConteudo(el))));
+  if (!fixo && !restou) return '';
+
+  return slide.outerHTML;
+}
+
+// Aplica `limparSlide` numa lista de blocos e descarta os que saíram.
+export const blocosFinais = (blocos) => lista(blocos)
+  .map((b) => ({ ...b, html: limparSlide(b.html) }))
+  .filter((b) => b.html);
+
 export const num = (x, fallback) => {
   const n = parseFloat(x);
   return isNaN(n) ? fallback : n;
