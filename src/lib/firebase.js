@@ -108,6 +108,24 @@ export const stageOf = (c) => {
 
 export const isStaffing = (c) => stageOf(c) === 'staffing';
 
+/*
+ * Cliente que já pertence à carteira de alguém.
+ *
+ * `active: false` é o que esconde o cliente enquanto ele corre o
+ * fluxo (kickoff → staffing → onboarding), e isso vale para as
+ * visões gerais: métricas, TV, listas da agência. Mas para QUEM FOI
+ * INDICADO pelo líder o cliente já é trabalho — a social media
+ * precisa começar a pré-estratégia antes da call de onboarding, não
+ * depois dela.
+ *
+ * Então a carteira pessoal de cada setor usa esta regra, e não
+ * `active !== false`: o cliente aparece assim que a indicação
+ * acontece. Quem não foi indicado continua sem ver nada, porque o
+ * filtro de responsável vem junto.
+ */
+const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
+export const naCarteira = (c) => c?.active !== false || EM_FLUXO.includes(stageOf(c));
+
 // Dias sem indicação de responsável até o sistema cobrar os líderes.
 // O alerta vai para o admin e para o líder do setor travado.
 export const STAFFING_ALERT_DAYS = 2;
