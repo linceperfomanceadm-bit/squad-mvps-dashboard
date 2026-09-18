@@ -33,11 +33,11 @@ const ATRASO_SALVAR = 800;
 
 // Conta os campos que ainda vão sair marcados no slide.
 // Uma linha de lista conta cada coluna em branco: é o que aparece
-// como [rótulo] em itálico no documento impresso.
+// como [rótulo] em itálico enquanto o documento está sendo montado
+// (no PDF e na apresentação eles somem).
 //
-// Com `essencial`, conta só o que o formulário está mostrando — é o
-// contador de progresso de cada seção. O total do topo e o aviso do
-// PDF contam tudo, porque é o que aparece marcado nos slides.
+// É o contador de progresso de cada seção, e ele conta tudo: o
+// formulário não esconde mais campo nenhum.
 const vazio = (v) => !v || !String(v).trim();
 
 function vaziosDoCampo(campo, valor, essencial) {
@@ -75,8 +75,12 @@ export default function DocEditorPage() {
   const [salvando, setSalvando] = useState(false);
   const [rascunho, setRascunho] = useState(null);
   const [deckCompleto, setDeckCompleto] = useState(false);
-  // REGRA 3.10 — modo essencial vem ligado.
-  const [essencial, setEssencial] = useState(true);
+  // O formulário mostra TODOS os campos, sempre. O modo essencial
+  // escondia os complementares e fazia campo aparecer e sumir no meio
+  // do preenchimento — quem está montando o documento perdia a
+  // referência do que já tinha visto. O que era "essencial" virou
+  // etiqueta: marca o campo como complementar e deixa ele lá.
+  const essencial = false;
   // Modo apresentação — usa o rascunho local, então o que a pessoa
   // acabou de digitar já aparece, mesmo antes de ir para o Firestore.
   const [apresentando, setApresentando] = useState(false);
@@ -380,16 +384,6 @@ export default function DocEditorPage() {
             <DocExtras doc={doc} extras={rascunho.extras} onChange={alterarExtras} />
           ) : (
             <>
-              <label style={S.chave}>
-                <input
-                  type="checkbox"
-                  checked={essencial}
-                  onChange={(e) => setEssencial(e.target.checked)}
-                  style={{ accentColor: '#EE3363', width: 15, height: 15 }}
-                />
-                <span style={{ color: 'var(--text)', fontWeight: 600 }}>Mostrar só o essencial</span>
-                <span>· esconde os campos complementares, sem apagar o que já foi digitado</span>
-              </label>
               <DocForm
                 secao={secaoAtual}
                 dados={dados}
@@ -499,12 +493,6 @@ const S = {
   },
   navOff: { fontSize: 10, color: 'var(--muted)', fontStyle: 'italic', flexShrink: 0 },
   navExtras: { marginTop: 10, borderTop: '1px solid var(--border)', borderRadius: 0, paddingTop: 14 },
-  chave: {
-    display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
-    fontSize: 11.5, color: 'var(--muted)', cursor: 'pointer',
-    background: 'var(--surface)', border: '1px solid var(--border)',
-    borderRadius: 9, padding: '9px 12px', marginBottom: 22,
-  },
   meio: { padding: '26px 26px 60px', overflowY: 'auto', borderRight: '1px solid var(--border)' },
   direita: { padding: 22, overflowY: 'auto', background: 'var(--bg)' },
 };
