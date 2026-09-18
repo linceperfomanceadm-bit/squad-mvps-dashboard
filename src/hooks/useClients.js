@@ -486,6 +486,13 @@ export function useClients() {
   // fechar, o cliente avança para o onboarding na mesma escrita —
   // nada de rodar duas vezes e deixar o cliente num estado quebrado
   // se a segunda falhar.
+  //
+  // A mesma função TROCA a indicação: chamar de novo para um setor já
+  // preenchido substitui a lista. Enquanto o cliente está em fluxo
+  // (Kick Off, staffing, onboarding) isso é rotina — alguém entra de
+  // férias, sai da agência ou o líder redistribui a carga antes de o
+  // trabalho começar. Quem sai perde o cliente da carteira na hora,
+  // porque toda a visibilidade deriva de `responsibles`.
   const setSectorResponsibles = async (clientId, sector, names, byName, opts = {}) => {
     try {
       const client = clients.find(c => c.id === clientId);
@@ -493,10 +500,31 @@ export function useClients() {
       const lista = asArray(names).filter(Boolean);
       if (!lista.length) return { success: false, error: 'Selecione ao menos um responsável.' };
 
+      const anteriores = asArray(client.responsibles?.[sector]);
+      const troca = anteriores.length > 0;
+
       const patch = {
         [`responsibles.${sector}`]: lista,
-        [`staffing.log.${sector}`]: { by: byName || null, at: new Date().toISOString() },
+        // `anteriores` só existe na troca: é o histórico que explica
+        // depois por que o cliente mudou de mão no meio do onboarding.
+        [`staffing.log.${sector}`]: {
+          by: byName || null,
+          at: new Date().toISOString(),
+          ...(troca ? { anteriores } : {}),
+        },
       };
+
+      // ID Visual na troca: o dono muda, o relógio não. Se quem tinha
+      // a marca saiu da lista, ela passa para quem o líder indicou (ou
+      // para o primeiro da lista), mantendo status e datas — o prazo
+      // combinado com o cliente não reinicia porque mudou o designer.
+      if (sector === 'design' && client.idv?.responsible && !lista.includes(client.idv.responsible)) {
+        const novoDono = opts.idvResponsible && lista.includes(opts.idvResponsible) ? opts.idvResponsible : lista[0];
+        patch['idv.responsible'] = novoDono;
+        patch['idv.reassignedAt'] = new Date().toISOString();
+        patch['idv.reassignedBy'] = byName || null;
+        patch['idv.reassignedFrom'] = client.idv.responsible;
+      }
 
       // ID Visual vendido: o bloco `idv` nasce agora, com o designer
       // que o líder escolheu. É o mesmo formato de antes, só que o
@@ -536,7 +564,7 @@ export function useClients() {
       }
 
       await updateDoc(doc(db, 'clients', clientId), patch);
-      return { success: true, activated: fechou };
+      return { success: true, activated: fechou, trocado: troca };
     } catch (err) { return { success: false, error: err.message }; }
   };
 
