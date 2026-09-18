@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, RefreshCw } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
 import { Overlay, ModalHeader, Section, LBL, BTN_GREEN, BTN_CANCEL, money } from './ui';
 
@@ -15,11 +15,26 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  *
  * O admin usa o mesmo modal, mas pode indicar por qualquer setor —
  * é o destravamento de quando um líder está ausente.
+ *
+ * TROCA: setor já indicado mostra quem está no cliente e um botão
+ * "Trocar". Ele abre a mesma lista de pessoas, já marcada com os
+ * atuais, e salva por cima. Enquanto o cliente está em fluxo isso é
+ * rotina (férias, saída, redistribuição de carga) e não deveria
+ * exigir o admin.
  */
 export default function StaffingModal({ client, sectors, collaborators, onClose, onConfirm, toast }) {
   const [sel, setSel] = useState({});
   const [busy, setBusy] = useState('');
   const [idvOwner, setIdvOwner] = useState('');
+  // Setores que a pessoa abriu para trocar. Vazio = mostra só quem
+  // já está no cliente, para ninguém mexer sem querer.
+  const [editando, setEditando] = useState({});
+
+  const abrirTroca = (sectorId, atuais) => {
+    setSel(r => ({ ...r, [sectorId]: atuais }));
+    if (sectorId === 'design' && client.idv?.responsible) setIdvOwner(client.idv.responsible);
+    setEditando(e => ({ ...e, [sectorId]: true }));
+  };
 
   const contrato = client.contrato || {};
   const briefing = contrato.briefing || client.briefing || '';
@@ -57,15 +72,21 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
     const nomes = sel[sectorId] || [];
     if (!nomes.length) return;
     setBusy(sectorId);
-    const opts = sectorId === 'design' && temIdVisual
+    // Na troca o ID Visual pode existir mesmo sem a marcação no
+    // contrato (admin adicionou depois), então o dono vai junto.
+    const opts = sectorId === 'design' && (temIdVisual || client.idv?.responsible)
       ? { idvResponsible: idvOwner || nomes[0] }
       : {};
     const r = await onConfirm(sectorId, nomes, opts);
     setBusy('');
     if (!r.success) { toast?.(r.error, 'e'); return; }
+    setEditando(e => ({ ...e, [sectorId]: false }));
+    const setorNome = SECTORS[sectorId]?.label || sectorId;
     toast?.(r.activated
       ? `${client.name} está ativo! Foi para o Onboarding do CS Operacional. 🎉`
-      : `Responsáveis de ${SECTORS[sectorId]?.label || sectorId} definidos.`);
+      : r.trocado
+        ? `Responsáveis de ${setorNome} atualizados: ${nomes.join(', ')}.`
+        : `Responsáveis de ${setorNome} definidos.`);
   };
 
   return (
@@ -73,7 +94,8 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 620, maxHeight: '88vh', overflowY: 'auto' }}>
         <ModalHeader title={client.name} onClose={onClose} />
         <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: -8, marginBottom: 18, lineHeight: 1.5 }}>
-          Leia o briefing e defina quem fica responsável por este cliente. Pode escolher mais de uma pessoa.
+          Leia o briefing e defina quem fica responsável por este cliente. Pode escolher mais de uma
+          pessoa — e trocar depois, enquanto o cliente ainda está em onboarding.
         </p>
 
         {servicos.length > 0 && (
@@ -153,10 +175,22 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
             return (
               <div key={sid}>
                 <p style={LBL}>{s.emoji} {String(s.label).toUpperCase()}</p>
-                {jaTem.length > 0 ? (
-                  <p style={{ fontSize: 12, color: 'var(--green)', marginTop: 6 }}>
-                    ✓ Já definido: {jaTem.join(', ')}
-                  </p>
+                {jaTem.length > 0 && !editando[sid] ? (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                    <p style={{ fontSize: 12, color: 'var(--green)' }}>
+                      ✓ Já definido: {jaTem.join(', ')}
+                      {sid === 'design' && client.idv?.responsible && (
+                        <span style={{ color: 'var(--muted)' }}> · ID Visual: {client.idv.responsible}</span>
+                      )}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => abrirTroca(sid, jaTem)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '5px 11px', fontSize: 11.5, fontWeight: 600, color: 'var(--muted)', cursor: 'pointer' }}
+                    >
+                      <RefreshCw size={11} /> Trocar
+                    </button>
+                  </div>
                 ) : people.length === 0 ? (
                   <p style={{ fontSize: 12, color: 'var(--amber)', marginTop: 6 }}>
                     Nenhum colaborador ativo neste setor. Cadastre alguém antes de indicar.
@@ -178,7 +212,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                         );
                       })}
                     </div>
-                    {sid === 'design' && temIdVisual && escolhidos.length > 1 && (
+                    {sid === 'design' && (temIdVisual || client.idv?.responsible) && escolhidos.length > 1 && (
                       <div style={{ marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: 12 }}>
                         <p style={LBL}>QUEM FICA COM A ID VISUAL?</p>
                         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>
@@ -201,13 +235,32 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                         </div>
                       </div>
                     )}
-                    <button
-                      disabled={!escolhidos.length || busy === sid}
-                      onClick={() => salvar(sid)}
-                      style={{ ...BTN_GREEN, width: '100%', marginTop: 10, opacity: escolhidos.length ? 1 : .45, cursor: escolhidos.length ? 'pointer' : 'not-allowed' }}
-                    >
-                      {busy === sid ? 'Salvando...' : `Confirmar responsáveis de ${s.label}`}
-                    </button>
+                    {editando[sid] && (
+                      <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+                        Quem sair da lista perde este cliente da carteira na hora. O que já foi produzido
+                        continua no cliente.
+                      </p>
+                    )}
+                    <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+                      {editando[sid] && (
+                        <button
+                          type="button"
+                          onClick={() => setEditando(e => ({ ...e, [sid]: false }))}
+                          style={{ ...BTN_CANCEL, flex: '0 0 auto' }}
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        disabled={!escolhidos.length || busy === sid}
+                        onClick={() => salvar(sid)}
+                        style={{ ...BTN_GREEN, flex: 1, opacity: escolhidos.length ? 1 : .45, cursor: escolhidos.length ? 'pointer' : 'not-allowed' }}
+                      >
+                        {busy === sid
+                          ? 'Salvando...'
+                          : editando[sid] ? `Atualizar responsáveis de ${s.label}` : `Confirmar responsáveis de ${s.label}`}
+                      </button>
+                    </div>
                   </>
                 )}
               </div>

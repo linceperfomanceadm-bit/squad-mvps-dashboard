@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { UserPlus, Clock } from 'lucide-react';
+import { UserPlus, Clock, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../shared/Toast';
-import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES } from '../../lib/firebase';
 import StaffingModal from './StaffingModal';
 import ClientOnboardingModal from './ClientOnboardingModal';
 import {
@@ -15,6 +15,9 @@ import {
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const RECENT_DAYS = 30;
+// Enquanto o cliente está numa destas etapas, a indicação ainda pode
+// ser trocada pelo próprio líder.
+const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
 const KICKOFF_COLOR = 'var(--purple)';
 
 /*
@@ -25,6 +28,10 @@ const KICKOFF_COLOR = 'var(--purple)';
  *     setor (`leaderOf`) e para o admin. Lista os clientes em staffing
  *     que ainda não têm responsável no setor dessa pessoa. É aqui que
  *     o quadro é fechado e o cliente entra na base.
+ *
+ *  1b. "Suas indicações" — clientes ainda em fluxo em que o setor
+ *     dessa pessoa JÁ tem responsável. Serve para trocar quem pega o
+ *     cliente antes de o trabalho começar, sem depender do admin.
  *
  *  2. "Onboarding em andamento" — clientes ativos com a call de
  *     onboarding pendente, em que a pessoa é responsável. Mostra a
@@ -70,6 +77,22 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
       .sort((a, b) => new Date(a.client.staffing?.startedAt || 0) - new Date(b.client.staffing?.startedAt || 0));
   }, [clients, mySectors, pendingSectorsOf]);
 
+  // 1b. Clientes em fluxo (Kick Off, staffing, onboarding) em que
+  //     algum setor meu já está preenchido. É onde a indicação pode
+  //     ser trocada — depois da call de onboarding o cliente entra na
+  //     rotina e a troca passa a ser assunto do admin, no cadastro.
+  const minhasIndicacoes = useMemo(() => {
+    if (!mySectors.length) return [];
+    return clients
+      .filter(c => EM_FLUXO.includes(stageOf(c)))
+      .map(c => ({
+        client: c,
+        setores: mySectors.filter(s => asArray(c.responsibles?.[s]).length > 0),
+      }))
+      .filter(x => x.setores.length > 0)
+      .sort((a, b) => (a.client.name || '').localeCompare(b.client.name || '', 'pt-BR'));
+  }, [clients, mySectors]);
+
   // Sou responsável por este cliente em algum setor?
   const souResponsavel = (c) => Object.values(c.responsibles || {}).some(v => asArray(v).includes(me));
 
@@ -111,7 +134,8 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
   }, [clients, isAdmin]);
 
   const openClient = openId ? clients.find(c => c.id === openId) || null : null;
-  const vazio = aguardando.length === 0 && emKickoff.length === 0 && emOnboarding.length === 0 && recentes.length === 0;
+  const vazio = aguardando.length === 0 && emKickoff.length === 0 && emOnboarding.length === 0
+    && recentes.length === 0 && minhasIndicacoes.length === 0;
 
   return (
     <div className="fade-up">
@@ -141,6 +165,26 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
                 pendentes={pendentes}
                 todosPendentes={pendingSectorsOf(client)}
                 onOpen={() => setStaffingTarget({ client, sectors: pendentes })}
+              />
+            ))}
+          </div>
+        </Bloco>
+      )}
+
+      {/* 1b. Trocar indicação já feita */}
+      {minhasIndicacoes.length > 0 && (
+        <Bloco
+          title="Suas indicações"
+          sub="Clientes que ainda não começaram. Dá para trocar quem fica responsável enquanto o onboarding não é realizado."
+          color="var(--blue)"
+        >
+          <div style={GRID}>
+            {minhasIndicacoes.map(({ client, setores }) => (
+              <IndicacaoCard
+                key={client.id}
+                client={client}
+                setores={setores}
+                onOpen={() => setStaffingTarget({ client, sectors: setores })}
               />
             ))}
           </div>
@@ -311,6 +355,42 @@ function Bloco({ title, sub, color, children }) {
       </div>
       <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 14, lineHeight: 1.5 }}>{sub}</p>
       {children}
+    </div>
+  );
+}
+
+// ── Card da indicação já feita (troca) ─────────────────────────
+// Mostra quem ESTÁ no cliente hoje, por setor desta pessoa, e abre o
+// mesmo modal da indicação — só que com a lista já marcada.
+function IndicacaoCard({ client, setores, onOpen }) {
+  const estagio = stageOf(client);
+  const estagioInfo = CLIENT_STAGES[estagio];
+
+  return (
+    <div style={CARD}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</h3>
+        {estagioInfo && <Tag color={estagioInfo.color}>{estagioInfo.label}</Tag>}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>
+        {setores.map(sid => {
+          const s = SECTORS[sid] || { label: sid, color: 'var(--muted)', emoji: '📦' };
+          const nomes = asArray(client.responsibles?.[sid]);
+          return (
+            <p key={sid} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.45 }}>
+              <span style={{ color: s.color, fontWeight: 600 }}>{s.emoji} {s.label}:</span> {nomes.join(', ')}
+              {sid === 'design' && client.idv?.responsible && (
+                <span style={{ color: 'var(--muted)' }}> · ID Visual: {client.idv.responsible}</span>
+              )}
+            </p>
+          );
+        })}
+      </div>
+
+      <button onClick={onOpen} style={{ ...BTN_PRIMARY, width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+        <RefreshCw size={13} /> Trocar responsável
+      </button>
     </div>
   );
 }
