@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { varsDaMarca } from '../../../../lib/docs/marca';
 import { blocosDoDeck } from './DocPreview';
+import { blocosFinais } from '../../../../lib/docs/motor';
 import '../../../../styles/lince-docs.css';
 
 // ─────────────────────────────────────────────────────────────
@@ -49,8 +50,12 @@ const comNumero = (html, n) => html.replace('<span class="pg"></span>', `<span c
 export default function DocPresenter({
   doc, dados, opcionais, extras, titulo, inicio = 0, onClose, onSalvarPDF,
 }) {
+  // Apresentação é versão final: o que não foi preenchido não
+  // aparece. Nada de "[frase de recorte]" na frente do cliente —
+  // `blocosFinais` tira o marcador e o que ficou vazio junto com ele,
+  // inclusive o slide inteiro quando nada foi preenchido nele.
   const blocos = useMemo(
-    () => blocosDoDeck(doc, dados, opcionais, extras),
+    () => blocosFinais(blocosDoDeck(doc, dados, opcionais, extras)),
     [doc, dados, opcionais, extras],
   );
   const total = blocos.length;

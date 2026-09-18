@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { LAYOUTS } from '../../../../lib/docs/layouts';
 import { varsDaMarca } from '../../../../lib/docs/marca';
+import { blocosFinais } from '../../../../lib/docs/motor';
 
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — PRÉ-VISUALIZAÇÃO
@@ -57,10 +58,14 @@ export default function DocPreview({
   imprimindo = false, apenasSecao = false,
 }) {
   const refs = useRef([]);
-  const todos = useMemo(
-    () => blocosDoDeck(doc, dados, opcionais, extras),
-    [doc, dados, opcionais, extras],
-  );
+  // Na tela de edição o deck mostra os campos vazios entre colchetes
+  // (regra 3.1). Na impressão não: o PDF vai para o cliente, então
+  // passa por `blocosFinais` — marcador some, e o que ficou sem
+  // conteúdo (linha, card, slide inteiro) sai junto.
+  const todos = useMemo(() => {
+    const brutos = blocosDoDeck(doc, dados, opcionais, extras);
+    return imprimindo ? blocosFinais(brutos) : brutos;
+  }, [doc, dados, opcionais, extras, imprimindo]);
 
   // Mostrar só os slides da seção aberta troca aproximação por
   // correspondência exata: o que está à direita é o que o campo à
