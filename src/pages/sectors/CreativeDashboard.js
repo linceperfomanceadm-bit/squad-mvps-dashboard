@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, ClipboardList, Palette, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { naCarteira } from '../../lib/firebase';
 import { useClients } from '../../hooks/useClients';
 import { useTasks } from '../../hooks/useTasks';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -38,17 +39,18 @@ export default function CreativeDashboard({ sectorId }) {
 
   const responsibleField = sectorId === 'design' ? 'design' : 'videomaker';
 
-  // `c.active !== false` + responsável em array: o admin salva os
-  // responsáveis como lista, então comparar com === deixava a carteira
-  // vazia para quem foi cadastrado por lá.
+  // `naCarteira` e não `active !== false`: o cliente entra na carteira
+  // assim que o líder indica o responsável, sem esperar a call de
+  // onboarding. Responsável em array porque o admin salva lista —
+  // comparar com === deixava a carteira vazia nesses casos.
   const myClients = clients.filter(
-    c => c.active !== false && asArray(c.responsibles?.[responsibleField]).includes(user?.name)
+    c => naCarteira(c) && asArray(c.responsibles?.[responsibleField]).includes(user?.name)
   );
 
   // ID Visual é exclusivo do Design e só do designer responsável.
   const isDesign = sectorId === 'design';
   const myIdVisual = isDesign
-    ? clients.filter(c => c.active !== false && c.idv?.responsible === user?.name)
+    ? clients.filter(c => naCarteira(c) && c.idv?.responsible === user?.name)
     : [];
   const idvOpen = myIdVisual.filter(c => c.idv?.status === 'onboarding' || c.idv?.status === 'production').length;
 

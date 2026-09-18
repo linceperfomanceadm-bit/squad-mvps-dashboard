@@ -11,7 +11,7 @@ import { useToast } from '../../components/shared/Toast';
 import AppShell from '../../components/shared/AppShell';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import { SECTORS, TASK_PRIORITIES } from '../../lib/firebase';
+import { SECTORS, TASK_PRIORITIES, naCarteira } from '../../lib/firebase';
 import { differenceInDays } from 'date-fns';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
@@ -99,10 +99,11 @@ export default function GenericSectorDashboard({ sectorId }) {
 
   const [page, setPage] = useState('overview');
 
-  // `c.active !== false` + responsável em array: o admin salva lista, e
-  // clientes antigos não têm o campo `active`.
+  // `naCarteira`: o cliente entra na carteira na indicação do líder,
+  // sem esperar a call de onboarding. Responsável em array porque o
+  // admin salva lista, e clientes antigos não têm o campo `active`.
   const myClients = clients.filter(
-    c => c.active !== false && asArray(c.responsibles?.[sectorId]).includes(user?.name)
+    c => naCarteira(c) && asArray(c.responsibles?.[sectorId]).includes(user?.name)
   );
 
   const myTasks = tasks.filter(

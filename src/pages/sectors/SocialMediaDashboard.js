@@ -4,6 +4,7 @@ import { LayoutDashboard, Users, Kanban, FileText, Calendar, ClipboardList, Book
 import { useAuth } from '../../contexts/AuthContext';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
+import { naCarteira } from '../../lib/firebase';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -46,10 +47,13 @@ export default function SocialMediaDashboard() {
   const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
   const [page, setPage] = useState('overview');
 
-  // `c.active !== false` e responsável em array: cliente antigo ou
-  // cadastrado pelo admin (que salva array) continua aparecendo.
+  // `naCarteira` e não `active !== false`: o cliente entra na carteira
+  // assim que o líder indica o responsável, ainda em staffing/Kick Off
+  // /onboarding. É o que permite começar a pré-estratégia antes da
+  // call de onboarding acontecer. Responsável em array porque o admin
+  // salva lista — cliente antigo continua aparecendo.
   const myClients = clients.filter(
-    c => c.active !== false && asArray(c.responsibles?.socialmedia).includes(user?.name)
+    c => naCarteira(c) && asArray(c.responsibles?.socialmedia).includes(user?.name)
   );
 
   // Cada social media enxerga os documentos dos clientes em que é
