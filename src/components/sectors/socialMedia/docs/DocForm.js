@@ -13,9 +13,11 @@ import { colunasVisiveis, linhasVisiveis, campoVisivel } from '../../../../lib/d
 // 'nota' (orientação, sem valor). Uma coluna pode ser 'opcao', que
 // vira select.
 //
-// REGRA 3.10 — no modo essencial, campos, colunas e linhas marcados
-// como complementares somem do formulário. Só da tela: o que já foi
-// digitado continua no documento.
+// REGRA 3.10 — campo complementar NÃO some mais do formulário: ele
+// ganha a etiqueta "complementar" e fica no lugar. Esconder campo
+// conforme uma caixa marcada fazia o formulário mudar de tamanho no
+// meio do preenchimento, e quem estava montando o documento perdia a
+// referência do que já tinha visto.
 // ─────────────────────────────────────────────────────────────
 
 function Dica({ children }) {
@@ -64,6 +66,12 @@ function CampoBase({ campo, valor, travada, desde, onChange, onDestravar }) {
   );
 }
 
+// Diz que o campo dá profundidade, sem sumir com ele.
+function Complementar({ mostrar }) {
+  if (!mostrar) return null;
+  return <span style={S.tagExtra}>complementar</span>;
+}
+
 function Nota({ campo }) {
   return (
     <div style={S.campo}>
@@ -91,7 +99,7 @@ function Lista({ campo, valor, onChange, essencial }) {
 
   return (
     <div style={S.campo}>
-      <label style={S.label}>{campo.rot}</label>
+      <label style={S.label}>{campo.rot}<Complementar mostrar={campo.extra} /></label>
       <Dica>{campo.dica}</Dica>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
         <div style={{ ...S.linha, ...grade, paddingBottom: 2 }}>
@@ -188,7 +196,7 @@ export default function DocForm({
             }
             return (
               <div key={c.id} style={S.campo}>
-                <label style={S.label}>{c.rot}</label>
+                <label style={S.label}>{c.rot}<Complementar mostrar={c.extra} /></label>
                 <Dica>{c.dica}</Dica>
                 {c.tipo === 'area' ? (
                   <textarea
@@ -224,6 +232,11 @@ const S = {
   input: {
     background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
     padding: '10px 13px', fontSize: 13, color: 'var(--text)', outline: 'none', width: '100%',
+  },
+  tagExtra: {
+    marginLeft: 7, fontSize: 9.5, fontWeight: 600, letterSpacing: '.06em',
+    padding: '2px 7px', borderRadius: 10, textTransform: 'none',
+    background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)',
   },
   dica: {
     display: 'flex', gap: 6, fontSize: 11.5, color: 'var(--muted)',
