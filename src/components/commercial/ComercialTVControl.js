@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock, Radio, Volume2, Save, Eye, EyeOff } from 'lucide-react';
+import { useComercial } from '../../hooks/useComercial';
+import { mesChave } from '../../lib/entregas';
 
 /*
  * Controle da TV da sala comercial (/tv/comercial). Mesmo desenho do
@@ -192,3 +194,11 @@ const S = {
   txt: { fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 12 },
   input: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)', marginBottom: 10, width: '100%' },
 };
+
+// Versão que busca os próprios dados — usada no admin, dentro da aba
+// "Painel de TV", onde não há a página do comercial em volta.
+export function ComercialTVControlConectado({ toast }) {
+  const { config, loading, saveConfig } = useComercial(mesChave());
+  if (loading) return <div className="spinner" style={{ margin: '40px auto' }} />;
+  return <ComercialTVControl config={config} saveConfig={saveConfig} toast={toast} />;
+}

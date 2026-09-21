@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck } from 'lucide-react';
 import {
   SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS,
   stageOf, naCarteira, contractState,
@@ -7,6 +7,8 @@ import {
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
 import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
+import { mesChave, entregasDoMes, resumoMes, statusGeral, cadastroPendencias } from '../../lib/entregas';
+import { BarraEntrega, Aderencia } from '../entregas/EntregasKit';
 
 const COLOR = 'var(--c)';
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -19,6 +21,8 @@ const STATUS_FILTERS = [
   { id: 'entrada', label: 'Entrando' },
   { id: 'atraso',  label: 'Com atraso' },
   { id: 'vencendo', label: 'Contrato vencendo' },
+  { id: 'entregas', label: 'Entregas atrasadas' },
+  { id: 'incompleto', label: 'Cadastro incompleto' },
 ];
 
 // 'YYYY-MM-DD' comparado como texto — mesma regra do Kanban, sem a
@@ -39,9 +43,16 @@ const hojeYmd = () => {
  *
  * Entram os clientes da base e os que ainda estão entrando (Kick Off,
  * staffing, onboarding) — a CS já é dona deles desde o cadastro.
+ *
+ * Entregas do contrato: cada card da base mostra o que o escopo prevê
+ * no mês contra o que já foi marcado, e o selo de cadastro incompleto.
+ * "Contrato e entregas" abre a ficha completa (histórico, entregas
+ * únicas, completar cadastro). Foi decisão de produto deixar isso aqui
+ * e não numa aba separada: é na Carteira que a CS já olha cada cliente.
  */
-export default function CSCarteira({ clients, tasks, collaborators, me, onOpenClient, onOpenTask }) {
-  const [csFilter, setCsFilter] = useState('__me__');
+export default function CSCarteira({ clients, tasks, collaborators, me, onOpenClient, onOpenTask, onOpenFicha, csInicial = '__me__' }) {
+  // O líder da CS abre em "Todas as CSs"; a CS, na própria carteira.
+  const [csFilter, setCsFilter] = useState(csInicial);
   const [statusFilter, setStatusFilter] = useState('all');
   const [busca, setBusca] = useState('');
 
@@ -63,6 +74,7 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
   const semCs = carteira.filter(c => asArray(c.responsibles?.cs).length === 0).length;
 
   const hoje = hojeYmd();
+  const mes = mesChave();
 
   // Enriquecimento: calculado uma vez por cliente e reaproveitado no
   // filtro, no resumo e no card.
@@ -75,6 +87,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         return a.deadline < b.deadline ? -1 : a.deadline > b.deadline ? 1 : 0;
       });
     const atrasadas = abertas.filter(t => t.deadline && t.deadline < hoje);
+    const stage = stageOf(c);
+    const entregas = stage === 'live' ? entregasDoMes(c, mes) : [];
     return {
       client: c,
       stage: stageOf(c),
@@ -84,8 +98,12 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       ops: computeOpsHealth(c.id, tasks),
       manual: resolveClientHealth(c),
       contrato: contractState(c),
+      entregas,
+      entregasResumo: resumoMes(entregas),
+      entregasStatus: statusGeral(entregas, mes),
+      pendencias: stage === 'live' ? cadastroPendencias(c) : [],
     };
-  }), [carteira, tasks, hoje]);
+  }), [carteira, tasks, hoje, mes]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -102,6 +120,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         if (statusFilter === 'entrada') return EM_ENTRADA.includes(it.stage);
         if (statusFilter === 'atraso') return it.atrasadas.length > 0;
         if (statusFilter === 'vencendo') return ['ending', 'expired'].includes(it.contrato.status);
+        if (statusFilter === 'entregas') return ['atrasado', 'abaixo'].includes(it.entregasStatus);
+        if (statusFilter === 'incompleto') return it.pendencias.length > 0;
         return true;
       })
       .filter(({ client }) => !q || (client.name || '').toLowerCase().includes(q))
@@ -115,7 +135,10 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
     abertas: filtrados.reduce((s, it) => s + it.abertas.length, 0),
     atrasadas: filtrados.reduce((s, it) => s + it.atrasadas.length, 0),
     vencendo: filtrados.filter(it => ['ending', 'expired'].includes(it.contrato.status)).length,
+    combinado: filtrados.reduce((s, it) => s + it.entregasResumo.combinado, 0),
+    entregue: filtrados.reduce((s, it) => s + it.entregasResumo.entregue, 0),
   }), [filtrados]);
+  const pctEntregas = resumo.combinado ? Math.round((resumo.entregue / resumo.combinado) * 100) : null;
 
   const mostraCs = csFilter === '__all__';
 
@@ -168,6 +191,11 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         <Stat label="Tasks em aberto" value={resumo.abertas} color="var(--blue)" />
         <Stat label="Tasks atrasadas" value={resumo.atrasadas} color={resumo.atrasadas > 0 ? 'var(--red)' : 'var(--muted)'} />
         <Stat label="Contratos vencendo" value={resumo.vencendo} color={resumo.vencendo > 0 ? 'var(--amber)' : 'var(--muted)'} />
+        <Stat
+          label="Entregue do combinado no mês"
+          value={pctEntregas == null ? '—' : `${pctEntregas}%`}
+          color={pctEntregas == null ? 'var(--muted)' : pctEntregas >= 100 ? 'var(--green)' : pctEntregas >= 70 ? 'var(--amber)' : 'var(--red)'}
+        />
       </div>
 
       {filtrados.length === 0
@@ -182,6 +210,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
                 hoje={hoje}
                 onOpen={() => onOpenClient(it.client)}
                 onOpenTask={onOpenTask}
+                onOpenFicha={onOpenFicha ? () => onOpenFicha(it.client) : undefined}
+                mes={mes}
               />
             ))}
           </div>
@@ -190,9 +220,9 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
   );
 }
 
-function CarteiraCard({ item, mostraCs, hoje, onOpen, onOpenTask }) {
+function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFicha }) {
   const [aberto, setAberto] = useState(false);
-  const { client, stage, abertas, atrasadas, aprovacao, ops, manual, contrato } = item;
+  const { client, stage, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, entregasStatus, pendencias } = item;
   const opsLv = HEALTH_LEVELS_4[ops.level];
   const manLv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const ctSt = CONTRACT_STATUS[contrato.status] || CONTRACT_STATUS.unknown;
@@ -254,7 +284,31 @@ function CarteiraCard({ item, mostraCs, hoje, onOpen, onOpenTask }) {
             {contrato.daysLeft != null && contrato.status === 'ending' && ` (${contrato.daysLeft}d)`}
           </p>
         )}
+
+        {/* Entregas do mês (escopo do contrato) */}
+        {stage === 'live' && entregas.length > 0 && (
+          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)', flex: 1 }}>Entregas do mês</span>
+              <span style={{ fontSize: 11.5, fontFamily: 'var(--fm)', color: 'var(--text)' }}>{entregasResumo.entregue}/{entregasResumo.combinado}</span>
+              <Aderencia pct={entregasResumo.pct} />
+            </div>
+            <BarraEntrega feito={entregasResumo.entregue} qtd={entregasResumo.combinado} status={entregasStatus} />
+          </div>
+        )}
+        {pendencias.length > 0 && (
+          <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: 10, lineHeight: 1.45 }}>
+            Cadastro incompleto · falta {pendencias.length} {pendencias.length === 1 ? 'item' : 'itens'}
+          </p>
+        )}
       </button>
+
+      {stage === 'live' && onOpenFicha && (
+        <button onClick={onOpenFicha} style={{ ...S.toggle, color: pendencias.length ? 'var(--c)' : 'var(--muted)', borderColor: pendencias.length ? 'var(--c-border)' : 'var(--border)' }}>
+          <ClipboardCheck size={13} />
+          {pendencias.length ? 'Completar cadastro e ver entregas' : 'Contrato e entregas'}
+        </button>
+      )}
 
       {abertas.length > 0 && (
         <button onClick={() => setAberto(v => !v)} style={S.toggle}>
