@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Calendar, Package, Monitor, FileText, Rocket, ClipboardCheck, Target } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Calendar, Package, Monitor, FileText, Rocket, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -23,7 +23,8 @@ import IdvAddServiceModal from '../../components/sectors/creative/IdvAddServiceM
 import AppShell from '../../components/shared/AppShell';
 import EntregasPainel from '../../components/entregas/EntregasPainel';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
-import ComercialPage from '../../components/commercial/ComercialPage';
+import { ComercialTVControlConectado } from '../../components/commercial/ComercialTVControl';
+import { PageHeader } from '../../components/shared/ui';
 import { SECTORS } from '../../lib/firebase';
 
 const NAV = [
@@ -40,7 +41,6 @@ const NAV = [
   { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
   { key: 'agenda',        label: 'Agenda',          icon: Calendar },
   { key: 'tv',            label: 'Painel de TV',    icon: Monitor },
-  { key: 'comercial',     label: 'TV Comercial',    icon: Target },
 ];
 
 export default function AdminDashboard() {
@@ -69,6 +69,8 @@ export default function AdminDashboard() {
   const [taskSectorFilter, setTaskSectorFilter] = useState('');
   const [taskCollabFilter, setTaskCollabFilter] = useState('');
   const [showAddIdv, setShowAddIdv] = useState(false);
+  // Aba Painel de TV: qual das duas TVs o admin está controlando.
+  const [tvAlvo, setTvAlvo] = useState('operacional');
 
   // Admin completa cadastro, define escopo, ajusta mês e corrige marcação.
   const acoesEntregas = acoesDeEntregas(
@@ -272,11 +274,24 @@ export default function AdminDashboard() {
         ) : page === 'agenda' ? (
           <AdminAgenda toast={toast} />
         ) : page === 'tv' ? (
-          <AdminTVControl toast={toast} />
+          <div className="fade-up">
+            <PageHeader
+              title="Painel de TV"
+              sub={tvAlvo === 'operacional' ? 'TV da agência (/tv) — toda alteração chega em menos de um segundo' : 'TV da sala comercial (/tv/comercial) — os lançamentos ficam com o líder do comercial'}
+              right={(
+                <>
+                  <button type="button" className={`ui-btn small ${tvAlvo === 'operacional' ? 'on' : ''}`} onClick={() => setTvAlvo('operacional')}>TV Operacional</button>
+                  <button type="button" className={`ui-btn small ${tvAlvo === 'comercial' ? 'on' : ''}`} onClick={() => setTvAlvo('comercial')}>TV Comercial</button>
+                </>
+              )}
+            />
+            {tvAlvo === 'operacional'
+              ? <AdminTVControl toast={toast} hideHeader />
+              : <ComercialTVControlConectado toast={toast} />}
+          </div>
         ) : page === 'entregas' ? (
           <EntregasPainel clients={clients} acoes={acoesEntregas} toast={toast} titulo="Entregas × Contrato" />
-        ) : page === 'comercial' ? (
-          <ComercialPage clients={clients} me={user?.name} toast={toast} />
+
         ) : (
           <AdminCollaborators
             collaborators={collaborators}
