@@ -3,7 +3,7 @@ import { Kpi } from '../../shared/ui';
 import { differenceInDays } from 'date-fns';
 import { Activity, AlertTriangle, RefreshCw, CheckCircle, Users } from 'lucide-react';
 import { WD_SERVICE_CONFIG } from '../../../lib/firebase';
-import { wdCardsOf, wdJobsOf, WD_ACTIVE_STATUSES } from '../../../lib/wdJobs';
+import { wdCardsOf, wdJobsOf, WD_ACTIVE_STATUSES, wdOnboardingStart, wdOnboardingLate } from '../../../lib/wdJobs';
 
 function StatCard({ label, value, sub, color }) {
   const tone = color === 'var(--green)' ? 'good' : color === 'var(--amber)' ? 'warn' : (color === 'var(--neon)' || color === 'var(--red)') ? 'bad' : undefined;
@@ -23,10 +23,8 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
   const activeJobsOf = (c) => wdJobsOf(c).filter(j => WD_ACTIVE_STATUSES.includes(j.status));
   const activeClients = clients.filter(c => activeJobsOf(c).length > 0);
 
-  const overdueOnboarding = onboarding.filter(({ job }) => {
-    if (!job.onboardingStartedAt) return false;
-    return differenceInDays(now, new Date(job.onboardingStartedAt)) > 7;
-  });
+  // Prazo do onboarding conta da call agendada pela CS (wdOnboardingStart).
+  const overdueOnboarding = onboarding.filter(({ client, job }) => wdOnboardingLate(client, job));
 
   const overdueProduction = production.filter(({ job }) => {
     if (!job.productionStartedAt || !job.service) return false;
@@ -88,7 +86,7 @@ export default function WDOverview({ clients, collaborators, onNavigate }) {
             ? <p style={{ fontSize: 13, color: 'var(--green)', textAlign: 'center', padding: '12px 0' }}>✓ Todos os serviços estão no prazo.</p>
             : late.slice(0, 5).map(({ key, client: c, job }) => {
               const isOnb = job.status === 'onboarding';
-              const startDate = isOnb ? job.onboardingStartedAt : job.productionStartedAt;
+              const startDate = isOnb ? wdOnboardingStart(c, job) : job.productionStartedAt;
               const days = startDate ? differenceInDays(now, new Date(startDate)) : 0;
               const svc = WD_SERVICE_CONFIG[job.service]?.label || job.service;
               return (

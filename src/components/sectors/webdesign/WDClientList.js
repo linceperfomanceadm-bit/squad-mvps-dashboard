@@ -1,9 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { differenceInDays } from 'date-fns';
-import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, Trash2, FileText, Layers, Plus } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckSquare, Square, ArrowRight, RotateCcw, Trash2, FileText, Layers, Plus, CalendarClock } from 'lucide-react';
 import { WD_SERVICE_CONFIG, RECURRENCE_SERVICES } from '../../../lib/firebase';
 import Countdown from '../../shared/Countdown';
-import { wdCardsOf } from '../../../lib/wdJobs';
+import { wdCardsOf, wdOnboardingStart, wdOnboardingLate } from '../../../lib/wdJobs';
+
+const fmtDataHora = (iso) => new Date(iso).toLocaleString('pt-BR', {
+  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+});
 
 // ─── Progress Ring ─────────────────────────────────────────────
 function Ring({ checked, total }) {
@@ -42,8 +45,12 @@ function WDCard({ client, job, onMoveToProduction, onMoveBackToOnboarding, onUpd
   const allChecked = total > 0 && checked === total;
   const isOnboarding = wd.status === 'onboarding';
   const isProduction = wd.status === 'production';
-  const startDate = isOnboarding ? wd.onboardingStartedAt : (isProduction ? wd.productionStartedAt : null);
+  // Onboarding: o prazo parte da call de onboarding agendada pela CS,
+  // e não do cadastro (ver wdOnboardingStart).
+  const startDate = isOnboarding ? wdOnboardingStart(client, wd) : (isProduction ? wd.productionStartedAt : null);
   const totalDays = isOnboarding ? 7 : cfg.days || 30;
+  // Call marcada para o futuro: o prazo ainda não começou a correr.
+  const aguardandoCall = isOnboarding && startDate && new Date(startDate) > new Date();
 
   const handleCheck = (itemId, val) => {
     const updated = checklist.map(i => i.id === itemId ? { ...i, checked: !val, checkedAt: !val ? new Date().toISOString() : null } : i);
@@ -79,7 +86,12 @@ function WDCard({ client, job, onMoveToProduction, onMoveBackToOnboarding, onUpd
           </div>
         </div>
 
-        {startDate && <Countdown startDate={startDate} totalDays={totalDays} />}
+        {aguardandoCall ? (
+          <div style={S.aguardando}>
+            <CalendarClock size={13} style={{ flexShrink: 0 }} />
+            <span>Call de onboarding em <strong>{fmtDataHora(startDate)}</strong> — o prazo de {totalDays}d começa nela.</span>
+          </div>
+        ) : startDate && <Countdown startDate={startDate} totalDays={totalDays} />}
 
         {expanded && (
           <div style={S.body} className="fade-in">
@@ -175,7 +187,7 @@ export default function WDClientList({ clients, collaborators, page, prodSubTab,
   const prodCounts = {};
   Object.keys(WD_SERVICE_CONFIG).forEach(k => { prodCounts[k] = cards.filter(c => c.job.status === 'production' && c.job.service === k).length; });
   const PAGE_LABELS = { onboarding: 'Onboarding', production: 'Produção', inactive: 'Inativos', recurrence: 'Recorrência', finished: 'Finalizados' };
-  const overdueOnb = cards.filter(({ job }) => job.status === 'onboarding' && job.onboardingStartedAt && differenceInDays(new Date(), new Date(job.onboardingStartedAt)) > 7).length;
+  const overdueOnb = cards.filter(({ client, job }) => wdOnboardingLate(client, job)).length;
 
   return (
     <div>
@@ -241,6 +253,7 @@ const S = {
   recBadge: { background: 'var(--purple-dim)', border: '1px solid var(--purple-b)', borderRadius: 4, padding: '1px 6px', fontSize: 10, color: 'var(--purple)', marginLeft: 4 },
   xbtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '4px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   body: { borderTop: '1px solid var(--border)', paddingTop: 12, marginTop: 12 },
+  aguardando: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--blue) 25%, transparent)', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.45 },
   secLbl: { fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', marginBottom: 8, fontWeight: 600, textTransform: 'uppercase', fontFamily: 'var(--fm)' },
   moveProdBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: 'linear-gradient(135deg,rgba(238,51,99,.18),rgba(238,51,99,.08))', border: '1px solid var(--neon-border)', borderRadius: 9, padding: 10, color: 'var(--neon)', fontSize: 13, fontWeight: 600, width: '100%', marginBottom: 10, cursor: 'pointer', transition: 'all .2s' },
   backBtn: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '7px 12px', color: 'var(--muted)', fontSize: 12, width: '100%', marginBottom: 12, cursor: 'pointer' },
