@@ -22,6 +22,8 @@ const configOf = (sectorId) => (sectorId === 'admin' ? ADMIN_CONFIG : SECTORS[se
 
 const tagOf = (user, sectorId) => {
   if (sectorId === 'admin') return 'ADMIN';
+  // Líder da CS entra pelo painel da CS, mas o painel dele é só de gestão.
+  if (sectorId === 'cs' && Array.isArray(user?.leaderOf) && user.leaderOf.includes('cs')) return 'LÍDER DA CS';
   if (sectorId === 'cs') return 'CS OPERACIONAL';
   return (configOf(sectorId).label || '').toUpperCase();
 };
