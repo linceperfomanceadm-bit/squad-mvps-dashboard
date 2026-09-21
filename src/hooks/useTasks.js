@@ -2,9 +2,41 @@ import { useState, useEffect, useRef } from 'react';
 import {
   collection, onSnapshot, addDoc, updateDoc,
   deleteDoc, doc, serverTimestamp, query, orderBy,
+  writeBatch, FieldPath,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
+
+// ─── Ordem pessoal do Kanban ──────────────────────────────────
+// Cada pessoa organiza as colunas do jeito dela, arrastando o card
+// dentro da coluna. A ordem é PESSOAL: a mesma task aparece no board
+// de quem pediu e de quem executa, e um não pode bagunçar o outro.
+// Por isso ela fica num mapa dentro da própria task, por nome:
+//
+//   sortOrder: { 'Fulano': 0, 'Ciclana': 3000 }
+//
+// Recebe a coluna inteira já na ordem nova e grava só o que mudou,
+// numa escrita atômica. FieldPath em vez de 'sortOrder.Nome' porque
+// nome de pessoa pode ter ponto, e o ponto quebraria o caminho.
+//
+// Fica fora do hook de propósito: o Kanban é montado por vários
+// painéis e nenhum precisa repassar mais um handler para isso.
+export async function saveTaskOrder(userName, orderedIds, allTasks) {
+  if (!userName || !Array.isArray(orderedIds) || !orderedIds.length) return { success: true };
+  try {
+    const batch = writeBatch(db);
+    let mudou = 0;
+    orderedIds.forEach((id, i) => {
+      const valor = i * 1000;
+      const task = (allTasks || []).find(t => t.id === id);
+      if (task?.sortOrder?.[userName] === valor) return;
+      batch.update(doc(db, 'tasks', id), new FieldPath('sortOrder', userName), valor);
+      mudou += 1;
+    });
+    if (mudou) await batch.commit();
+    return { success: true };
+  } catch (err) { return { success: false, error: err.message }; }
+}
 
 // ─── Auto-reparo de tasks presas em aprovação ──────────────────
 // Bug histórico: ao enviar para aprovação sem escolher aprovador, a

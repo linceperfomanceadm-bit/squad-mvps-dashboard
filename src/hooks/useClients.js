@@ -19,8 +19,8 @@ export function useClients() {
     });
   }, []);
 
-  // Add client — o CS Comercial cadastra o cliente novo (estágio
-  // `kickoff`) ou o admin cadastra direto. Campos extras (bloco
+  // Add client — a CS cadastra o cliente novo (estágio `kickoff`) ou
+  // o admin cadastra direto. Campos extras (bloco
   // `contrato`, `kickoff`, etc.) são preservados: só `name`,
   // `responsibles` e os blocos de setor têm tratamento especial.
   //
@@ -32,7 +32,7 @@ export function useClients() {
     try {
       const { name, responsibles, wdService, idVisualResponsible, stage, ...extra } = data || {};
       const emFluxo = stage === 'kickoff' || stage === 'staffing' || stage === 'onboarding';
-      // Cadastro da CS Comercial: a call de Kick Off já nasce aberta,
+      // Cadastro da CS: a call de Kick Off já nasce aberta,
       // sem depender de responsáveis — eles vêm depois dela.
       const kickoffCall = stage === 'kickoff'
         ? { pending: true, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null }
@@ -456,19 +456,23 @@ export function useClients() {
   // ════════════════════════════════════════════════════════════
   //  ONBOARDING DE CLIENTES — duas calls
   //
-  //  kickoff    → CS COMERCIAL agenda e realiza a call de Kick Off.
-  //               A CS Operacional acompanha a data, sem agendar.
+  //  A CS é um time só e conduz o fluxo inteiro:
+  //
+  //  kickoff    → a CS agenda e realiza a call de Kick Off.
   //  staffing   → Kick Off realizado. Os LÍDERES de cada setor
-  //               indicam os responsáveis, pelo card travado na aba
-  //               de Onboarding da CS Operacional.
-  //  onboarding → quadro fechado. A CS OPERACIONAL agenda a call de
-  //               onboarding. É no AGENDAMENTO que o cliente vira
-  //               `active: true` e aparece para os responsáveis
-  //  live       → call de onboarding realizada, rotina normal
+  //               indicam os responsáveis e, ao mesmo tempo, a CS já
+  //               pode agendar a call de onboarding.
+  //  onboarding → quadro fechado. Se a call já estava marcada, ela
+  //               continua valendo — nada é zerado.
+  //  live       → call de onboarding realizada, rotina normal. Só
+  //               destrava com o quadro de responsáveis completo.
+  //
+  //  O AGENDAMENTO da call de onboarding é o que vira `active: true`
+  //  e mostra o cliente para os responsáveis.
   //
   //  Dois blocos separados no documento:
-  //    kickoffCall{} → call 1 (Kick Off), dona: CS Comercial
-  //    kickoff{}     → call 2 (Onboarding), dona: CS Operacional
+  //    kickoffCall{} → call 1 (Kick Off)
+  //    kickoff{}     → call 2 (Onboarding)
   //
   //  O nome `kickoff` para a call 2 é legado e foi mantido de
   //  propósito: é o que os clientes já cadastrados usam. Renomear
@@ -550,17 +554,20 @@ export function useClients() {
       const fechou = aindaFalta.length === 0 && client.stage === 'staffing';
 
       if (fechou) {
-        // Quadro completo: destrava a call de onboarding para a CS
-        // Operacional. O cliente CONTINUA invisível para os setores —
-        // só aparece quando essa call for agendada.
+        // Quadro completo. Como a call de onboarding pode ter sido
+        // agendada enquanto os líderes indicavam, o bloco `kickoff`
+        // só nasce aqui se ainda não existir agendamento — senão a
+        // data marcada seria apagada e o cliente sumiria do time.
         patch.stage = 'onboarding';
-        patch.active = false;
         patch['staffing.completedAt'] = new Date().toISOString();
-        patch.kickoff = {
-          pending: true, at: null, meetLink: '',
-          scheduledBy: null, scheduledAt: null,
-          confirmedAt: null, confirmedBy: null,
-        };
+        if (!client.kickoff?.at) {
+          patch.active = false;
+          patch.kickoff = {
+            pending: true, at: null, meetLink: '',
+            scheduledBy: null, scheduledAt: null,
+            confirmedAt: null, confirmedBy: null,
+          };
+        }
       }
 
       await updateDoc(doc(db, 'clients', clientId), patch);
@@ -580,10 +587,9 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── Call 1: Kick Off (CS Comercial) ──────────────────────────
+  // ── Call 1: Kick Off ─────────────────────────────────────────
   // Primeira etapa do ciclo: acontece logo após o cadastro, antes de
-  // existir qualquer responsável. Quem agenda é a CS Comercial; na
-  // ausência dela, o admin.
+  // existir qualquer responsável. Quem agenda é a CS (ou o admin).
   const scheduleKickoffCall = async (clientId, byName, at, meetLink) => {
     if (!at) return { success: false, error: 'Defina a data e a hora da call.' };
     try {
@@ -614,8 +620,8 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // Kick Off realizado: abre o staffing. O card travado aparece na
-  // aba de Onboarding da CS Operacional e só os líderes de cada setor
+  // Kick Off realizado: abre o staffing e, junto, libera a CS para
+  // agendar a call de onboarding. Só os líderes de cada setor
   // conseguem indicar quem fica com o cliente.
   const confirmKickoffCall = async (clientId, byName) => {
     try {
@@ -637,18 +643,26 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // ── Call 2: Onboarding (CS Operacional) ──────────────────────
+  // ── Call 2: Onboarding ───────────────────────────────────────
   // O agendamento é o gatilho de visibilidade: `active: true` faz o
   // cliente aparecer na aba de onboarding de cada responsável.
+  //
+  // Pode ser marcada logo depois do Kick Off, com os líderes ainda
+  // indicando o time. Nesse caso o estágio continua `staffing` até o
+  // último setor ser preenchido — quem fecha o quadro é o
+  // `setSectorResponsibles`, e ele preserva esta data.
   const scheduleOnboarding = async (clientId, byName, at, meetLink) => {
     if (!at) return { success: false, error: 'Defina a data e a hora da call.' };
     try {
       const client = clients.find(c => c.id === clientId);
-      if (client && pendingSectorsOf(client).length > 0) {
-        return { success: false, error: 'Ainda faltam responsáveis. A call de onboarding só abre com o quadro completo.' };
+      if (!client) return { success: false, error: 'Cliente não encontrado.' };
+      const estagio = stageOf(client);
+      if (estagio === 'kickoff') {
+        return { success: false, error: 'Marque o Kick Off como realizado antes de agendar o onboarding.' };
       }
+      const faltam = pendingSectorsOf(client).length > 0;
       await updateDoc(doc(db, 'clients', clientId), {
-        stage: 'onboarding',
+        stage: faltam ? 'staffing' : 'onboarding',
         active: true,
         'kickoff.pending': true,
         'kickoff.at': at,
@@ -660,10 +674,19 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // CS Operacional confirma que a call aconteceu. O cliente sai da
-  // aba de onboarding de todo mundo e entra na rotina normal.
+  // A CS confirma que a call aconteceu. O cliente sai da aba de
+  // onboarding de todo mundo e entra na rotina normal. Sem o quadro
+  // completo não entra: cliente na base sem responsável some das
+  // carteiras e ninguém produz.
   const confirmKickoff = async (clientId, byName) => {
     try {
+      const client = clients.find(c => c.id === clientId);
+      if (client) {
+        const faltam = pendingSectorsOf(client);
+        if (faltam.length) {
+          return { success: false, error: 'Ainda faltam responsáveis indicados. O cliente só entra na base com o quadro completo.' };
+        }
+      }
       await updateDoc(doc(db, 'clients', clientId), {
         stage: 'live',
         active: true,
@@ -675,15 +698,20 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
-  // Cancela um cadastro feito por engano. Só antes de qualquer
-  // indicação de responsável — depois disso o cliente já existe para
-  // outras pessoas e apagar viraria surpresa.
+  // Cancela um cadastro feito por engano. Vale no Kick Off e no
+  // staffing, antes de qualquer indicação de responsável e antes de a
+  // call de onboarding ser marcada — depois disso o cliente já existe
+  // para outras pessoas e apagar viraria surpresa.
   const cancelStaffing = async (clientId) => {
     try {
       const client = clients.find(c => c.id === clientId);
       if (!client) return { success: false, error: 'Cliente não encontrado.' };
-      if (client.stage !== 'staffing') {
-        return { success: false, error: 'Este cliente já está ativo na base.' };
+      const estagio = stageOf(client);
+      if (estagio !== 'kickoff' && estagio !== 'staffing') {
+        return { success: false, error: 'Este cliente já passou do staffing — não dá mais para cancelar o cadastro.' };
+      }
+      if (client.kickoff?.at) {
+        return { success: false, error: 'A call de onboarding já foi agendada — não dá para cancelar o cadastro.' };
       }
       // O CS Operacional já vem preenchido do cadastro, então ele NÃO
       // pode entrar nesta conta — senão nenhum cadastro seria mais
