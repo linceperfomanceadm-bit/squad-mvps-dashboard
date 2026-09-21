@@ -5,7 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../shared/Toast';
-import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES, onboardingAgendado } from '../../lib/firebase';
 import StaffingModal from './StaffingModal';
 import ClientOnboardingModal from './ClientOnboardingModal';
 import {
@@ -98,9 +98,11 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
 
   // 2. Clientes com a call de onboarding JÁ AGENDADA. Antes disso o
   //    cliente grava `active: false` e nem aparece aqui — é o que
-  //    garante que o time só o conhece quando há data marcada.
+  //    garante que o time só o conhece quando há data marcada. A call
+  //    pode ser marcada com o staffing ainda aberto, por isso vale
+  //    `onboardingAgendado` e não o estágio.
   const emOnboarding = useMemo(() => clients
-    .filter(c => c.active !== false && stageOf(c) === 'onboarding' && c.kickoff?.at)
+    .filter(c => c.active !== false && onboardingAgendado(c))
     .filter(c => isAdmin || souResponsavel(c))
     .sort((a, b) => {
       const aa = a.kickoff?.at ? new Date(a.kickoff.at).getTime() : Infinity;
@@ -191,11 +193,11 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
         </Bloco>
       )}
 
-      {/* 2. Kick Off — só o admin, para destravar na ausência da CS Comercial */}
+      {/* 2. Kick Off — só o admin, para destravar na ausência da CS */}
       {isAdmin && emKickoff.length > 0 && (
         <Bloco
           title="Aguardando Kick Off"
-          sub="Quadro fechado, esperando a CS Comercial marcar a call. Você pode agendar por ela se for preciso."
+          sub="Recém-cadastrados, esperando a CS marcar a call. Você pode agendar por ela se for preciso."
           color={KICKOFF_COLOR}
         >
           <div style={GRID}>
@@ -282,7 +284,7 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
       {kickoffSchedule && ReactDOM.createPortal(
         <ScheduleModal
           title={kickoffSchedule.kickoffCall?.at ? 'Reagendar Kick Off' : 'Agendar Kick Off'}
-          subtitle={`Call de Kick Off com ${kickoffSchedule.name}, entre CS Comercial e CS Operacional.`}
+          subtitle={`Call de Kick Off com ${kickoffSchedule.name}, conduzida pela CS.`}
           initialAt={toLocalInput(kickoffSchedule.kickoffCall?.at)}
           initialLink={kickoffSchedule.kickoffCall?.meetLink || ''}
           confirmLabel={kickoffSchedule.kickoffCall?.at ? 'Reagendar' : 'Agendar call'}

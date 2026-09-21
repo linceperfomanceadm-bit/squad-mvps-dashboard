@@ -5,13 +5,13 @@ import { SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE
 const COLOR = 'var(--c)';
 
 /*
- * CADASTRO DE CLIENTE — CS Comercial (e admin, na ausência dela).
+ * CADASTRO DE CLIENTE — CS (e admin).
  *
  * É o ponto de entrada do cliente no app. Ao salvar, o cliente nasce
  * em `stage: 'kickoff'` — a call de Kick Off é a primeira etapa. Ele
- * fica invisível para os setores até que, depois do Kick Off, os
- * líderes indiquem os responsáveis e a call de onboarding seja
- * agendada pela CS Operacional.
+ * fica invisível para os setores até que, depois do Kick Off, a CS
+ * agende a call de onboarding (os líderes indicam os responsáveis em
+ * paralelo, e quem já foi indicado passa a ver o cliente na hora).
  *
  * Etapa 1 — Cliente (nome na base + qualificação do contrato:
  *           empresa, representante legal e endereço destrinchado)
@@ -55,9 +55,9 @@ const empty = {
   services: [],
   serviceDescs: {},
   sectors: [],
-  // CS Operacional que vai tocar o cliente. Diferente dos demais
-  // setores, este não passa por indicação de líder: quem escolhe é a
-  // própria CS Comercial, aqui no cadastro.
+  // CS que vai tocar o cliente. Diferente dos demais setores, este
+  // não passa por indicação de líder: quem escolhe é a própria CS,
+  // aqui no cadastro.
   csResponsible: '',
   // Entregas com pipeline próprio. As duas convivem: dá para vender
   // ID Visual junto de um serviço web no mesmo contrato.
@@ -88,10 +88,9 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
 
   const set = (k, v) => setData(d => ({ ...d, [k]: v }));
 
-  // Só CS Operacional ativo entra na lista — a CS Comercial não vira
-  // responsável operacional pelo cliente.
+  // Qualquer CS ativa pode ficar com o cliente — o time é um só.
   const csOperacionais = collaborators.filter(
-    c => c.active !== false && c.sector === 'cs' && (c.csRole || 'operacional') === 'operacional'
+    c => c.active !== false && c.sector === 'cs'
   );
 
   const toggleService = (id) => setData(d => ({
@@ -270,10 +269,9 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
       services: servicos,
       briefing: data.briefing.trim(),
       observations: data.observations.trim(),
-      // Call 1 (Kick Off, CS Comercial) e call 2 (Onboarding, CS
-      // Operacional). Ambas só viram `pending: true` no seu momento:
-      // a primeira quando o quadro de responsáveis fecha, a segunda
-      // quando o Kick Off é dado como realizado.
+      // Call 1 (Kick Off) e call 2 (Onboarding), ambas da CS. O
+      // Kick Off já nasce aberto (o `addClient` marca `pending`); o
+      // onboarding só abre depois do Kick Off realizado.
       kickoffCall: { pending: false, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null },
       kickoff: { pending: false, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null },
       clientHealth: null,

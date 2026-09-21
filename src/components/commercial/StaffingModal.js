@@ -51,12 +51,9 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
     });
   };
 
-  const peopleOf = (sectorId) => collaborators.filter(c => {
-    if (c.sector !== sectorId || c.active === false) return false;
-    // No CS, quem toca o cliente no dia a dia é o time operacional.
-    if (sectorId === 'cs') return (c.csRole || 'operacional') === 'operacional';
-    return true;
-  });
+  // A CS é um time só: qualquer colaborador ativo do setor pode ser
+  // indicado, inclusive quem ainda está cadastrado como 'comercial'.
+  const peopleOf = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active !== false);
 
   const temIdVisual = !!contrato.hasIdVisual;
 

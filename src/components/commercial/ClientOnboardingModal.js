@@ -19,16 +19,17 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  * fazer. Quem passa handler, ganha botão:
  *
  *   onScheduleKickoff / onCancelKickoff / onConfirmKickoffCall
- *     → CS Comercial e admin. Só destrava com o quadro de
- *       responsáveis completo.
+ *     → CS e admin, no estágio de Kick Off. Não depende de
+ *       responsáveis — eles só são indicados depois do Kick Off.
  *
  *   onSchedule / onReschedule / onConfirm
- *     → CS Operacional e admin, depois do Kick Off realizado.
+ *     → CS e admin, depois do Kick Off realizado. Agendar não depende
+ *       do quadro; marcar como realizada, sim.
  *
  *   onRename
  *     → libera a edição do nome do cliente. Quem renomeia mexe em
  *       card, solicitação e documento já criados (o nome está
- *       copiado neles), então isso é da CS Comercial e do admin.
+ *       copiado neles), então isso é da CS e do admin.
  *
  *   onAddAttachment / onRemoveAttachment
  *     → anexos avulsos, adicionados depois do cadastro.
@@ -37,8 +38,8 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  *     → prazo do contrato. É a CS que registra o desfecho.
  *
  *   nenhum handler
- *     → leitura pura. É o caso da CS Operacional na aba Kick Off e
- *       dos responsáveis de setor na aba Onboarding.
+ *     → leitura pura. É o caso dos responsáveis de setor na aba
+ *       Onboarding.
  *
  * O anexo do CONTRATO nunca é renderizado aqui, de propósito: ele tem
  * CPF, CNPJ e valores e fica só guardado no Storage.
@@ -151,27 +152,19 @@ export default function ClientOnboardingModal({
         {/* ── Call 1: Kick Off ── */}
         <CallBlock
           label="CALL DE KICK OFF"
-          sublabel="CS Comercial + CS Operacional"
+          sublabel="CS + cliente"
           color={KICKOFF_COLOR}
           call={kickoffCall}
           client={client}
           kind="kickoff"
           participants={participantes}
-          waitingText={
-            !quadroCompleto
-              ? `Bloqueada até os líderes indicarem responsável em: ${faltando.map(s => SECTORS[s]?.label || s).join(', ')}.`
-              : 'Aguardando a CS Comercial definir data e hora.'
-          }
+          waitingText="Aguardando a CS definir data e hora."
         />
 
         {(onScheduleKickoff || onCancelKickoff || onConfirmKickoffCall) && stage === 'kickoff' && (
           <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
             {!kickoffCall.at && onScheduleKickoff && (
-              <button
-                style={{ ...BTN_PRIMARY, flex: 1, opacity: quadroCompleto ? 1 : .45, cursor: quadroCompleto ? 'pointer' : 'not-allowed' }}
-                disabled={!quadroCompleto}
-                onClick={onScheduleKickoff}
-              >
+              <button style={{ ...BTN_PRIMARY, flex: 1 }} onClick={onScheduleKickoff}>
                 Agendar Kick Off
               </button>
             )}
@@ -188,7 +181,9 @@ export default function ClientOnboardingModal({
         )}
 
         {/* ── Call 2: Onboarding ── */}
-        {(stage === 'onboarding' || stage === 'live' || onboardingCall.at) && (
+        {/* Aparece logo depois do Kick Off: a call pode ser marcada
+            enquanto os líderes ainda indicam o time. */}
+        {(stage !== 'kickoff' || onboardingCall.at) && (
           <>
             <CallBlock
               label="CALL DE ONBOARDING"
@@ -198,7 +193,7 @@ export default function ClientOnboardingModal({
               client={client}
               kind="onboarding"
               participants={participantes}
-              waitingText="Aguardando a CS Operacional definir data e hora."
+              waitingText="Aguardando a CS definir data e hora."
             />
 
             {(onSchedule || onReschedule || onConfirm) && (
@@ -210,9 +205,21 @@ export default function ClientOnboardingModal({
                   <button style={{ ...BTN_CANCEL, flex: 1 }} onClick={onReschedule}>Reagendar</button>
                 )}
                 {onboardingCall.at && onConfirm && (
-                  <button style={{ ...BTN_GREEN, flex: 1 }} onClick={onConfirm}>✓ Call realizada</button>
+                  <button
+                    style={{ ...BTN_GREEN, flex: 1, opacity: quadroCompleto ? 1 : .45, cursor: quadroCompleto ? 'pointer' : 'not-allowed' }}
+                    disabled={!quadroCompleto}
+                    title={quadroCompleto ? undefined : 'Falta responsável em algum setor'}
+                    onClick={onConfirm}
+                  >
+                    ✓ Call realizada
+                  </button>
                 )}
               </div>
+            )}
+            {onboardingCall.at && onConfirm && !quadroCompleto && (
+              <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: -10, marginBottom: 16, lineHeight: 1.5 }}>
+                O cliente só entra na base com todos os responsáveis indicados.
+              </p>
             )}
           </>
         )}
