@@ -1,6 +1,8 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Plus, X } from 'lucide-react';
-import { TASK_COLUMNS } from '../../lib/firebase';
+import { TASK_COLUMNS, TASK_PRIORITIES } from '../../lib/firebase';
+import { saveTaskOrder } from '../../hooks/useTasks';
+import { taskCreatedAt } from '../../lib/taskTime';
 import TaskCard from './TaskCard';
 import TaskModal from './TaskModal';
 import CreateTaskModal from './CreateTaskModal';
@@ -23,6 +25,38 @@ const DATE_FILTERS = [
   { id: 'none',     label: 'Sem prazo' },
 ];
 
+// Ordenação das colunas. "Minha ordem" é a que a pessoa monta
+// arrastando o card dentro da coluna; task que ela ainda não
+// organizou entra no topo, pelo prazo mais próximo — é o que é novo
+// para ela.
+const SORT_OPTIONS = [
+  { id: 'manual',        label: 'Minha ordem' },
+  { id: 'deadline_asc',  label: 'Prazo mais próximo' },
+  { id: 'deadline_desc', label: 'Prazo mais distante' },
+  { id: 'created_desc',  label: 'Criadas recentemente' },
+  { id: 'created_asc',   label: 'Criadas há mais tempo' },
+  { id: 'priority',      label: 'Prioridade' },
+];
+
+const PRIORITY_RANK = Object.fromEntries(TASK_PRIORITIES.map((p, i) => [p.id, TASK_PRIORITIES.length - i]));
+const createdMs = (t) => { const d = taskCreatedAt(t); return d ? d.getTime() : 0; };
+// Sem prazo vai para o fim nas duas direções — é o que menos aperta.
+const byDeadline = (dir) => (a, b) => {
+  if (!a.deadline && !b.deadline) return createdMs(a) - createdMs(b);
+  if (!a.deadline) return 1;
+  if (!b.deadline) return -1;
+  if (a.deadline === b.deadline) return createdMs(a) - createdMs(b);
+  return a.deadline < b.deadline ? -dir : dir;
+};
+
+const sortKey = (userName) => `kanban-sort:${userName || 'anon'}`;
+const readSort = (userName) => {
+  try {
+    const v = window.localStorage.getItem(sortKey(userName));
+    return SORT_OPTIONS.some(o => o.id === v) ? v : 'manual';
+  } catch { return 'manual'; }
+};
+
 export default function TaskKanban({
   tasks, clients, collaborators,
   allClients,
@@ -42,10 +76,18 @@ export default function TaskKanban({
   const [showCreate, setShowCreate] = useState(false);
   const [draggingId, setDraggingId] = useState(null);
   const [dragOverCol, setDragOverCol] = useState(null);
+  // Onde o card vai cair dentro da coluna: { col, index }.
+  const [dropSlot, setDropSlot] = useState(null);
   const [clientFilter, setClientFilter] = useState('');
   const [dateFilter, setDateFilter] = useState('');
   const [scope, setScope] = useState('mine');
+  const [sortMode, setSortMode] = useState(() => readSort(currentUser));
   const dragTask = useRef(null);
+
+  // Preferência de ordenação por pessoa, lembrada neste navegador.
+  useEffect(() => {
+    try { window.localStorage.setItem(sortKey(currentUser), sortMode); } catch { /* sem storage, segue na memória */ }
+  }, [sortMode, currentUser]);
 
   const temEscopo = readOnly && Array.isArray(myClientIds);
 
@@ -140,37 +182,119 @@ export default function TaskKanban({
     const c = t.completedAt?.toDate ? t.completedAt.toDate() : t.completedAt ? new Date(t.completedAt) : null;
     return !!c && c >= inicioMes;
   };
-  const tasksByColumn = (colId) => visibleTasks.filter(t => t.status === colId && doneNoMes(t));
+  // Ordena uma lista de tasks conforme o modo escolhido.
+  const sortTasks = (list) => {
+    const arr = [...list];
+    if (sortMode === 'deadline_asc')  return arr.sort(byDeadline(1));
+    if (sortMode === 'deadline_desc') return arr.sort(byDeadline(-1));
+    if (sortMode === 'created_desc')  return arr.sort((a, b) => createdMs(b) - createdMs(a));
+    if (sortMode === 'created_asc')   return arr.sort((a, b) => createdMs(a) - createdMs(b));
+    if (sortMode === 'priority') {
+      return arr.sort((a, b) => ((PRIORITY_RANK[b.priority] || 0) - (PRIORITY_RANK[a.priority] || 0)) || byDeadline(1)(a, b));
+    }
+    // Minha ordem: sem posição definida primeiro (pelo prazo), depois
+    // as que a pessoa já organizou.
+    const pos = (t) => t.sortOrder?.[currentUser];
+    const temPos = (t) => typeof pos(t) === 'number';
+    return arr.sort((a, b) => {
+      const pa = temPos(a), pb = temPos(b);
+      if (pa !== pb) return pa ? 1 : -1;
+      if (!pa) return byDeadline(1)(a, b);
+      return pos(a) - pos(b);
+    });
+  };
+
+  const tasksByColumn = (colId) => sortTasks(visibleTasks.filter(t => t.status === colId && doneNoMes(t)));
   const doneOcultas = visibleTasks.filter(t => t.status === 'done' && !doneNoMes(t)).length;
 
   // ── Drag handlers ─────────────────────────────────────────────
-  const handleDragStart = (e, task) => {
-    dragTask.current = task;
-    setDraggingId(task.id);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragEnd = () => {
+  // Dois gestos no mesmo arraste:
+  //  · soltar em OUTRA coluna → muda o status (regras de sempre);
+  //  · soltar na MESMA coluna → reordena (ordem pessoal, vale para
+  //    qualquer um, inclusive no modo acompanhamento da CS).
+  const limparArraste = () => {
     setDraggingId(null);
     setDragOverCol(null);
+    setDropSlot(null);
     dragTask.current = null;
+  };
+
+  const handleDragStart = (e, task) => {
+    dragTask.current = task;
+    e.dataTransfer.effectAllowed = 'move';
+    // Sem dado no dataTransfer o Firefox nem começa o arraste.
+    try { e.dataTransfer.setData('text/plain', task.id); } catch { /* ok */ }
+    // Adia o estado para o navegador capturar a "foto" do card antes
+    // de ele ficar transparente.
+    setTimeout(() => setDraggingId(task.id), 0);
   };
 
   const handleDragOver = (e, colId) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    setDragOverCol(colId);
+    if (dragOverCol !== colId) setDragOverCol(colId);
+
+    // Posição de inserção pela altura do mouse em relação ao meio de
+    // cada card da coluna.
+    const cards = e.currentTarget.querySelectorAll('[data-kanban-card]');
+    let index = cards.length;
+    for (let i = 0; i < cards.length; i += 1) {
+      const r = cards[i].getBoundingClientRect();
+      if (e.clientY < r.top + r.height / 2) { index = i; break; }
+    }
+    if (!dropSlot || dropSlot.col !== colId || dropSlot.index !== index) setDropSlot({ col: colId, index });
+  };
+
+  // dragleave dispara ao passar por cima de cada filho da coluna. Só
+  // limpa quando o mouse sai de verdade — era isso que fazia o destaque
+  // piscar e o card "não pegar" na coluna do lado.
+  const handleDragLeave = (e, colId) => {
+    if (e.currentTarget.contains(e.relatedTarget)) return;
+    if (dragOverCol === colId) setDragOverCol(null);
+    if (dropSlot?.col === colId) setDropSlot(null);
+  };
+
+  const reorder = async (task, colId, index) => {
+    const visiveis = tasksByColumn(colId);
+    const de = visiveis.findIndex(t => t.id === task.id);
+    if (de < 0) return;
+    let para = index;
+    if (de < para) para -= 1;
+    if (para === de) return;
+
+    const semEle = visiveis.filter(t => t.id !== task.id);
+    const vizinho = semEle[para] || null;   // card que vai ficar logo abaixo
+
+    // A ordem é gravada sobre a coluna INTEIRA (sem filtro de tela),
+    // para um filtro ativo não embaralhar as tasks escondidas.
+    const coluna = sortTasks(baseTasks.filter(t => t.status === colId)).map(t => t.id).filter(id => id !== task.id);
+    let alvo;
+    if (vizinho) alvo = coluna.indexOf(vizinho.id);
+    else {
+      const ultimo = semEle[semEle.length - 1];
+      alvo = ultimo ? coluna.indexOf(ultimo.id) + 1 : coluna.length;
+    }
+    if (alvo < 0) alvo = coluna.length;
+    coluna.splice(alvo, 0, task.id);
+
+    if (sortMode !== 'manual') setSortMode('manual');
+    await saveTaskOrder(currentUser, coluna, tasks);
   };
 
   const handleDrop = async (e, targetColId) => {
     e.preventDefault();
     const task = dragTask.current;
-    setDraggingId(null);
-    setDragOverCol(null);
-    dragTask.current = null;
+    const slot = dropSlot;
+    limparArraste();
+
+    if (!task) return;
+
+    if (task.status === targetColId) {
+      if (slot && slot.col === targetColId) await reorder(task, targetColId, slot.index);
+      return;
+    }
 
     if (readOnly) return;
-    if (!task || task.status === targetColId) return;
 
     const isResponsible = task.responsibleName === currentUser ||
       (Array.isArray(task.responsibleNames) && task.responsibleNames.includes(currentUser));
@@ -198,6 +322,16 @@ export default function TaskKanban({
       setSelectedTaskId(task.id);
       return;
     }
+  };
+
+  // Linha de inserção: só no reordenar (mesma coluna) e só quando a
+  // posição muda de fato.
+  const draggingTask = draggingId ? tasks.find(t => t.id === draggingId) : null;
+  const mostraLinha = (colId, colTasks, index) => {
+    if (!draggingTask || draggingTask.status !== colId) return false;
+    if (!dropSlot || dropSlot.col !== colId || dropSlot.index !== index) return false;
+    const de = colTasks.findIndex(t => t.id === draggingTask.id);
+    return index !== de && index !== de + 1;
   };
 
   return (
@@ -278,6 +412,17 @@ export default function TaskKanban({
           ))}
         </select>
 
+        <select
+          value={sortMode}
+          onChange={e => setSortMode(e.target.value)}
+          title="Ordem dos cards em cada coluna. Arraste um card dentro da coluna para montar a sua ordem."
+          style={{ ...S.filter, minWidth: 190 }}
+        >
+          {SORT_OPTIONS.map(o => (
+            <option key={o.id} value={o.id}>Ordenar: {o.label}</option>
+          ))}
+        </select>
+
         {filtroAtivo && (
           <button onClick={limparFiltros} style={S.clearBtn}>
             <X size={13} /> Limpar filtros
@@ -286,7 +431,9 @@ export default function TaskKanban({
       </div>
 
       {/* Kanban columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, alignItems: 'start' }}>
+      {/* stretch: a coluna inteira vira área de soltar, e não só a
+          altura dos cards que ela tem. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, alignItems: 'stretch' }}>
         {TASK_COLUMNS.map(col => {
           const colTasks     = tasksByColumn(col.id);
           const reworkCount  = colTasks.filter(t => t.isRework).length;
@@ -302,7 +449,7 @@ export default function TaskKanban({
                 transition: 'all .15s ease',
               }}
               onDragOver={e => handleDragOver(e, col.id)}
-              onDragLeave={() => setDragOverCol(null)}
+              onDragLeave={e => handleDragLeave(e, col.id)}
               onDrop={e => handleDrop(e, col.id)}
             >
               {/* Column header */}
@@ -328,30 +475,32 @@ export default function TaskKanban({
                 </div>
               </div>
 
-              {/* Drop hint */}
-              {isDragTarget && draggingId && (
-                <div style={{ border: `2px dashed color-mix(in srgb, ${col.color} 31%, transparent)`, borderRadius: 8, padding: '12px', marginBottom: 8, textAlign: 'center' }}>
-                  <span style={{ fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>Soltar aqui</span>
-                </div>
-              )}
-
-              {/* Tasks */}
-              {colTasks.length === 0 && !isDragTarget ? (
-                <p style={{ fontSize: 12, color: 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: .5 }}>
-                  {filtroAtivo ? 'Nada com esse filtro' : 'Vazio'}
+              {/* Tasks. O destaque de "soltar aqui" é a borda da coluna —
+                  nada é inserido no meio da lista, então os cards não
+                  pulam de lugar enquanto se arrasta. */}
+              {colTasks.length === 0 ? (
+                <p style={{ fontSize: 12, color: isDragTarget ? col.color : 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: isDragTarget ? .9 : .5, fontFamily: isDragTarget ? 'var(--fm)' : undefined }}>
+                  {isDragTarget && draggingId ? 'Soltar aqui' : filtroAtivo ? 'Nada com esse filtro' : 'Vazio'}
                 </p>
               ) : (
-                colTasks.map(task => (
-                  <div
-                    key={task.id}
-                    draggable={!readOnly}
-                    onDragStart={readOnly ? undefined : (e => handleDragStart(e, task))}
-                    onDragEnd={readOnly ? undefined : handleDragEnd}
-                    style={{ opacity: draggingId === task.id ? 0.4 : 1, cursor: readOnly ? 'pointer' : 'grab', transition: 'opacity .15s' }}
-                  >
-                    <TaskCard task={task} onClick={() => setSelectedTaskId(task.id)} />
+                <>
+                  {colTasks.map((task, i) => (
+                    <div
+                      key={task.id}
+                      data-kanban-card
+                      draggable
+                      onDragStart={e => handleDragStart(e, task)}
+                      onDragEnd={limparArraste}
+                      style={{ position: 'relative', opacity: draggingId === task.id ? 0.35 : 1, cursor: 'grab', transition: 'opacity .15s' }}
+                    >
+                      {mostraLinha(col.id, colTasks, i) && <DropLine color={col.color} />}
+                      <TaskCard task={task} onClick={() => setSelectedTaskId(task.id)} />
+                    </div>
+                  ))}
+                  <div style={{ position: 'relative', height: 0 }}>
+                    {mostraLinha(col.id, colTasks, colTasks.length) && <DropLine color={col.color} />}
                   </div>
-                ))
+                </>
               )}
             </div>
           );
@@ -395,6 +544,15 @@ export default function TaskKanban({
         />
       )}
     </div>
+  );
+}
+
+function DropLine({ color }) {
+  return (
+    <div style={{
+      position: 'absolute', left: 2, right: 2, top: -6, height: 3, borderRadius: 3,
+      background: color, boxShadow: `0 0 10px ${color}`, pointerEvents: 'none', zIndex: 2,
+    }} />
   );
 }
 
