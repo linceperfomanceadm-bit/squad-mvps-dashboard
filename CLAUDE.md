@@ -112,7 +112,7 @@ Criar colaborador usa uma **instância secundária e descartável do Firebase** 
 
 **A CS é um time só.** Não existe mais CS Comercial: toda a CS faz o fluxo inteiro, do cadastro à entrada do cliente na base. `CS_ROLES` tem só `operacional`; colaboradores antigos com `csRole: 'comercial'` caem no mesmo painel, e `/cs-comercial` ficou como redirecionamento. O setor Comercial (SDR/Closer) foi removido — o cadastro manual pela CS é a única porta de entrada de cliente.
 
-**Líder da CS = líder do comercial.** Não é setor nem rota própria: é quem tem `'cs'` em `leaderOf`. Entra pelo acesso da CS e ganha as abas "Gestão do Time" e "Comercial" no `CSOperacionalDashboard` (o admin também vê).
+**Líder da CS = líder do comercial.** Não é setor nem rota própria: é quem tem `'cs'` em `leaderOf`. Entra pelo acesso da CS, mas o `CSOperacionalDashboard` vira um painel **só de gestão** (`modoGestao`): Gestão do Time, Carteira de todas as CSs, Comercial e Agenda — sem cadastro, Kick Off, onboarding ou solicitações. A etiqueta do usuário mostra "LÍDER DA CS".
 
 As guardas do front são só UX — a barreira real são as regras do Firestore. Toda coleção nova precisa de regra separando equipe (`isStaff()`) de acesso anônimo (`isAnon()`); o anônimo (Painel de TV) só lê `tasks`, `clients` e `app_config`.
 
@@ -188,9 +188,9 @@ Persistência em `useDocuments.js`: o documento inteiro (dados, slides extras, s
 - **Marcações** em `entregas['AAAA-MM'] = { feito: {itemId: n}, qtd: {itemId: n}, log: [...] }`. `qtd` é ajuste só daquele mês (cliente que entrou no meio do mês). O que falta não acumula para o mês seguinte.
 - Regras da agência: o mês vira no dia 1 para todos; o mês anterior aceita marcação até o dia 5 (`mesesEditaveis`); o ritmo esperado usa tempo útil (`fracaoDoMes` → `businessMsBetween`).
 - Entregas únicas (site, ID Visual) **não** têm checklist novo: `entregasUnicas` lê `wdJobsOf` e o bloco `idv`.
-- `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Completar é o `ClienteCadastroModal` (CS, líder e admin).
+- `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Contam só prazo, serviços e escopo; arquivo do contrato e briefing são opcionais. Completar é o `ClienteCadastroModal` (CS, líder e admin).
 - Escrita no `useClients`: `saveCadastro`, `saveEscopo`, `ajustarMesEntregas`, `marcarEntrega` (transação), `transferirCS`. As telas recebem essas funções já embrulhadas por `acoesDeEntregas` (`components/entregas/acoes.js`); ação ausente esconde o botão.
-- Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin e da CS), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
+- Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin; na CS o acompanhamento fica no card da Carteira de Clientes, por decisão de produto), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
 
 ### Comercial (Hunters)
 
@@ -199,7 +199,7 @@ Tudo lançado à mão pelo líder do comercial (o CRM é externo). Fica em `app_
 - `app_config/comercial` — controles da TV comercial (mesmos campos `tv*` da TV operacional) + `closers[]` e `sdrs[]`.
 - `app_config/comercial_AAAA-MM` — `meta`, `leads`, `vendas[]`, `sdr{ [chaveSdr(nome)]: { agendados, realizados, noShow } }`, `churn[]`.
 
-`src/hooks/useComercial.js` escreve (painel), `src/hooks/useComercialTVData.js` lê anônimo (TV), `src/lib/comercial.js` calcula meta, ritmo, rankings, funil, carteira e alertas para os dois. A TV (`pages/TVComercial.js`) segue o padrão da `/tv` — CSS próprio, palco 1920×1080, cinco cenas — com identidade Hunters (grafite, prata e o dourado do emblema só em conquista). **Diferente da `/tv`, mostra R$**: fica na sala do comercial. O modo visita esconde todo valor e a cena de alerta. Churn do mês soma o lançado à mão com os contratos encerrados pela CS no mês.
+No admin, a TV comercial é controlada dentro da aba "Painel de TV" (troca TV Operacional / TV Comercial); os lançamentos ficam com o líder. `src/hooks/useComercial.js` escreve (painel), `src/hooks/useComercialTVData.js` lê anônimo (TV), `src/lib/comercial.js` calcula meta, ritmo, rankings, funil, carteira e alertas para os dois. A TV (`pages/TVComercial.js`) segue o padrão da `/tv` — CSS próprio, palco 1920×1080, cinco cenas — com identidade Hunters (grafite, prata e o dourado do emblema só em conquista). **Diferente da `/tv`, mostra R$**: fica na sala do comercial. O modo visita esconde todo valor e a cena de alerta. Churn do mês soma o lançado à mão com os contratos encerrados pela CS no mês.
 
 ## Visual
 
