@@ -22,7 +22,7 @@ const configOf = (sectorId) => (sectorId === 'admin' ? ADMIN_CONFIG : SECTORS[se
 
 const tagOf = (user, sectorId) => {
   if (sectorId === 'admin') return 'ADMIN';
-  if (sectorId === 'cs' && user?.csRole) return user.csRole === 'comercial' ? 'CS COMERCIAL' : 'CS OPERACIONAL';
+  if (sectorId === 'cs') return 'CS OPERACIONAL';
   return (configOf(sectorId).label || '').toUpperCase();
 };
 
