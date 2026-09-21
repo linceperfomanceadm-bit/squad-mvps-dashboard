@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Users, FileText, Kanban, AlertTriangle } from 'lucide-react';
 import { resolveClientHealth, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
 import SMClientModal from './SMClientModal';
+import { entregasDoSetor, resumoMes, statusGeral, mesChave, acompanhaEntregas } from '../../../lib/entregas';
+import { BarraEntrega } from '../../entregas/EntregasKit';
 
 // ─────────────────────────────────────────────────────────────
 // Mural do Social Media
@@ -12,7 +14,7 @@ import SMClientModal from './SMClientModal';
 // ─────────────────────────────────────────────────────────────
 
 export default function SMMural({
-  clients, documents, tasks, onAbrirDocumento, onNovoDocumento,
+  clients, documents, tasks, onAbrirDocumento, onNovoDocumento, acoesEntregas,
 }) {
   const [aberto, setAberto] = useState(null);
 
@@ -49,6 +51,10 @@ export default function SMMural({
             const saude = resolveClientHealth(c);
             const nivel = saude && HEALTH_LEVELS_4[saude.level];
             const semBase = !c.sm?.baseCalculo;
+            // Entregas do mês do Social Media (escopo do contrato).
+            const mes = mesChave();
+            const entregas = acompanhaEntregas(c, mes) ? entregasDoSetor(c, 'socialmedia', mes) : [];
+            const resumo = resumoMes(entregas);
 
             return (
               <button key={c.id} type="button" style={S.card} onClick={() => setAberto(c.id)}>
@@ -74,6 +80,16 @@ export default function SMMural({
                     {abertas.length} {abertas.length === 1 ? 'task' : 'tasks'}
                   </span>
                 </div>
+
+                {entregas.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--muted)', marginBottom: 6 }}>
+                      <span>Entregas do mês</span>
+                      <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{resumo.entregue}/{resumo.combinado}</span>
+                    </div>
+                    <BarraEntrega feito={resumo.entregue} qtd={resumo.combinado} status={statusGeral(entregas, mes)} />
+                  </div>
+                )}
 
                 {(atrasadas > 0 || semBase) && (
                   <div style={S.avisos}>
@@ -104,6 +120,7 @@ export default function SMMural({
           onClose={() => setAberto(null)}
           onAbrirDocumento={onAbrirDocumento}
           onNovoDocumento={onNovoDocumento}
+          acoesEntregas={acoesEntregas}
         />
       )}
     </div>

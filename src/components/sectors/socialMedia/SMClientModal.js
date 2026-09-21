@@ -1,9 +1,11 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { X, FileText, Kanban, Palette, Calculator, Plus, ExternalLink } from 'lucide-react';
+import { X, FileText, Kanban, Palette, Calculator, Plus, ExternalLink, ListChecks } from 'lucide-react';
 import { docPorId } from '../../../lib/docs/catalogo';
 import { DOC_STATUS } from '../../../hooks/useDocuments';
 import { resolveClientHealth, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
+import { entregasDoSetor, resumoMes, mesChave, rotuloMes, acompanhaEntregas } from '../../../lib/entregas';
+import { LinhaEntrega, Aderencia } from '../../entregas/EntregasKit';
 
 // ─────────────────────────────────────────────────────────────
 // Mural do Social Media — FICHA DO CLIENTE
@@ -42,9 +44,14 @@ function Bloco({ icone: Icone, titulo, acao, children }) {
 }
 
 export default function SMClientModal({
-  cliente, documentos, tasks, onClose, onAbrirDocumento, onNovoDocumento,
+  cliente, documentos, tasks, onClose, onAbrirDocumento, onNovoDocumento, acoesEntregas,
 }) {
   if (!cliente) return null;
+
+  // Checklist do mês: só os itens de Social Media do escopo do contrato.
+  const mes = mesChave();
+  const entregas = acompanhaEntregas(cliente, mes) ? entregasDoSetor(cliente, 'socialmedia', mes) : [];
+  const resumoEntregas = resumoMes(entregas);
 
   const saude = resolveClientHealth(cliente);
   const nivel = saude && HEALTH_LEVELS_4[saude.level];
@@ -73,6 +80,25 @@ export default function SMClientModal({
         </header>
 
         <div style={S.corpo}>
+          {/* Entregas do mês — o que o contrato prevê e o que já foi feito */}
+          {entregas.length > 0 && (
+            <Bloco
+              icone={ListChecks}
+              titulo={`Entregas de ${rotuloMes(mes)}`}
+              acao={<Aderencia pct={resumoEntregas.pct} />}
+            >
+              {entregas.map((it) => (
+                <LinhaEntrega
+                  key={it.id}
+                  item={it}
+                  mes={mes}
+                  compacta
+                  onMarcar={acoesEntregas?.marcar ? (itemId, delta) => acoesEntregas.marcar(cliente.id, mes, itemId, delta) : undefined}
+                />
+              ))}
+            </Bloco>
+          )}
+
           {/* Base de cálculo — a decisão que atravessa todos os relatórios */}
           <Bloco icone={Calculator} titulo="Base de cálculo do engajamento">
             {base ? (
