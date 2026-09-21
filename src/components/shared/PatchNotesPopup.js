@@ -14,17 +14,16 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-06-1';
+export const PATCH_VERSION = '2026-09-1';
  
 const PATCH_NOTES = {
-  date: 'Junho de 2026',
+  date: 'Setembro de 2026',
   title: 'Novidades no painel',
   items: [
-    { emoji: '👥', text: 'Agora uma task pode ter mais de um responsável.' },
-    { emoji: '📅', text: 'Dá para alterar a data de entrega de uma task — basta justificar a mudança.' },
-    { emoji: '✅', text: 'O "Meu Dia" foi repaginado: um botão único para criar atividades (anotação, card ou lembrete).' },
-    { emoji: '🤝', text: 'No cadastro de clientes, cada setor pode ter mais de um responsável.' },
-    { emoji: '🛠️', text: 'Corrigimos a data de entrega que aparecia um dia antes.' },
+    { emoji: '✅', text: 'Nova aba "Entregas do Mês": o checklist do que o contrato de cada cliente prevê no mês. Cada entrega feita, é só marcar.' },
+    { emoji: '📋', text: 'A CS agora vê o contrato contra o que foi entregue, cliente por cliente, com o histórico de cada mês.' },
+    { emoji: '🗂️', text: 'Clientes antigos podem ter o cadastro completado: tempo de contrato, contrato, briefing, serviços e entregas mensais.' },
+    { emoji: '🌐', text: 'Site e ID Visual aparecem no card do cliente como concluídos ou em andamento, direto dos painéis de Web e Design.' },
   ],
 };
  
