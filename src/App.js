@@ -23,6 +23,8 @@ import PortalDashboard from './pages/PortalDashboard';
 // Painel de parede: carregado sob demanda para não pesar o bundle de
 // quem só usa o dashboard normal.
 const TVPanel = lazy(() => import('./pages/TVPanel'));
+// TV da sala comercial (Hunters) — mesma lógica: pública, anônima, sob demanda.
+const TVComercial = lazy(() => import('./pages/TVComercial'));
 
 // Destino do usuário de CS. A CS virou um time só — quem ainda está
 // cadastrado como 'comercial' cai no mesmo painel.
@@ -140,6 +142,15 @@ function AppRoutes() {
       <Route path="/tv" element={
         <Suspense fallback={<div style={{ minHeight: '100vh', background: '#050508' }} />}>
           <TVPanel />
+        </Suspense>
+      } />
+
+      {/* TV da sala comercial — pública e anônima como a /tv, mas mostra
+          meta e vendas em R$ (fica na sala do comercial). O modo visita
+          esconde todo valor. */}
+      <Route path="/tv/comercial" element={
+        <Suspense fallback={<div style={{ minHeight: '100vh', background: '#08090b' }} />}>
+          <TVComercial />
         </Suspense>
       } />
 
