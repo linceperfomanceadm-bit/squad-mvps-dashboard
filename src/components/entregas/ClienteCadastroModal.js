@@ -179,7 +179,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
         </div>
 
         <div style={{ marginTop: 12 }}>
-          <p style={LBL}>ARQUIVO DO CONTRATO</p>
+          <p style={LBL}>ARQUIVO DO CONTRATO (OPCIONAL)</p>
           <div style={S.arquivo}>
             {contratoAtual ? (
               <>
@@ -233,7 +233,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
         ))}
 
         {/* ── Briefing ─────────────────────────────── */}
-        <h4 style={S.sec}>Briefing</h4>
+        <h4 style={S.sec}>Briefing <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>opcional</span></h4>
         <textarea rows={4} value={f.briefing} onChange={e => set('briefing', e.target.value)} placeholder="Contexto do cliente, objetivos, público, tom de voz..." style={{ ...INP, resize: 'vertical' }} />
         <div style={{ ...S.arquivo, marginTop: 8 }}>
           {briefingAtual ? (
