@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction, deleteField } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
+import { versoesDoEscopo, inicioNovaVersao, novoIdItem } from '../lib/entregas';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -923,6 +924,185 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Completar cadastro ──────────────────────────────────────
+  // Clientes antigos nasceram antes de o cadastro ter prazo, anexos e
+  // serviços. Esta é a porta para completar qualquer cliente depois,
+  // sem migração: CS, líder da CS e admin preenchem o que faltar.
+  //
+  // Cada campo é gravado no bloco `contrato` (formato novo) e no
+  // espelho do topo do doc (formato que as telas antigas leem), como
+  // o cadastro já faz. Só entra no patch o que veio em `dados`.
+  const saveCadastro = async (clientId, dados = {}, byName) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    const patch = {};
+    const agora = new Date().toISOString();
+
+    if ('contractMonths' in dados) {
+      const meses = Math.max(0, Math.round(Number(dados.contractMonths) || 0));
+      patch['contrato.contractMonths'] = meses ? String(meses) : '';
+      patch.contractMonths = meses ? String(meses) : '';
+      // `contract.baseMonths` é o que o relógio do contrato lê primeiro.
+      patch['contract.baseMonths'] = meses;
+    }
+    if ('contractStart' in dados) {
+      // Data escolhida em "AAAA-MM-DD" vira meio-dia local, para não
+      // voltar um dia em fuso negativo. Vazio devolve ao padrão (call
+      // de onboarding realizada).
+      const v = String(dados.contractStart || '').trim();
+      if (v) {
+        const [y, m, d] = v.split('-').map(Number);
+        patch['contract.startAt'] = new Date(y, m - 1, d, 12, 0, 0).toISOString();
+      } else {
+        patch['contract.startAt'] = null;
+      }
+    }
+    ['contactName', 'contactPhone', 'contactEmail'].forEach(k => {
+      if (k in dados) {
+        const v = String(dados[k] || '').trim();
+        patch[`contrato.${k}`] = v;
+        patch[k] = v;
+      }
+    });
+    if ('briefing' in dados) {
+      const v = String(dados.briefing || '').trim();
+      patch['contrato.briefing'] = v;
+      patch.briefing = v;
+    }
+    if ('servicos' in dados) {
+      const lista = (Array.isArray(dados.servicos) ? dados.servicos : [])
+        .filter(sv => sv && sv.id)
+        .map(sv => ({ id: sv.id, label: sv.label || sv.id, desc: String(sv.desc || '').trim() }));
+      patch['contrato.servicos'] = lista;
+      patch.services = lista;
+    }
+    // Arquivos: o upload acontece antes (uploadClientFile); aqui só se
+    // grava a referência. O CONTRATO nunca é exibido em tela — a
+    // referência fica guardada para consulta no Storage.
+    ['anexoBriefing', 'anexoContrato'].forEach(k => {
+      if (k in dados) {
+        patch[`contrato.${k}`] = dados[k] ? { ...dados[k], by: byName || null, at: agora } : null;
+      }
+    });
+
+    if (!Object.keys(patch).length) return { success: true };
+    patch.cadastroLog = arrayUnion({ campos: Object.keys(dados), by: byName || null, at: agora });
+    try {
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Escopo de entregas (recorrentes do mês) ─────────────────
+  // Salva uma nova VERSÃO do escopo. Primeiro escopo do cliente vale
+  // já; mudança num escopo existente vale no próximo dia 1 (regra da
+  // agência) — o mês em andamento e o histórico ficam como estavam.
+  // Salvar de novo antes do dia 1 substitui a versão agendada.
+  const saveEscopo = async (clientId, { itens = [], semRecorrencia = false } = {}, byName) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    const limpos = (Array.isArray(itens) ? itens : [])
+      .map(it => ({
+        id: it.id || novoIdItem(),
+        sector: it.sector,
+        label: String(it.label || '').trim(),
+        qtd: Math.max(0, Math.round(Number(it.qtd) || 0)),
+      }))
+      .filter(it => it.sector && it.label && it.qtd > 0);
+
+    if (!limpos.length && !semRecorrencia) {
+      return { success: false, error: 'Adicione ao menos uma entrega ou marque que o cliente não tem entregas mensais.' };
+    }
+
+    const desde = inicioNovaVersao(client);
+    const anteriores = versoesDoEscopo(client).filter(v => v.desde < desde);
+    // Sem recorrência e sem histórico: basta a marcação, não há versão.
+    const versoes = (!limpos.length && !anteriores.length)
+      ? []
+      : [...anteriores, { desde, itens: limpos, por: byName || null, em: new Date().toISOString() }];
+
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        escopo: { versoes, semRecorrencia: limpos.length === 0 },
+      });
+      return { success: true, desde };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Ajuste de quantidade SÓ de um mês (cliente que entrou no meio do
+  // mês, combinado pontual). Não mexe no escopo nem nos outros meses.
+  // `qtds` = { [itemId]: n }; null devolve ao valor do contrato.
+  const ajustarMesEntregas = async (clientId, mes, qtds = {}, byName) => {
+    const at = new Date().toISOString();
+    const patch = {};
+    const logs = [];
+    Object.entries(qtds).forEach(([id, v]) => {
+      if (v === null || v === '') {
+        patch[`entregas.${mes}.qtd.${id}`] = deleteField();
+        logs.push({ tipo: 'ajuste', item: id, para: null, by: byName || null, at });
+      } else {
+        const n = Math.max(0, Math.round(Number(v) || 0));
+        patch[`entregas.${mes}.qtd.${id}`] = n;
+        logs.push({ tipo: 'ajuste', item: id, para: n, by: byName || null, at });
+      }
+    });
+    if (!logs.length) return { success: true };
+    patch[`entregas.${mes}.log`] = arrayUnion(...logs);
+    try {
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // Marca (+1) ou desmarca (-1) uma entrega do mês. Em transação: duas
+  // pessoas clicando juntas não se sobrescrevem, e o valor nunca fica
+  // negativo. Toda marcação entra no log do mês (quem, quando).
+  const marcarEntrega = async (clientId, mes, itemId, delta, byName) => {
+    const ref = doc(db, 'clients', clientId);
+    try {
+      const resultado = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado.');
+        const atual = Number(snap.data()?.entregas?.[mes]?.feito?.[itemId] || 0);
+        const novo = Math.max(0, atual + Number(delta || 0));
+        if (novo === atual) return atual;
+        tx.update(ref, {
+          [`entregas.${mes}.feito.${itemId}`]: novo,
+          [`entregas.${mes}.log`]: arrayUnion({
+            tipo: 'marca', item: itemId, delta: novo - atual, de: atual, para: novo,
+            by: byName || null, at: new Date().toISOString(),
+          }),
+        });
+        return novo;
+      });
+      return { success: true, feito: resultado };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // ── Transferir carteira entre CSs ───────────────────────────
+  // Usado pelo líder da CS. Troca quem sai por quem entra em
+  // `responsibles.cs`, preservando outras CSs que já dividam o cliente.
+  const transferirCS = async (clientIds = [], de, para, byName) => {
+    if (!para) return { success: false, error: 'Escolha para quem transferir.' };
+    if (!clientIds.length) return { success: false, error: 'Selecione ao menos um cliente.' };
+    try {
+      const batch = writeBatch(db);
+      const at = new Date().toISOString();
+      clientIds.forEach(id => {
+        const c = clients.find(x => x.id === id);
+        if (!c) return;
+        const atual = asArray(c.responsibles?.cs).filter(n => n !== de);
+        if (!atual.includes(para)) atual.push(para);
+        batch.update(doc(db, 'clients', id), {
+          'responsibles.cs': atual,
+          csLog: arrayUnion({ de: de || null, para, by: byName || null, at }),
+        });
+      });
+      await batch.commit();
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── CS Operacional: Saúde do Cliente (farol manual) ─────────
   // level: 'green' | 'yellow' | 'orange' | 'red' | null (limpar)
   const setClientHealth = async (clientId, level, note, byName) => {
@@ -949,5 +1129,6 @@ export function useClients() {
     pendingSectorsOf, uploadClientFile, nudgeSectorLeader,
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
+    saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, transferirCS,
   };
 }
