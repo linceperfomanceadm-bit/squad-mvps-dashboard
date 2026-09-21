@@ -26,7 +26,7 @@ const CENAS = [
   { id: 'health',     label: 'Travar em Saúde da carteira' },
 ];
 
-export default function AdminTVControl({ toast }) {
+export default function AdminTVControl({ toast, hideHeader = false }) {
   const { config, loading, saveConfig } = useAppConfig();
   const [msg, setMsg] = useState('');
   const [saving, setSaving] = useState('');
@@ -113,14 +113,16 @@ export default function AdminTVControl({ toast }) {
 
   return (
     <div className="fade-up">
-      <div style={{ marginBottom: 22 }}>
+      {/* Sem título quando a aba "Painel de TV" já desenha o próprio
+          cabeçalho (com a troca TV Operacional / TV Comercial). */}
+      {!hideHeader && <div style={{ marginBottom: 22 }}>
         <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
           Painel de TV
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
           Controle o painel da parede em tempo real. Toda alteração chega na TV em menos de um segundo.
         </p>
-      </div>
+      </div>}
 
       {/* Status + endereço */}
       <div style={{
