@@ -15,7 +15,7 @@ import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import { wdCardsOf } from '../../lib/wdJobs';
+import { wdCardsOf, wdOnboardingLate } from '../../lib/wdJobs';
 import { WD_SERVICE_CONFIG } from '../../lib/firebase';
 
 const NAV = [
@@ -60,10 +60,8 @@ export default function WebDesignDashboard() {
     finished: wdCards.filter(k => k.job.status === 'finished').length,
   };
 
-  const overdueOnboarding = wdCards.filter(({ job }) => {
-    if (job.status !== 'onboarding' || !job.onboardingStartedAt) return false;
-    return (Date.now() - new Date(job.onboardingStartedAt)) / 86400000 > 7;
-  }).length;
+  // Prazo do onboarding conta da call agendada pela CS, não do cadastro.
+  const overdueOnboarding = wdCards.filter(({ client, job }) => wdOnboardingLate(client, job)).length;
 
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;

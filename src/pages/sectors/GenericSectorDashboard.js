@@ -128,12 +128,15 @@ export default function GenericSectorDashboard({ sectorId }) {
   const meuNome = user?.name;
   const lidero = Array.isArray(user?.leaderOf) ? user.leaderOf : [];
   const souResp = (c) => Object.values(c.responsibles || {}).some(v => (Array.isArray(v) ? v : v ? [v] : []).includes(meuNome));
+  // A call de onboarding pode ser marcada com o staffing ainda aberto,
+  // então as duas condições valem ao mesmo tempo para o mesmo cliente.
   const onboardingCount = clients.filter(c => {
-    if (c.stage === 'staffing') {
-      if (user?.isAdmin) return true;
-      return (c.staffing?.sectors || []).some(sid => lidero.includes(sid) && !(Array.isArray(c.responsibles?.[sid]) ? c.responsibles[sid].length : !!c.responsibles?.[sid]));
-    }
-    return c.active !== false && c.kickoff?.pending && (user?.isAdmin || souResp(c));
+    const liderPendente = c.stage === 'staffing' && (
+      user?.isAdmin
+      || (c.staffing?.sectors || []).some(sid => lidero.includes(sid) && !(Array.isArray(c.responsibles?.[sid]) ? c.responsibles[sid].length : !!c.responsibles?.[sid]))
+    );
+    const agendadoMeu = c.active !== false && c.kickoff?.pending && (user?.isAdmin || souResp(c));
+    return liderPendente || agendadoMeu;
   }).length;
   // Reporte da CS: só setores de produção recebem solicitação.
   const showRequests = showOnboarding;
