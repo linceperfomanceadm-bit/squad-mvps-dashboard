@@ -49,6 +49,8 @@ Create React App (JavaScript, sem TypeScript, sem biblioteca de estado, sem fram
 - **Reporte da CS** — `REQUEST_STATUS`, `REQUEST_SECTORS`, `REQUEST_SLA_HOURS`
 - **Quadros** — `SM_COLUMNS`, `TASK_COLUMNS`, `TASK_PRIORITIES`, `APPROVAL_STATUS`, `SLA_DAYS`
 - **Portal** — `ECOMMERCE_PLATFORMS`, `PRODUCT_CATEGORIES`, `PORTAL_STATUS`
+- **Entregas do contrato** — `ENTREGAVEIS`, `ENTREGA_SECTORS`, `ENTREGA_STATUS`, `CADASTRO_PENDENCIAS`, `HEALTH_STALE_DAYS`, `FLUXO_PARADO_DIAS`
+- **Comercial** — `COMERCIAL_TEAM` (time Hunters, logo `/logos/hunters.png`)
 
 **Mude a cor de um setor ou adicione um status aqui e o app inteiro acompanha.** Sempre consulte este arquivo antes de escrever um rótulo, cor ou status em outro lugar. Constante nova entra dentro do bloco correspondente — os outros arquivos importam por nome e o bundle quebra se o export não resolver.
 
@@ -62,7 +64,7 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 
 `src/hooks/use*.js` são a camada de dados de tudo que uma tela renderiza. Cada hook abre um `onSnapshot`, mapeia `{ id, ...data }` para o estado e expõe funções de CRUD. Sem cache, sem normalização, sem store global — o componente assina chamando o hook e toda aba aberta atualiza em tempo real.
 
-Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `portal_clients`, `portal_products`, `userIndex` e o singleton `app_config/general`.
+Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `portal_clients`, `portal_products`, `userIndex` e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
 
 Quatro arquivos acessam o Firestore direto, cada um por um motivo:
 
@@ -105,9 +107,12 @@ Criar colaborador usa uma **instância secundária e descartável do Firebase** 
 | `/documentos/:docId` · `/documentos/:docId/imprimir` | `requireSector="socialmedia"` + `allowAdmin` |
 | `/admin` | `requireAdmin` |
 | `/tv` | nenhuma — painel público, login anônimo, só leitura, carregado sob demanda |
+| `/tv/comercial` | nenhuma — TV da sala comercial, mesma lógica da `/tv` |
 | `/portal/login` · `/portal` | `PortalProtectedRoute` (login do portal, não da equipe) |
 
 **A CS é um time só.** Não existe mais CS Comercial: toda a CS faz o fluxo inteiro, do cadastro à entrada do cliente na base. `CS_ROLES` tem só `operacional`; colaboradores antigos com `csRole: 'comercial'` caem no mesmo painel, e `/cs-comercial` ficou como redirecionamento. O setor Comercial (SDR/Closer) foi removido — o cadastro manual pela CS é a única porta de entrada de cliente.
+
+**Líder da CS = líder do comercial.** Não é setor nem rota própria: é quem tem `'cs'` em `leaderOf`. Entra pelo acesso da CS e ganha as abas "Gestão do Time" e "Comercial" no `CSOperacionalDashboard` (o admin também vê).
 
 As guardas do front são só UX — a barreira real são as regras do Firestore. Toda coleção nova precisa de regra separando equipe (`isStaff()`) de acesso anônimo (`isAnon()`); o anônimo (Painel de TV) só lê `tasks`, `clients` e `app_config`.
 
@@ -174,6 +179,27 @@ Use a API de **4 níveis** — `HEALTH_LEVELS_4`, `HEALTH_ORDER_4`, `computeOpsH
 Adicionar documento é um objeto em `catalogo.js` **se reutilizar um layout existente**; layout novo exige editar `layouts.js` também.
 
 Persistência em `useDocuments.js`: o documento inteiro (dados, slides extras, seções opcionais, pendências) fica num registro de `documents`, passando por `DOC_STATUS` — `rascunho → revisao → aprovado → entregue`. Cada PDF gerado adiciona um snapshot à subcoleção `versions`. Há modo apresentação dentro do app, mantendo a opção de salvar PDF. `src/styles/lince-docs.css` estiliza a rota de impressão e usa Unbounded/Saira Extra Condensed — identidade própria do módulo.
+
+### Entregas do contrato
+
+`src/lib/entregas.js` (funções puras) + `src/components/entregas/` (telas). Responde "o cliente está recebendo o que contratou?".
+
+- **Escopo mensal** no cliente: `escopo.versoes[{ desde: 'AAAA-MM', itens: [{ id, sector, label, qtd }] }]` e `escopo.semRecorrencia`. Versões, e não um escopo só, para reconstruir qualquer mês passado — inclusive os meses em que ninguém marcou nada. O primeiro escopo vale no mês atual; mudança vale no próximo dia 1 (`inicioNovaVersao`). O id do item se mantém entre versões.
+- **Marcações** em `entregas['AAAA-MM'] = { feito: {itemId: n}, qtd: {itemId: n}, log: [...] }`. `qtd` é ajuste só daquele mês (cliente que entrou no meio do mês). O que falta não acumula para o mês seguinte.
+- Regras da agência: o mês vira no dia 1 para todos; o mês anterior aceita marcação até o dia 5 (`mesesEditaveis`); o ritmo esperado usa tempo útil (`fracaoDoMes` → `businessMsBetween`).
+- Entregas únicas (site, ID Visual) **não** têm checklist novo: `entregasUnicas` lê `wdJobsOf` e o bloco `idv`.
+- `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Completar é o `ClienteCadastroModal` (CS, líder e admin).
+- Escrita no `useClients`: `saveCadastro`, `saveEscopo`, `ajustarMesEntregas`, `marcarEntrega` (transação), `transferirCS`. As telas recebem essas funções já embrulhadas por `acoesDeEntregas` (`components/entregas/acoes.js`); ação ausente esconde o botão.
+- Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin e da CS), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
+
+### Comercial (Hunters)
+
+Tudo lançado à mão pelo líder do comercial (o CRM é externo). Fica em `app_config` porque é a coleção que a TV anônima já lê:
+
+- `app_config/comercial` — controles da TV comercial (mesmos campos `tv*` da TV operacional) + `closers[]` e `sdrs[]`.
+- `app_config/comercial_AAAA-MM` — `meta`, `leads`, `vendas[]`, `sdr{ [chaveSdr(nome)]: { agendados, realizados, noShow } }`, `churn[]`.
+
+`src/hooks/useComercial.js` escreve (painel), `src/hooks/useComercialTVData.js` lê anônimo (TV), `src/lib/comercial.js` calcula meta, ritmo, rankings, funil, carteira e alertas para os dois. A TV (`pages/TVComercial.js`) segue o padrão da `/tv` — CSS próprio, palco 1920×1080, cinco cenas — com identidade Hunters (grafite, prata e o dourado do emblema só em conquista). **Diferente da `/tv`, mostra R$**: fica na sala do comercial. O modo visita esconde todo valor e a cena de alerta. Churn do mês soma o lançado à mão com os contratos encerrados pela CS no mês.
 
 ## Visual
 
