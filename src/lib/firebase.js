@@ -57,29 +57,31 @@ export function sectorTheme(sectorId, theme = 'dark') {
 }
 
 // ─── Subpapéis (funções dentro do setor) ──────────────────────
-// O login é o mesmo do setor; o que decide para qual painel a pessoa
-// vai é a FUNÇÃO cadastrada no colaborador.
+// A CS era dividida em Comercial e Operacional. Hoje é um time só:
+// toda CS faz o fluxo inteiro, do cadastro à entrada na base. A lista
+// fica com uma função só para não quebrar quem ainda lê `csRole`
+// (colaboradores antigos com 'comercial' caem no mesmo painel).
 export const CS_ROLES = [
-  { id: 'comercial',   label: 'CS Comercial',   desc: 'Cadastro de clientes e acompanhamento do staffing' },
-  { id: 'operacional', label: 'CS Operacional', desc: 'Onboarding, saúde operacional e saúde do cliente' },
+  { id: 'operacional', label: 'CS Operacional', desc: 'Cadastro, Kick Off, onboarding e saúde dos clientes' },
 ];
 
 // ─── Ciclo de vida do cliente ─────────────────────────────────
-// O cliente nasce no cadastro da CS Comercial e passa por quatro
-// estágios antes de virar rotina:
+// O cliente nasce no cadastro da CS e passa por quatro estágios antes
+// de virar rotina. A CS conduz tudo; os líderes só indicam o time.
 //
-//   staffing   → cadastrado, aguardando os líderes indicarem os
-//                responsáveis de cada setor contratado.
-//   kickoff    → quadro completo. A CS COMERCIAL agenda e realiza a
-//                call de Kick Off, junto com a CS Operacional.
-//   onboarding → Kick Off realizado. A CS OPERACIONAL agenda a call
-//                de onboarding com o time. É no AGENDAMENTO dessa
-//                call que o cliente fica visível para os responsáveis.
-//   live       → call de onboarding realizada. Rotina normal.
+//   kickoff    → cadastrado. A CS agenda e realiza a call de Kick Off.
+//   staffing   → Kick Off realizado, faltando responsável em algum
+//                setor. Os líderes indicam o time e, EM PARALELO, a
+//                CS já pode agendar a call de onboarding.
+//   onboarding → quadro completo (com ou sem call agendada).
+//   live       → call de onboarding realizada. Rotina normal. Só dá
+//                para marcar a call como realizada com o quadro
+//                completo.
 //
-// Enquanto não chega em `onboarding` agendado, o cliente grava
+// Até a call de onboarding ser AGENDADA o cliente grava
 // `active: false` — é o que já o esconde de todos os filtros do app
-// (`active !== false`) sem precisar mexer em dezenas de telas.
+// (`active !== false`) sem precisar mexer em dezenas de telas. Quem já
+// foi indicado vê o cliente antes disso, pela regra de `naCarteira`.
 //
 // Cliente antigo, sem o campo `stage`, conta como 'live'.
 export const CLIENT_STAGES = {
@@ -109,6 +111,18 @@ export const stageOf = (c) => {
 export const isStaffing = (c) => stageOf(c) === 'staffing';
 
 /*
+ * Call de onboarding agendada e ainda não realizada.
+ *
+ * Com o staffing correndo em paralelo, a call pode ser marcada com o
+ * cliente ainda em `staffing` — por isso não dá para olhar só o
+ * estágio. Vale para os dois estágios pré-base.
+ */
+export const onboardingAgendado = (c) => {
+  const st = stageOf(c);
+  return (st === 'staffing' || st === 'onboarding') && !!c?.kickoff?.at && c.kickoff?.pending !== false;
+};
+
+/*
  * Cliente que já pertence à carteira de alguém.
  *
  * `active: false` é o que esconde o cliente enquanto ele corre o
@@ -131,7 +145,7 @@ export const naCarteira = (c) => c?.active !== false || EM_FLUXO.includes(stageO
 export const STAFFING_ALERT_DAYS = 2;
 
 // ─── Contrato: prazo, aviso e renovação ───────────────────────
-// A duração vem do cadastro da CS Comercial (`contrato.contractMonths`)
+// A duração vem do cadastro da CS (`contrato.contractMonths`)
 // e vira um relógio interno. O contador só começa quando o cliente
 // entra em produção de verdade — ou seja, na call de onboarding
 // realizada. Antes disso não há contrato correndo.
@@ -265,7 +279,7 @@ export const SERVICE_SECTOR_MAP = {
   design:         'design',
 };
 
-// Formas de pagamento do cadastro de cliente (CS Comercial).
+// Formas de pagamento do cadastro de cliente (CS).
 export const PAYMENT_METHODS = [
   'PIX', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Transferência', 'Outro',
 ];

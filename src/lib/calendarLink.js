@@ -55,7 +55,7 @@ export function clientCallCalendarUrl({ kind, client, at, meetLink, participants
 
   const linhas = [];
   if (kind === 'kickoff') {
-    linhas.push('Call de Kick Off entre CS Comercial e CS Operacional.');
+    linhas.push('Call de Kick Off com o cliente, conduzida pela CS.');
   } else {
     linhas.push('Call de onboarding com o time responsável pelo cliente.');
   }

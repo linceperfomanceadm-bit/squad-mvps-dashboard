@@ -36,3 +36,33 @@ export function wdJobsOf(client) {
 export function wdCardsOf(clients) {
   return (clients || []).flatMap(c => wdJobsOf(c).map(job => ({ key: `${c.id}_${job.id}`, client: c, job })));
 }
+
+// ─── Prazo de onboarding do Web ───────────────────────────────
+// Antes o relógio do onboarding partia de `onboardingStartedAt`, que
+// é gravado quando o serviço é CRIADO — no cadastro do cliente. Com o
+// Kick Off e o staffing no meio, o card ficava "atrasado" antes mesmo
+// da call de onboarding existir. O prazo anda junto com a CS: conta a
+// partir da call de onboarding agendada (`client.kickoff.at` — o nome
+// `kickoff` é legado, é a call 2, ver useClients). Mesma regra do ID
+// Visual (IdVisualBoard).
+//
+// Vale a data MAIS RECENTE entre as duas: serviço aberto depois da
+// call (cliente antigo da casa) conta a partir da abertura, e não de
+// uma call de meses atrás.
+export function wdOnboardingStart(client, job) {
+  const datas = [job?.onboardingStartedAt, client?.kickoff?.at]
+    .filter(Boolean)
+    .map(d => new Date(d))
+    .filter(d => !Number.isNaN(d.getTime()));
+  if (!datas.length) return null;
+  return new Date(Math.max(...datas.map(d => d.getTime()))).toISOString();
+}
+
+// Onboarding estourado (mais de `dias` desde o início do prazo). Call
+// marcada para o futuro não conta: o prazo nem começou.
+export function wdOnboardingLate(client, job, dias = 7) {
+  if (job?.status !== 'onboarding') return false;
+  const inicio = wdOnboardingStart(client, job);
+  if (!inicio) return false;
+  return (Date.now() - new Date(inicio).getTime()) / 86400000 > dias;
+}
