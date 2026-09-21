@@ -12,7 +12,6 @@ import WebDesignDashboard from './pages/sectors/WebDesignDashboard';
 import SocialMediaDashboard from './pages/sectors/SocialMediaDashboard';
 import CreativeDashboard from './pages/sectors/CreativeDashboard';
 import GenericSectorDashboard from './pages/sectors/GenericSectorDashboard';
-import CSComercialDashboard from './pages/sectors/CSComercialDashboard';
 import CSOperacionalDashboard from './pages/sectors/CSOperacionalDashboard';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import DocEditorPage from './pages/sectors/DocEditorPage';
@@ -25,17 +24,17 @@ import PortalDashboard from './pages/PortalDashboard';
 // quem só usa o dashboard normal.
 const TVPanel = lazy(() => import('./pages/TVPanel'));
 
-// Destino do usuário de CS conforme o subpapel.
-// Sem subpapel cadastrado, cai no CS Operacional (padrão seguro).
-function csHome(user) {
-  return user?.csRole === 'comercial' ? '/cs-comercial' : '/cs-operacional';
+// Destino do usuário de CS. A CS virou um time só — quem ainda está
+// cadastrado como 'comercial' cai no mesmo painel.
+function csHome() {
+  return '/cs-operacional';
 }
 
 // Rota base de qualquer usuário (usada em redirecionamentos).
 function homeFor(user) {
   if (!user) return '/';
   if (user.isAdmin) return '/admin';
-  if (user.sector === 'cs') return csHome(user);
+  if (user.sector === 'cs') return csHome();
   return `/${user.sector}`;
 }
 
@@ -60,11 +59,10 @@ function ProtectedRoute({ children, requireSector, requireAdmin, requireCsRole, 
 
   if (requireAdmin && !user.isAdmin) return <Navigate to={homeFor(user)} replace />;
 
-  // Rota que exige um subpapel de CS específico (comercial/operacional).
+  // Rota da CS. Não olha mais o subpapel: todo colaborador de CS
+  // usa o mesmo painel.
   if (requireCsRole) {
     if (user.sector !== 'cs') return <Navigate to={homeFor(user)} replace />;
-    const role = user.csRole || 'operacional';
-    if (role !== requireCsRole) return <Navigate to={homeFor(user)} replace />;
     return children;
   }
 
@@ -83,7 +81,7 @@ function CSRedirect() {
   if (user.firstAccess) return <Navigate to="/first-access" replace />;
   if (user.isAdmin) return <Navigate to="/admin" replace />;
   if (user.sector !== 'cs') return <Navigate to={homeFor(user)} replace />;
-  return <Navigate to={csHome(user)} replace />;
+  return <Navigate to={csHome()} replace />;
 }
 
 function AppRoutes() {
@@ -112,11 +110,10 @@ function AppRoutes() {
       <Route path="/videomaker" element={
         <ProtectedRoute requireSector="videomaker"><CreativeDashboard sectorId="videomaker" /></ProtectedRoute>
       } />
-      {/* CS — redireciona para Comercial ou Operacional conforme a função */}
+      {/* CS — um painel só. /cs-comercial fica como redirecionamento
+          para quem tinha o endereço salvo. */}
       <Route path="/cs" element={<CSRedirect />} />
-      <Route path="/cs-comercial" element={
-        <ProtectedRoute requireCsRole="comercial"><CSComercialDashboard /></ProtectedRoute>
-      } />
+      <Route path="/cs-comercial" element={<CSRedirect />} />
       <Route path="/cs-operacional" element={
         <ProtectedRoute requireCsRole="operacional"><CSOperacionalDashboard /></ProtectedRoute>
       } />
