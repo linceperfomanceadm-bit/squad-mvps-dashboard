@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Plus, X, Search, Trash2, Check, Edit2 } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
+import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck } from 'lucide-react';
+import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS } from '../../lib/firebase';
+import { cadastroPendencias } from '../../lib/entregas';
+import ClienteFicha from '../entregas/ClienteFicha';
 
 // Normaliza responsáveis de um setor para SEMPRE um array.
 // (clientes antigos guardam string; novos guardam array.)
@@ -197,8 +199,11 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave, onRename
   );
 }
 
-export default function AdminClients({ clients, collaborators, onAdd, onUpdate, onDelete, onRename }) {
+export default function AdminClients({ clients, collaborators, onAdd, onUpdate, onDelete, onRename, acoesEntregas, toast }) {
   const [showAdd, setShowAdd] = useState(false);
+  // Ficha de contrato e entregas — guarda só o id para ler o cliente vivo.
+  const [fichaId, setFichaId] = useState(null);
+  const ficha = fichaId ? clients.find(c => c.id === fichaId) : null;
   const [editClient, setEditClient] = useState(null);
   const [search, setSearch] = useState('');
   const [delConfirm, setDelConfirm] = useState(null);
@@ -247,6 +252,14 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                         AGUARDANDO RESPONSÁVEIS
                       </span>
                     )}
+                    {c.active !== false && cadastroPendencias(c).length > 0 && (
+                      <span
+                        title={`Falta: ${cadastroPendencias(c).map(p => CADASTRO_PENDENCIAS[p]?.label || p).join(', ')}`}
+                        style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)', verticalAlign: 'middle', cursor: 'help' }}
+                      >
+                        CADASTRO INCOMPLETO
+                      </span>
+                    )}
                   </td>
                   <td style={{ padding: '12px 14px' }}>
                     {c.wd?.status
@@ -277,6 +290,11 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                       <button style={S.iconBtnBlue} onClick={() => setEditClient(c)} title="Editar responsáveis">
                         <Edit2 size={13} />
                       </button>
+                      {acoesEntregas && (
+                        <button style={S.iconBtn} onClick={() => setFichaId(c.id)} title="Contrato, cadastro e entregas">
+                          <ClipboardCheck size={13} />
+                        </button>
+                      )}
                       {delConfirm === c.id
                         ? <>
                             <button style={S.iconBtnRed} onClick={() => { onDelete(c.id); setDelConfirm(null); }}><Check size={13} /></button>
@@ -307,6 +325,9 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
       {editClient && ReactDOM.createPortal(
         <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} onRename={onRename} />,
         document.body)}
+      {ficha && (
+        <ClienteFicha client={ficha} acoes={acoesEntregas} toast={toast} onClose={() => setFichaId(null)} />
+      )}
     </div>
   );
 }
