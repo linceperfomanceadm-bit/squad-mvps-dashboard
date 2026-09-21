@@ -281,10 +281,8 @@ export function cadastroPendencias(c) {
   if (!c) return [];
   const contrato = c.contrato || {};
   const faltas = [];
+  // Contrato e briefing (arquivos) são opcionais: não contam como falta.
   if (!contractState(c).baseMonths) faltas.push('prazo');
-  if (!contrato.anexoContrato) faltas.push('contrato');
-  const briefingTexto = String(contrato.briefing || c.briefing || '').trim();
-  if (!briefingTexto && !contrato.anexoBriefing) faltas.push('briefing');
   const servicos = contrato.servicos || c.services || [];
   if (!Array.isArray(servicos) || servicos.length === 0) faltas.push('servicos');
   if (!temEscopoDefinido(c)) faltas.push('escopo');

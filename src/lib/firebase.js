@@ -447,10 +447,9 @@ export const ENTREGA_STATUS = {
 // Pendências de cadastro. Clientes antigos nasceram antes de vários
 // campos existirem; o selo de "cadastro incompleto" aponta o que falta
 // para a CS completar sem precisar de migração.
+// Arquivo do contrato e briefing são opcionais e não entram aqui.
 export const CADASTRO_PENDENCIAS = {
   prazo:    { id: 'prazo',    label: 'Tempo de contrato' },
-  contrato: { id: 'contrato', label: 'Arquivo do contrato' },
-  briefing: { id: 'briefing', label: 'Briefing' },
   servicos: { id: 'servicos', label: 'Serviços contratados' },
   escopo:   { id: 'escopo',   label: 'Escopo de entregas' },
 };
