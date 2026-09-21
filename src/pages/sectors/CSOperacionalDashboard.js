@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, Rocket, Activity, HeartPulse, Calendar, X, UserPlus,
   Kanban, MessageSquare, Clock, Video, Bell, ListTodo, Trash2, Briefcase,
-  ClipboardCheck, UsersRound, Target,
+  UsersRound, Target,
 } from 'lucide-react';
 import DayTasks from '../../components/shared/DayTasks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -24,7 +24,6 @@ import StaffingModal from '../../components/commercial/StaffingModal';
 import ContractBlock from '../../components/commercial/ContractBlock';
 import CSLiderPanel from '../../components/commercial/CSLiderPanel';
 import ComercialPage from '../../components/commercial/ComercialPage';
-import EntregasPainel from '../../components/entregas/EntregasPainel';
 import ClienteFicha from '../../components/entregas/ClienteFicha';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { cadastroPendencias, entregasDoMes, resumoMes, mesChave } from '../../lib/entregas';
@@ -91,7 +90,11 @@ export default function CSOperacionalDashboard() {
     requests, createRequest, addReply, closeRequest, deleteRequest,
   } = useRequests();
 
-  const [page, setPage] = useState('onboarding');
+  // Líder da CS (que é o líder do comercial) tem um painel só de gestão:
+  // entra pelo mesmo acesso da CS, mas sem as ferramentas do dia a dia
+  // (cadastro, Kick Off, onboarding, solicitações...). Abre na gestão.
+  const modoGestao = !user?.isAdmin && Array.isArray(user?.leaderOf) && user.leaderOf.includes('cs');
+  const [page, setPage] = useState(modoGestao ? 'time' : 'onboarding');
   const [onlyMine, setOnlyMine] = useState(false);
   const [opsFilter, setOpsFilter] = useState('all');
   const [openId, setOpenId] = useState(null);
@@ -107,9 +110,9 @@ export default function CSOperacionalDashboard() {
   const [fichaId, setFichaId] = useState(null);
 
   const me = user?.name;
-  // Líder da CS (que é o líder do comercial): entra pelo mesmo acesso da
-  // CS e ganha a gestão do time e o comercial. O admin também vê.
-  const isLider = !!user?.isAdmin || (Array.isArray(user?.leaderOf) && user.leaderOf.includes('cs'));
+  // Gestão do time e comercial: líder da CS (e o admin, se um dia abrir
+  // este painel).
+  const isLider = modoGestao || !!user?.isAdmin;
 
   // CS completa cadastro, define escopo, ajusta o mês e corrige marcação.
   const acoesEntregas = acoesDeEntregas(
@@ -230,22 +233,22 @@ export default function CSOperacionalDashboard() {
   const cadastrosIncompletos = activeClients.filter(c => stageOf(c) === 'live' && cadastroPendencias(c).length > 0).length;
   const fichaClient = fichaId ? clients.find(c => c.id === fichaId) || null : null;
 
-  const NAV = [
+  const NAV = modoGestao ? [
+    { key: 'time',      label: 'Gestão do Time',       icon: UsersRound },
+    { key: 'carteira',  label: 'Carteira de Clientes', icon: Briefcase, badge: cadastrosIncompletos },
+    { key: 'comercial', label: 'Comercial',            icon: Target },
+    { key: 'agenda',    label: 'Agenda',               icon: Calendar },
+  ] : [
     { key: 'register',   label: 'Cadastrar Cliente', icon: UserPlus },
     { key: 'kickoff',    label: 'Kick Off', icon: Rocket, badge: kickoffClients.length, badgeDanger: kickoffSemAgenda > 0 },
     { key: 'onboarding', label: 'Onboarding de Clientes', icon: Rocket, badge: flowClients.length, badgeDanger: onboardingSemAgenda > 0 || staffingAtrasado > 0 },
-    { key: 'carteira', label: 'Carteira de Clientes', icon: Briefcase },
-    { key: 'entregas', label: 'Entregas × Contrato', icon: ClipboardCheck, badge: cadastrosIncompletos },
+    { key: 'carteira', label: 'Carteira de Clientes', icon: Briefcase, badge: cadastrosIncompletos },
     { key: 'ops',      label: 'Saúde Operacional', icon: Activity,   badge: opsCounts.red, badgeDanger: opsCounts.red > 0 },
     { key: 'client',   label: 'Saúde do Cliente',  icon: HeartPulse },
     { key: 'kanban',   label: 'Produção',          icon: Kanban },
     { key: 'day',      label: 'Tarefas do Dia',   icon: ListTodo },
     { key: 'requests', label: 'Solicitações',      icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
     { key: 'overview', label: 'Visão Geral',       icon: LayoutDashboard },
-    ...(isLider ? [
-      { key: 'time',      label: 'Gestão do Time', icon: UsersRound },
-      { key: 'comercial', label: 'Comercial',      icon: Target },
-    ] : []),
     { key: 'agenda',   label: 'Agenda',            icon: Calendar },
   ];
 
@@ -253,13 +256,14 @@ export default function CSOperacionalDashboard() {
     register:    ['Cadastrar Cliente', 'A entrada do cliente na agência. Depois de salvar, ele vai para o Kick Off.'],
     kickoff:     ['Kick Off', 'Agende a call de Kick Off e marque quando ela acontecer'],
     onboarding:  ['Onboarding de Clientes', 'Agende a call de onboarding enquanto os líderes indicam o time'],
-    carteira: ['Carteira de Clientes', 'Quem você atende, com o time, a saúde e as tasks em aberto de cada cliente'],
+    carteira: modoGestao
+      ? ['Carteira de Clientes', 'Todas as carteiras: time, saúde, tasks em aberto e as entregas do contrato de cada cliente']
+      : ['Carteira de Clientes', 'Quem você atende: time, saúde, tasks em aberto e as entregas do contrato de cada cliente'],
     ops:      ['Saúde Operacional', 'Farol automático pelas tasks em atraso de cada cliente'],
     client:   ['Saúde do Cliente', 'Farol manual — relacionamento e pendências por parte do cliente'],
     kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
     requests: ['Reporte da CS', 'Solicitações abertas para os times de produção'],
     overview: ['Visão Geral', 'Carteira e entrada de clientes em números'],
-    entregas: ['Entregas × Contrato', 'O que cada contrato prevê no mês contra o que já foi entregue'],
     time:     ['', ''],   // o painel do líder desenha o próprio título
     comercial: ['', ''],
     day:      ['', ''],   // o DayTasks desenha o próprio título
@@ -301,7 +305,7 @@ export default function CSOperacionalDashboard() {
           <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 22, gap: 12 }}>
               <div>
-                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>🎧 CS OPERACIONAL</span>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 20, background: `color-mix(in srgb, ${COLOR} 10%, transparent)`, color: COLOR, border: `1px solid color-mix(in srgb, ${COLOR} 25%, transparent)`, fontFamily: 'var(--fm)' }}>{modoGestao ? 'GESTÃO DA CS' : '🎧 CS OPERACIONAL'}</span>
                 {HEAD[page]?.[0] && <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginTop: 10, marginBottom: 4 }}>{HEAD[page][0]}</h1>}
                 {HEAD[page]?.[1] && <p style={{ fontSize: 13, color: 'var(--muted)' }}>{HEAD[page][1]}</p>}
               </div>
@@ -417,6 +421,8 @@ export default function CSOperacionalDashboard() {
                 me={me}
                 onOpenClient={(c) => (stageOf(c) === 'live' ? setOpenId(c.id) : setFlowId(c.id))}
                 onOpenTask={setTaskId}
+                onOpenFicha={(c) => setFichaId(c.id)}
+                csInicial={modoGestao ? '__all__' : '__me__'}
               />
             )}
 
@@ -502,10 +508,6 @@ export default function CSOperacionalDashboard() {
                 onDelete={deleteRequest}
                 toast={toast}
               />
-            )}
-
-            {page === 'entregas' && (
-              <EntregasPainel clients={clients} acoes={acoesEntregas} toast={toast} />
             )}
 
             {page === 'time' && isLider && (
