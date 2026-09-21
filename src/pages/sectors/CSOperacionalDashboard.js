@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import {
   LayoutDashboard, Rocket, Activity, HeartPulse, Calendar, X, UserPlus,
   Kanban, MessageSquare, Clock, Video, Bell, ListTodo, Trash2, Briefcase,
+  ClipboardCheck, UsersRound, Target,
 } from 'lucide-react';
 import DayTasks from '../../components/shared/DayTasks';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,7 +22,14 @@ import ClientRegisterForm from '../../components/commercial/ClientRegisterForm';
 import ClientOnboardingModal from '../../components/commercial/ClientOnboardingModal';
 import StaffingModal from '../../components/commercial/StaffingModal';
 import ContractBlock from '../../components/commercial/ContractBlock';
-import { SECTORS, STAFFING_ALERT_DAYS, stageOf } from '../../lib/firebase';
+import CSLiderPanel from '../../components/commercial/CSLiderPanel';
+import ComercialPage from '../../components/commercial/ComercialPage';
+import EntregasPainel from '../../components/entregas/EntregasPainel';
+import ClienteFicha from '../../components/entregas/ClienteFicha';
+import { acoesDeEntregas } from '../../components/entregas/acoes';
+import { cadastroPendencias, entregasDoMes, resumoMes, mesChave } from '../../lib/entregas';
+import { Aderencia } from '../../components/entregas/EntregasKit';
+import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, stageOf } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
   HEALTH_LEVELS_4, HEALTH_ORDER_4,
@@ -72,6 +80,7 @@ export default function CSOperacionalDashboard() {
     setSectorResponsibles, nudgeSectorLeader,
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
+    saveCadastro, saveEscopo, marcarEntrega, ajustarMesEntregas, transferirCS,
   } = useClients();
   const { collaborators } = useCollaborators();
   const {
@@ -95,8 +104,18 @@ export default function CSOperacionalDashboard() {
   const [scheduleTarget, setScheduleTarget] = useState(null);
   const [staffingTarget, setStaffingTarget] = useState(null);
   const [taskId, setTaskId] = useState(null);
+  const [fichaId, setFichaId] = useState(null);
 
   const me = user?.name;
+  // Líder da CS (que é o líder do comercial): entra pelo mesmo acesso da
+  // CS e ganha a gestão do time e o comercial. O admin também vê.
+  const isLider = !!user?.isAdmin || (Array.isArray(user?.leaderOf) && user.leaderOf.includes('cs'));
+
+  // CS completa cadastro, define escopo, ajusta o mês e corrige marcação.
+  const acoesEntregas = acoesDeEntregas(
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas },
+    me, toast
+  );
   // Setores que esta pessoa pode preencher: os que ela lidera (e todos,
   // se for admin). Sem isso, o quadro do card é só leitura.
   const mySectors = user?.isAdmin
@@ -207,17 +226,26 @@ export default function CSOperacionalDashboard() {
   // Solicitações que o colaborador já respondeu e esperam a CS encerrar.
   const requestsToClose = requests.filter(r => r.status === 'answered').length;
 
+  // Clientes na base com cadastro incompleto (antigos, em geral).
+  const cadastrosIncompletos = activeClients.filter(c => stageOf(c) === 'live' && cadastroPendencias(c).length > 0).length;
+  const fichaClient = fichaId ? clients.find(c => c.id === fichaId) || null : null;
+
   const NAV = [
     { key: 'register',   label: 'Cadastrar Cliente', icon: UserPlus },
     { key: 'kickoff',    label: 'Kick Off', icon: Rocket, badge: kickoffClients.length, badgeDanger: kickoffSemAgenda > 0 },
     { key: 'onboarding', label: 'Onboarding de Clientes', icon: Rocket, badge: flowClients.length, badgeDanger: onboardingSemAgenda > 0 || staffingAtrasado > 0 },
     { key: 'carteira', label: 'Carteira de Clientes', icon: Briefcase },
+    { key: 'entregas', label: 'Entregas × Contrato', icon: ClipboardCheck, badge: cadastrosIncompletos },
     { key: 'ops',      label: 'Saúde Operacional', icon: Activity,   badge: opsCounts.red, badgeDanger: opsCounts.red > 0 },
     { key: 'client',   label: 'Saúde do Cliente',  icon: HeartPulse },
     { key: 'kanban',   label: 'Produção',          icon: Kanban },
     { key: 'day',      label: 'Tarefas do Dia',   icon: ListTodo },
     { key: 'requests', label: 'Solicitações',      icon: MessageSquare, badge: requestsToClose, badgeDanger: requestsToClose > 0 },
     { key: 'overview', label: 'Visão Geral',       icon: LayoutDashboard },
+    ...(isLider ? [
+      { key: 'time',      label: 'Gestão do Time', icon: UsersRound },
+      { key: 'comercial', label: 'Comercial',      icon: Target },
+    ] : []),
     { key: 'agenda',   label: 'Agenda',            icon: Calendar },
   ];
 
@@ -231,6 +259,9 @@ export default function CSOperacionalDashboard() {
     kanban:   ['Produção dos Clientes', 'Acompanhamento em tempo real — leitura e comentário, sem mover card'],
     requests: ['Reporte da CS', 'Solicitações abertas para os times de produção'],
     overview: ['Visão Geral', 'Carteira e entrada de clientes em números'],
+    entregas: ['Entregas × Contrato', 'O que cada contrato prevê no mês contra o que já foi entregue'],
+    time:     ['', ''],   // o painel do líder desenha o próprio título
+    comercial: ['', ''],
     day:      ['', ''],   // o DayTasks desenha o próprio título
     agenda:   ['Agenda', ''],
   };
@@ -473,6 +504,26 @@ export default function CSOperacionalDashboard() {
               />
             )}
 
+            {page === 'entregas' && (
+              <EntregasPainel clients={clients} acoes={acoesEntregas} toast={toast} />
+            )}
+
+            {page === 'time' && isLider && (
+              <CSLiderPanel
+                clients={clients}
+                tasks={tasks}
+                requests={requests}
+                collaborators={collaborators}
+                acoes={acoesEntregas}
+                toast={toast}
+                onTransferir={(ids, de, para) => transferirCS(ids, de, para, me)}
+              />
+            )}
+
+            {page === 'comercial' && isLider && (
+              <ComercialPage clients={clients} me={me} toast={toast} />
+            )}
+
             {page === 'agenda' && <AgendaView />}
           </>
         )}
@@ -498,6 +549,7 @@ export default function CSOperacionalDashboard() {
           manual={resolveClientHealth(openClient)}
           onClose={() => setOpenId(null)}
           onSetHealth={() => { setHealthTarget(openClient); setOpenId(null); }}
+          onOpenFicha={() => { setFichaId(openClient.id); setOpenId(null); }}
           onRenewContract={async (meses, obs) => {
             const r = await renewContract(openClient.id, meses, me, obs);
             if (r.success) toast(`Contrato renovado por ${meses} ${Number(meses) === 1 ? 'mês' : 'meses'}.`);
@@ -678,6 +730,11 @@ export default function CSOperacionalDashboard() {
           onChangeDeadline={changeDeadline}
           onDelete={async (...args) => { await deleteTask(...args); setTaskId(null); }}
         />
+      )}
+
+      {/* Contrato, cadastro e entregas do cliente (aberto pelo drawer). */}
+      {fichaClient && (
+        <ClienteFicha client={fichaClient} acoes={acoesEntregas} toast={toast} onClose={() => setFichaId(null)} />
       )}
 
       {healthTarget && ReactDOM.createPortal(
@@ -1043,7 +1100,7 @@ function ClientHealthModal({ client, onClose, onSave }) {
 }
 
 // ── Drawer do cliente ──────────────────────────────────────────
-function ClientDrawer({ client, health, manual, onClose, onSetHealth, onRenewContract, onCloseContract, onReopenContract }) {
+function ClientDrawer({ client, health, manual, onClose, onSetHealth, onOpenFicha, onRenewContract, onCloseContract, onReopenContract }) {
   const lv = HEALTH_LEVELS_4[health.level];
   const mlv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const sectors = Object.entries(client.responsibles || {}).filter(([, v]) => v && (Array.isArray(v) ? v.length : true));
@@ -1069,6 +1126,8 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth, onRenewCon
         <button style={{ ...BTN_CANCEL, width: '100%', marginBottom: 18 }} onClick={onSetHealth}>
           Avaliar saúde do cliente
         </button>
+
+        {onOpenFicha && <ResumoEntregas client={client} onOpen={onOpenFicha} />}
 
         {health.overdueTasks.length > 0 && (
           <Section title={`Tasks em atraso (${health.overdueTasks.length})`} color={lv.color}>
@@ -1120,6 +1179,31 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth, onRenewCon
         )}
       </div>
     </Overlay>
+  );
+}
+
+// Resumo de contrato e entregas no drawer do cliente: aderência do mês
+// e o que falta no cadastro, com o atalho para a ficha completa.
+function ResumoEntregas({ client, onOpen }) {
+  const pend = cadastroPendencias(client);
+  const resumo = resumoMes(entregasDoMes(client, mesChave()));
+  return (
+    <Section title="Contrato e entregas" color={COLOR}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: pend.length ? 10 : 12 }}>
+        <span style={{ fontSize: 12.5, color: 'var(--text)', flex: 1 }}>
+          {resumo.combinado ? `Entregas do mês: ${resumo.entregue} de ${resumo.combinado}` : 'Sem entregas mensais combinadas'}
+        </span>
+        <Aderencia pct={resumo.pct} />
+      </div>
+      {pend.length > 0 && (
+        <p style={{ fontSize: 11.5, color: 'var(--amber)', marginBottom: 12, lineHeight: 1.5 }}>
+          Cadastro incompleto — falta: {pend.map(p => CADASTRO_PENDENCIAS[p]?.label || p).join(', ')}.
+        </p>
+      )}
+      <button style={{ ...(pend.length ? BTN_PRIMARY : BTN_CANCEL), width: '100%' }} onClick={onOpen}>
+        {pend.length ? 'Completar cadastro e ver entregas' : 'Ver contrato e entregas'}
+      </button>
+    </Section>
   );
 }
 

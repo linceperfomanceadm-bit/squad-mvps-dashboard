@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Kanban, FileText, Calendar, ClipboardList, BookOpen, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, FileText, Calendar, ClipboardList, BookOpen, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
@@ -18,6 +18,8 @@ import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import TaskKanban from '../../components/kanban/TaskKanban';
+import EntregasSetor from '../../components/entregas/EntregasSetor';
+import { acoesDeEntregas } from '../../components/entregas/acoes';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
 const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
@@ -25,6 +27,7 @@ const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',   icon: LayoutDashboard },
   { key: 'mural',      label: 'Mural',          icon: Users },
+  { key: 'entregas',   label: 'Entregas do Mês', icon: ListChecks },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
   { key: 'documentos', label: 'Documentos',     icon: FileText },
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
@@ -37,7 +40,7 @@ export default function SocialMediaDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { clients, loading, updateBrandbook, addBrandMaterial, removeBrandMaterial } = useClients();
+  const { clients, loading, updateBrandbook, addBrandMaterial, removeBrandMaterial, marcarEntrega } = useClients();
   const { collaborators } = useCollaborators();
   const {
     tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval,
@@ -46,6 +49,9 @@ export default function SocialMediaDashboard() {
   const { requests, markSeen, addReply } = useRequests();
   const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
   const [page, setPage] = useState('overview');
+
+  // Quem produz só marca entregas — escopo e cadastro são da CS.
+  const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
 
   // `naCarteira` e não `active !== false`: o cliente entra na carteira
   // assim que o líder indica o responsável, ainda em staffing/Kick Off
@@ -149,7 +155,10 @@ export default function SocialMediaDashboard() {
             tasks={tasks}
             onAbrirDocumento={(id) => navigate(`/documentos/${id}`)}
             onNovoDocumento={handleNovoDocDoCliente}
+            acoesEntregas={acoesEntregas}
           />
+        ) : page === 'entregas' ? (
+          <EntregasSetor clients={clients} sectorId="socialmedia" me={user?.name} acoes={acoesEntregas} />
         ) : page === 'documentos' ? (
           <DocsList
             documents={myDocs}

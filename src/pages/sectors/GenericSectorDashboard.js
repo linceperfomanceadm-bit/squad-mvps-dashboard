@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Kanban, Calendar, ClipboardList, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Kanban, Calendar, ClipboardList, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
@@ -11,7 +11,9 @@ import { useToast } from '../../components/shared/Toast';
 import AppShell from '../../components/shared/AppShell';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import { SECTORS, TASK_PRIORITIES, naCarteira } from '../../lib/firebase';
+import { SECTORS, TASK_PRIORITIES, ENTREGA_SECTORS, naCarteira } from '../../lib/firebase';
+import EntregasSetor from '../../components/entregas/EntregasSetor';
+import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { differenceInDays } from 'date-fns';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
@@ -88,7 +90,7 @@ function GenericOverview({ myTasks, sectorId }) {
 export default function GenericSectorDashboard({ sectorId }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients } = useClients();
+  const { clients, marcarEntrega } = useClients();
   const { collaborators } = useCollaborators();
   const {
     tasks, loading: loadingTasks,
@@ -98,6 +100,9 @@ export default function GenericSectorDashboard({ sectorId }) {
   const { requests, markSeen, addReply } = useRequests();
 
   const [page, setPage] = useState('overview');
+  const temEntregas = ENTREGA_SECTORS.includes(sectorId);
+  // Quem produz só marca entregas — escopo e cadastro são da CS.
+  const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
 
   // `naCarteira`: o cliente entra na carteira na indicação do líder,
   // sem esperar a call de onboarding. Responsável em array porque o
@@ -147,6 +152,7 @@ export default function GenericSectorDashboard({ sectorId }) {
     ...(hideTasks ? [] : [{ key: 'kanban', label: 'Tasks', icon: Kanban, badge: pendingApproval, badgeDanger: pendingApproval > 0 }]),
     ...(showRequests ? [{ key: 'requests', label: 'Reporte da CS', icon: MessageSquare, badge: openRequests, badgeDanger: openRequests > 0 }] : []),
     ...(showOnboarding ? [{ key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList, badge: onboardingCount, badgeDanger: onboardingCount > 0 }] : []),
+    ...(temEntregas ? [{ key: 'entregas', label: 'Entregas do Mês', icon: ListChecks }] : []),
     { key: 'agenda',   label: 'Agenda',       icon: Calendar },
   ];
 
@@ -170,6 +176,8 @@ export default function GenericSectorDashboard({ sectorId }) {
           />
         ) : page === 'onboarding' && showOnboarding ? (
           <OnboardingBoard sectorId={sectorId} />
+        ) : page === 'entregas' && temEntregas ? (
+          <EntregasSetor clients={clients} sectorId={sectorId} me={user?.name} acoes={acoesEntregas} />
         ) : page === 'agenda' ? (
           <AgendaView />
         ) : (page === 'kanban' && !hideTasks) ? (

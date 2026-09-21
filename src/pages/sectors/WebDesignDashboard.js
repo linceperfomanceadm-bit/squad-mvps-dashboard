@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, Calendar, Package, ClipboardList, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, UserCheck, AlertCircle, RefreshCw, CheckCircle, Kanban, Calendar, Package, ClipboardList, MessageSquare, ListChecks } from 'lucide-react';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
@@ -15,6 +15,8 @@ import AgendaView from '../../components/shared/AgendaView';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import RequestsInbox from '../../components/shared/RequestsInbox';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
+import EntregasSetor from '../../components/entregas/EntregasSetor';
+import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { wdCardsOf, wdOnboardingLate } from '../../lib/wdJobs';
 import { WD_SERVICE_CONFIG } from '../../lib/firebase';
 
@@ -26,6 +28,7 @@ const NAV = [
   { key: 'recurrence', label: 'Recorrência',   icon: RefreshCw },
   { key: 'finished',   label: 'Finalizados',   icon: CheckCircle },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
+  { key: 'entregas',   label: 'Entregas do Mês', icon: ListChecks },
   { key: 'requests',   label: 'Reporte da CS',  icon: MessageSquare },
   { key: 'client_onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
   { key: 'portal',     label: 'Portal de Produtos', icon: Package },
@@ -35,12 +38,14 @@ const NAV = [
 export default function WebDesignDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, wdAddService, wdRemoveService, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus } = useClients();
+  const { clients, loading, wdAddService, wdRemoveService, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, marcarEntrega } = useClients();
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
 
   const [page, setPage] = useState('overview');
+  // Recorrentes do contrato (ex.: atualizações de site). Quem produz só marca.
+  const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
   const [prodSubTab, setProdSubTab] = useState('ecommerce');
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -141,6 +146,8 @@ export default function WebDesignDashboard() {
           <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
         ) : page === 'client_onboarding' ? (
           <OnboardingBoard sectorId="webdesign" />
+        ) : page === 'entregas' ? (
+          <EntregasSetor clients={clients} sectorId="webdesign" me={user?.name} acoes={acoesEntregas} />
         ) : (
           <WDClientList
             clients={wdClients}

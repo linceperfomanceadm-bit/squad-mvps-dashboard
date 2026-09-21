@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, ClipboardList, Palette, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, ClipboardList, Palette, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { naCarteira } from '../../lib/firebase';
 import { useClients } from '../../hooks/useClients';
@@ -16,6 +16,8 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
+import EntregasSetor from '../../components/entregas/EntregasSetor';
+import { acoesDeEntregas } from '../../components/entregas/acoes';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
 const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
@@ -26,6 +28,7 @@ export default function CreativeDashboard({ sectorId }) {
   const {
     clients, loading: loadingClients, updateBrandbook, addBrandMaterial, removeBrandMaterial,
     idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus,
+    marcarEntrega,
   } = useClients();
   const { collaborators, loading: loadingCollabs } = useCollaborators();
   const {
@@ -36,6 +39,8 @@ export default function CreativeDashboard({ sectorId }) {
   const { requests, markSeen, addReply } = useRequests();
 
   const [page, setPage] = useState('overview');
+  // Quem produz só marca entregas — escopo e cadastro são da CS.
+  const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
 
   const responsibleField = sectorId === 'design' ? 'design' : 'videomaker';
 
@@ -87,6 +92,7 @@ export default function CreativeDashboard({ sectorId }) {
   const NAV = [
     { key: 'overview',  label: 'Visão Geral',   icon: LayoutDashboard },
     { key: 'kanban',    label: 'Tasks',          icon: Kanban },
+    { key: 'entregas',  label: 'Entregas do Mês', icon: ListChecks },
     { key: 'requests',  label: 'Reporte da CS',  icon: MessageSquare },
     ...(isDesign ? [{ key: 'idvisual', label: 'ID Visual', icon: Palette }] : []),
     { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
@@ -158,6 +164,8 @@ export default function CreativeDashboard({ sectorId }) {
             onUpdateNotes={idvUpdateNotes}
             onMoveStatus={wrap(idvMoveStatus, 'Status do ID Visual atualizado.')}
           />
+        ) : page === 'entregas' ? (
+          <EntregasSetor clients={clients} sectorId={sectorId} me={user?.name} acoes={acoesEntregas} />
         ) : page === 'onboarding' ? (
           <OnboardingBoard sectorId={sectorId} />
         ) : page === 'vault' ? (
