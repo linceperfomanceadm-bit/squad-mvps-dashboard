@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff, Crown } from 'lucide-react';
-import { SECTORS, CS_ROLES } from '../../lib/firebase';
+import { SECTORS } from '../../lib/firebase';
 
 export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
@@ -21,9 +21,9 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
     if (!form.loginId.trim()) { setError('Defina o ID de acesso.'); return; }
     if (!form.password.trim() || form.password.length < 4) { setError('Senha provisória deve ter pelo menos 4 caracteres.'); return; }
     if (collaborators.some(c => c.loginId === form.loginId.trim())) { setError('Este ID já está em uso.'); return; }
-    if (form.sector === 'cs' && !form.csRole) { setError('Defina a função no CS (Comercial ou Operacional).'); return; }
     setLoading(true);
-    const res = await onAdd({ ...form, loginId: form.loginId.trim() });
+    // A CS é um time só: todo colaborador do setor grava a mesma função.
+    const res = await onAdd({ ...form, loginId: form.loginId.trim(), csRole: form.sector === 'cs' ? 'operacional' : '' });
     setLoading(false);
     if (res.success) { setForm({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '', leaderOf: [] }); setShowForm(false); setError(''); }
     else setError(res.error);
@@ -36,7 +36,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
       sector: editForm.sector,
       isAdmin: editForm.isAdmin || false,
       leaderOf: editForm.leaderOf || [],
-      csRole: editForm.sector === 'cs' ? (editForm.csRole || 'operacional') : '',
+      csRole: editForm.sector === 'cs' ? 'operacional' : '',
     });
     setEditId(null);
   };
@@ -107,15 +107,6 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                 </button>
               </div>
             </div>
-            {form.sector === 'cs' && (
-              <div style={S.field}>
-                <label style={S.label}>Função no CS *</label>
-                <select style={S.select} value={form.csRole} onChange={e => set('csRole', e.target.value)}>
-                  <option value="">Selecione...</option>
-                  {CS_ROLES.map(r => <option key={r.id} value={r.id}>{r.label} ({r.desc})</option>)}
-                </select>
-              </div>
-            )}
             <div style={{ ...S.field, justifyContent: 'flex-end', flexDirection: 'row', alignItems: 'flex-end', gap: 12 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--text)', userSelect: 'none' }}>
                 <input type="checkbox" checked={form.isAdmin} onChange={e => set('isAdmin', e.target.checked)} style={{ width: 16, height: 16, accentColor: 'var(--neon)' }} />
@@ -215,12 +206,6 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
             {!SECTORS[editForm.sector] && <option value={editForm.sector || ''}>📦 Setor removido ({editForm.sector || '—'})</option>}
             {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
           </select>
-          {editForm.sector === 'cs' && (
-            <select style={S.select} value={editForm.csRole || ''} onChange={e => onEditFormChange('csRole', e.target.value)}>
-              <option value="">Função no CS...</option>
-              {CS_ROLES.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
-            </select>
-          )}
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>
             <input type="checkbox" checked={editForm.isAdmin} onChange={e => onEditFormChange('isAdmin', e.target.checked)} style={{ accentColor: 'var(--neon)' }} />
             Permissões de Admin
@@ -244,7 +229,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               <div>
                 <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>{collab.name}
                   {collab.sector === 'cs' && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `color-mix(in srgb, ${sector.color} 13%, transparent)`, color: sector.color, verticalAlign: 'middle' }}>{(collab.csRole || 'operacional') === 'comercial' ? 'CS COMERCIAL' : 'CS OPERACIONAL'}</span>
+                    <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 8, marginLeft: 8, fontFamily: 'var(--fm)', background: `color-mix(in srgb, ${sector.color} 13%, transparent)`, color: sector.color, verticalAlign: 'middle' }}>CS OPERACIONAL</span>
                   )}
                 </p>
                 <p style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)' }}>ID: {collab.loginId}</p>
