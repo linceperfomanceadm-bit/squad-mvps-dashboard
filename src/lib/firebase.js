@@ -407,6 +407,74 @@ export const SALE_SERVICES = [
   { id: 'outro',          label: 'Outro' },
 ];
 
+// ─── Entregas do contrato (escopo mensal) ─────────────────────
+// O contrato diz o que o cliente recebe todo mês (ex.: 16 artes de
+// feed + 8 artes para tráfego). A CS cadastra esse escopo no cliente;
+// quem produz vai marcando o que entregou; admin e CS acompanham.
+//
+// Regras da agência:
+//   · o mês vira no dia 1 para todos os clientes;
+//   · o que faltou NÃO acumula para o mês seguinte, mas cada mês fica
+//     no histórico do cliente (consulta contratual e avaliação do time);
+//   · mudança de escopo vale a partir do próximo dia 1 — o mês em
+//     andamento e o histórico não mudam;
+//   · no primeiro mês (cliente que entrou no meio do mês) a CS pode
+//     ajustar as quantidades só daquele mês.
+//
+// Sugestões de entregável por setor. São só atalhos do formulário:
+// a CS pode digitar qualquer outro nome.
+export const ENTREGAVEIS = {
+  socialmedia: ['Artes de feed', 'Artes para tráfego pago', 'Stories', 'Reels', 'Carrosséis'],
+  design:      ['Peças gráficas', 'Criativos para anúncio', 'Materiais impressos'],
+  videomaker:  ['Vídeos editados', 'Reels', 'Captações'],
+  trafego:     ['Relatórios de desempenho', 'Reuniões de resultado', 'Campanhas novas'],
+  webdesign:   ['Atualizações de site', 'Landing pages'],
+};
+
+// Setores que podem ter entregas recorrentes no escopo.
+export const ENTREGA_SECTORS = ['socialmedia', 'design', 'videomaker', 'trafego', 'webdesign'];
+
+// Situação de cada item no mês. `tone` segue o kit (good/warn/bad),
+// então a cor sai das variáveis semânticas e funciona no dark e no light.
+export const ENTREGA_STATUS = {
+  entregue: { id: 'entregue', label: 'Entregue',        tone: 'good' },
+  ritmo:    { id: 'ritmo',    label: 'No ritmo',        tone: 'good' },
+  abaixo:   { id: 'abaixo',   label: 'Abaixo do ritmo', tone: 'warn' },
+  atrasado: { id: 'atrasado', label: 'Atrasado',        tone: 'bad' },
+  faltou:   { id: 'faltou',   label: 'Não fechou',      tone: 'bad' },
+};
+
+// Pendências de cadastro. Clientes antigos nasceram antes de vários
+// campos existirem; o selo de "cadastro incompleto" aponta o que falta
+// para a CS completar sem precisar de migração.
+export const CADASTRO_PENDENCIAS = {
+  prazo:    { id: 'prazo',    label: 'Tempo de contrato' },
+  contrato: { id: 'contrato', label: 'Arquivo do contrato' },
+  briefing: { id: 'briefing', label: 'Briefing' },
+  servicos: { id: 'servicos', label: 'Serviços contratados' },
+  escopo:   { id: 'escopo',   label: 'Escopo de entregas' },
+};
+
+// Saúde manual sem revisão há mais que isso vira "desatualizada" no
+// painel do líder da CS.
+export const HEALTH_STALE_DAYS = 30;
+
+// Cliente há mais que isso entre o cadastro e a entrada na base aparece
+// como "fluxo parado" no painel do líder da CS.
+export const FLUXO_PARADO_DIAS = 10;
+
+// ─── Comercial (Hunters) ──────────────────────────────────────
+// Dados da TV da sala comercial. Tudo é lançado à mão pelo líder do
+// comercial (o CRM é externo). Ficam em `app_config` porque é a única
+// coleção que a TV anônima já tem permissão de ler:
+//   app_config/comercial            → controles da TV + time (Closers/SDRs)
+//   app_config/comercial_AAAA-MM    → meta e lançamentos de cada mês
+export const COMERCIAL_TEAM = {
+  id: 'comercial',
+  label: 'Hunters',
+  logo: '/logos/hunters.png',
+};
+
 // ─── Portal de Coleta de Produtos (clientes externos) ─────────
 // Plataformas de e-commerce que o cliente pode ter. "Outro" abre
 // campo de texto livre na criação do acesso.
