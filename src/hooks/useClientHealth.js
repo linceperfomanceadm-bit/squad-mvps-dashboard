@@ -1,4 +1,4 @@
-import { differenceInDays } from 'date-fns';
+import { deadlineState } from '../lib/taskTime';
 
 /*
  * Saúde do cliente — agora são DOIS faróis independentes (fluxograma):
@@ -35,13 +35,32 @@ export function levelFromOverdue(overdue) {
   return 'green';
 }
 
+// ─── Atraso ────────────────────────────────────────────────────
+// Mesma régua do kanban (deadlineState): conta o prazo EFETIVO (fim do
+// dia + o tempo útil que a task passou congelada em aprovação) e task
+// em aprovação não é atraso — quem responde pelo prazo é quem entrega.
+// Antes daqui cada tela comparava a data crua e uma task parada na mão
+// do aprovador aparecia como atrasada na TV e na saúde do cliente.
+export function isTaskOverdue(task, now = new Date()) {
+  if (!task || task.status === 'done') return false;
+  const st = deadlineState(task, now);
+  return !!st && st.kind === 'late';
+}
+
+// Dias de atraso, na mesma contagem do selo "Nd de atraso" do card.
+export function overdueDays(task, now = new Date()) {
+  const st = deadlineState(task, now);
+  if (!st || st.kind !== 'late') return 0;
+  return Math.max(1, Math.floor((now - st.deadline) / 86400000) + 1);
+}
+
 // ─── 1. Saúde Operacional (automática, por tasks) ──────────────
 export function computeOpsHealth(clientId, tasks) {
   const clientTasks = (tasks || []).filter(t => t.clientId === clientId);
   const now = new Date();
 
   const active  = clientTasks.filter(t => t.status !== 'done');
-  const overdue = active.filter(t => t.deadline && differenceInDays(now, new Date(t.deadline)) > 0);
+  const overdue = active.filter(t => isTaskOverdue(t, now));
   const reworks = active.filter(t => t.isRework);
 
   const level = levelFromOverdue(overdue.length);

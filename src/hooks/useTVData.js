@@ -1,11 +1,16 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
-import { differenceInDays, isSameDay, startOfWeek, subWeeks, startOfMonth, isAfter } from 'date-fns';
+import { isSameDay, startOfWeek, subWeeks, startOfMonth, isAfter } from 'date-fns';
 import { db, auth } from '../lib/firebase';
-import { computeOpsHealth, resolveClientHealth, HEALTH_ORDER_4 } from './useClientHealth';
+import {
+  computeOpsHealth, resolveClientHealth, HEALTH_ORDER_4, isTaskOverdue, overdueDays,
+} from './useClientHealth';
 import { entregadoresDe } from './useTasks';
-import { resolveTimeStats, formatBusinessDuration } from '../lib/taskTime';
+import {
+  resolveTimeStats, formatBusinessDuration, effectiveDeadlineAt,
+  businessMsBetween, BUSINESS_MS_PER_DAY,
+} from '../lib/taskTime';
 
 /*
  * useTVData — alimenta o painel de parede (/tv).
@@ -88,6 +93,15 @@ const fmtDuracao = (ms) => {
   return `${d}d ${Math.round(horas - d * 24)}h`;
 };
 
+// Entrega no prazo = ENVIO para aprovação dentro do prazo (gravado em
+// deliveredOnTime). A demora do aprovador não pune quem entregou.
+// Task antiga sem o campo cai na comparação com o prazo efetivo.
+const entregueNoPrazo = (t) => {
+  if (typeof t.deliveredOnTime === 'boolean') return t.deliveredOnTime;
+  const limite = effectiveDeadlineAt(t);
+  return !limite || new Date(t.completedAt) <= limite;
+};
+
 const setorDe = (t) => t.deliveredBySector || t.responsibleSector;
 const pessoaDe = (t) => t.deliveredBy || t.responsibleName;
 
@@ -114,7 +128,7 @@ function porPessoa(lista) {
       if (!t.reworkCount) p.limpas += 1;
       if (t.deadline) {
         p.comPrazo += 1;
-        if (differenceInDays(fim, new Date(t.deadline)) <= 0) p.noPrazo += 1;
+        if (entregueNoPrazo(t)) p.noPrazo += 1;
       }
       if (t.startedAt) {
         const ms = fim - new Date(t.startedAt);
@@ -329,7 +343,9 @@ export function useTVData() {
     const inicioMes = startOfMonth(now);
     const diasUteisAteHoje = Math.min(5, diaSemana(now) + 1);
 
-    const atrasada = t => t.deadline && differenceInDays(now, new Date(t.deadline)) > 0;
+    // Atraso pela régua única (useClientHealth → deadlineState): task em
+    // aprovação fica fora, prazo congelado não conta contra o squad.
+    const atrasada = t => isTaskOverdue(t, now);
 
     // ── Em aberto ─────────────────────────────────────────────
     const doing = openTasks.filter(t => t.status === 'doing');
@@ -342,17 +358,24 @@ export function useTVData() {
       clientName: t.clientName || 'Sem cliente',
       who: t.responsibleName || '—',
       sector: t.responsibleSector,
-      days: differenceInDays(now, new Date(t.deadline)),
+      days: overdueDays(t, now),
     })).sort((a, b) => b.days - a.days);
 
+    // Parada em aprovação: 2+ dias ÚTEIS na mão do aprovador (fim de
+    // semana e madrugada não contam), mesma medida do card do kanban.
+    const esperaAprovacao = t => {
+      const desde = t.approvalStartedAt || t.approvalAt;
+      return desde ? businessMsBetween(desde, now) : 0;
+    };
     const stuckApproval = approval
-      .filter(t => t.approvalAt && differenceInDays(now, new Date(t.approvalAt)) >= 2)
-      .map(t => ({
+      .map(t => ({ t, ms: esperaAprovacao(t) }))
+      .filter(({ ms }) => ms >= 2 * BUSINESS_MS_PER_DAY)
+      .map(({ t, ms }) => ({
         id: t.id, name: t.name,
         clientName: t.clientName || 'Sem cliente',
         who: t.responsibleName || '—',
         sector: t.responsibleSector,
-        days: differenceInDays(now, new Date(t.approvalAt)),
+        days: Math.floor(ms / BUSINESS_MS_PER_DAY),
       })).sort((a, b) => b.days - a.days);
 
     const reworkList = rework.map(t => ({
@@ -418,8 +441,7 @@ export function useTVData() {
 
     const limpasSemana = semana.filter(t => !t.reworkCount).length;
     const comPrazoSemana = semana.filter(t => t.deadline);
-    const noPrazoSemana = comPrazoSemana.filter(t =>
-      differenceInDays(new Date(t.completedAt), new Date(t.deadline)) <= 0).length;
+    const noPrazoSemana = comPrazoSemana.filter(entregueNoPrazo).length;
 
     const weekStats = {
       total: semana.length,
@@ -477,7 +499,7 @@ export function useTVData() {
       const pior = (manual.level && HEALTH_ORDER_4[manual.level] < HEALTH_ORDER_4[ops.level])
         ? manual.level : ops.level;
       const atrasadas = (ops.overdueTasks || [])
-        .map(t => ({ days: differenceInDays(now, new Date(t.deadline)), sector: t.responsibleSector }))
+        .map(t => ({ days: overdueDays(t, now), sector: t.responsibleSector }))
         .sort((a, b) => b.days - a.days);
       const ativasDoCliente = openTasks.find(t => t.clientId === c.id);
       return {
