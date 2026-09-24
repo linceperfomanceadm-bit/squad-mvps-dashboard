@@ -123,6 +123,19 @@ export const onboardingAgendado = (c) => {
 };
 
 /*
+ * Cliente inativo — saiu da base, mas o histórico fica.
+ *
+ * Inativar grava `active: false` (o que já tira o cliente de toda
+ * visão geral, métrica, carteira e da TV, sem mexer em tela nenhuma) e
+ * o bloco `inativo = { at, by, motivo }`, que é o que diferencia o
+ * inativo do cliente que só está correndo o fluxo de entrada — os dois
+ * gravam `active: false`. Reativar apaga o bloco e volta `active: true`.
+ * Só cliente já na base (`live`) pode ser inativado; desistência no
+ * meio do fluxo continua sendo exclusão.
+ */
+export const isInativo = (c) => !!c?.inativo?.at;
+
+/*
  * Cliente que já pertence à carteira de alguém.
  *
  * `active: false` é o que esconde o cliente enquanto ele corre o
@@ -138,7 +151,7 @@ export const onboardingAgendado = (c) => {
  * filtro de responsável vem junto.
  */
 const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
-export const naCarteira = (c) => c?.active !== false || EM_FLUXO.includes(stageOf(c));
+export const naCarteira = (c) => !isInativo(c) && (c?.active !== false || EM_FLUXO.includes(stageOf(c)));
 
 // Dias sem indicação de responsável até o sistema cobrar os líderes.
 // O alerta vai para o admin e para o líder do setor travado.
@@ -278,6 +291,22 @@ export const SERVICE_SECTOR_MAP = {
   video:          'videomaker',
   design:         'design',
 };
+
+// ─── Pasta do cliente no Drive ────────────────────────────────
+// A CS cola o link da pasta no cadastro (`contrato.driveUrl`). Link
+// colado sem protocolo ("drive.google.com/...") viraria um caminho
+// relativo do app ao clicar — por isso sempre passa por aqui.
+export const normalizaLink = (v) => {
+  const t = String(v || '').trim();
+  if (!t) return '';
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
+};
+// Aceita qualquer endereço com domínio e sem espaço.
+export const linkValido = (v) => {
+  const t = String(v || '').trim();
+  return !t || /^(https?:\/\/)?[^\s/]+\.[^\s/]+(\/\S*)?$/i.test(t);
+};
+export const driveDoCliente = (c) => normalizaLink(c?.contrato?.driveUrl || c?.driveUrl || '');
 
 // Formas de pagamento do cadastro de cliente (CS).
 export const PAYMENT_METHODS = [
