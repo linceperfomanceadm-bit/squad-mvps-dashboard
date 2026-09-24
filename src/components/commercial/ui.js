@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { X, Check } from 'lucide-react';
+import { X, Check, FolderOpen, ExternalLink } from 'lucide-react';
 
 /*
- * Peças de UI compartilhadas pelos painéis do funil
- * (SDR, Closer, CS Comercial e CS Operacional).
+ * Peças de UI compartilhadas pelos painéis da CS, pelos modais de
+ * cliente (staffing, onboarding, ficha) e pelos formulários.
  * Mantém o mesmo padrão de estilo inline do resto do app.
  */
 
@@ -153,6 +153,17 @@ export function RO({ label, value, block }) {
       <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', marginBottom: 2 }}>{String(label).toUpperCase()}</p>
       <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, whiteSpace: block ? 'pre-wrap' : 'normal' }}>{value}</p>
     </div>
+  );
+}
+
+// Atalho para a pasta do cliente no Drive (`driveDoCliente`). Sem link,
+// não renderiza nada — quem chama não precisa checar.
+export function LinkDrive({ url, style }) {
+  if (!url) return null;
+  return (
+    <a className="ui-btn small" href={url} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', ...style }} title={url}>
+      <FolderOpen size={13} /> Pasta no Drive <ExternalLink size={11} style={{ opacity: .6 }} />
+    </a>
   );
 }
 
