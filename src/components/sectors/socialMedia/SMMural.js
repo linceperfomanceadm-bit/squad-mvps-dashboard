@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Users, FileText, Kanban, AlertTriangle } from 'lucide-react';
-import { resolveClientHealth, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
+import { resolveClientHealth, isTaskOverdue, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
 import SMClientModal from './SMClientModal';
 import { entregasDoSetor, resumoMes, statusGeral, mesChave, acompanhaEntregas } from '../../../lib/entregas';
 import { BarraEntrega } from '../../entregas/EntregasKit';
@@ -47,7 +47,9 @@ export default function SMMural({
           {clients.map((c) => {
             const docs = docsDo(c.id);
             const abertas = tasksDo(c.id).filter((t) => t.status !== 'done');
-            const atrasadas = abertas.filter((t) => t.deadline && new Date(t.deadline) < new Date()).length;
+            // Mesma régua do kanban e da saúde do cliente: prazo efetivo em
+            // tempo útil, e task em aprovação não conta como atraso.
+            const atrasadas = abertas.filter((t) => isTaskOverdue(t)).length;
             const saude = resolveClientHealth(c);
             const nivel = saude && HEALTH_LEVELS_4[saude.level];
             const semBase = !c.sm?.baseCalculo;

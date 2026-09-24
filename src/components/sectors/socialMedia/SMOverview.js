@@ -2,6 +2,7 @@ import React from 'react';
 import { Kpi } from '../../shared/ui';
 import { Users, FileText, Kanban, AlertTriangle } from 'lucide-react';
 import { DOC_STATUS } from '../../../hooks/useDocuments';
+import { isTaskOverdue } from '../../../hooks/useClientHealth';
 
 // ─────────────────────────────────────────────────────────────
 // Visão Geral do Social Media
@@ -28,7 +29,9 @@ export default function SMOverview({ myClients, myDocs, myTasks, onNavigate }) {
   const entregues = myDocs.filter((d) => d.status === 'entregue').length;
 
   const abertas = myTasks.filter((t) => t.status !== 'done');
-  const atrasadas = abertas.filter((t) => t.deadline && new Date(t.deadline) < agora);
+  // Mesma régua do kanban: prazo efetivo em tempo útil, e task em
+  // aprovação não é atraso de quem produz.
+  const atrasadas = abertas.filter((t) => isTaskOverdue(t, agora));
   const aguardando = myTasks.filter((t) => t.status === 'approval').length;
 
   // Cliente sem base de cálculo não consegue ter relatório comparável.
