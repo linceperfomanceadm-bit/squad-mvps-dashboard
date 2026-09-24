@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Video, CalendarPlus, Pencil, Paperclip, Trash2, Check, X } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES } from '../../lib/firebase';
+import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES, driveDoCliente } from '../../lib/firebase';
 import { clientCallCalendarUrl } from '../../lib/calendarLink';
 import ContractBlock from './ContractBlock';
 import {
-  Overlay, ModalHeader, Section, RO, Tag,
+  Overlay, ModalHeader, Section, RO, Tag, LinkDrive,
   money, fmtDateTime, fmtDate, INP, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
 } from './ui';
 
@@ -63,6 +63,7 @@ export default function ClientOnboardingModal({
   const briefing = contrato.briefing || client.briefing || '';
   const servicos = contrato.servicos || client.services || [];
   const anexo = contrato.anexoBriefing || null;
+  const drive = driveDoCliente(client);
 
   const stage = stageOf(client);
   const kickoffCall = client.kickoffCall || {};
@@ -284,13 +285,19 @@ export default function ClientOnboardingModal({
           </Section>
         )}
 
-        {briefing && (
+        {(briefing || drive || anexo?.url) && (
           <Section title="Briefing" color={COLOR}>
-            <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{briefing}</p>
-            {anexo?.url && (
-              <a href={anexo.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 10, fontSize: 12, color: 'var(--blue)', fontFamily: 'var(--fm)' }}>
-                📎 {anexo.name}
-              </a>
+            {briefing && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{briefing}</p>}
+            {(drive || anexo?.url) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: briefing ? 12 : 0 }}>
+                <LinkDrive url={drive} />
+                {/* Anexo de briefing do formato antigo (o campo saiu do cadastro). */}
+                {anexo?.url && (
+                  <a href={anexo.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--blue)', fontFamily: 'var(--fm)', textDecoration: 'none' }}>
+                    <Paperclip size={12} /> {anexo.name}
+                  </a>
+                )}
+              </div>
             )}
           </Section>
         )}

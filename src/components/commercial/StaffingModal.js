@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Check, RefreshCw } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG } from '../../lib/firebase';
-import { Overlay, ModalHeader, Section, LBL, BTN_GREEN, BTN_CANCEL, money } from './ui';
+import { Check, RefreshCw, Paperclip } from 'lucide-react';
+import { SECTORS, WD_SERVICE_CONFIG, driveDoCliente } from '../../lib/firebase';
+import { Overlay, ModalHeader, Section, LBL, BTN_GREEN, BTN_CANCEL, money, LinkDrive } from './ui';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
@@ -40,6 +40,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
   const briefing = contrato.briefing || client.briefing || '';
   const servicos = contrato.servicos || client.services || [];
   const anexo = contrato.anexoBriefing || null;
+  const drive = driveDoCliente(client);
 
   const toggle = (sectorId, personName) => {
     setSel(r => {
@@ -125,13 +126,19 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
           </Section>
         )}
 
-        {briefing && (
+        {(briefing || drive || anexo?.url) && (
           <Section title="Briefing" color="var(--neon)">
-            <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{briefing}</p>
-            {anexo?.url && (
-              <a href={anexo.url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 10, fontSize: 12, color: 'var(--blue)', fontFamily: 'var(--fm)' }}>
-                📎 {anexo.name}
-              </a>
+            {briefing && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{briefing}</p>}
+            {(drive || anexo?.url) && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: briefing ? 12 : 0 }}>
+                <LinkDrive url={drive} />
+                {/* Anexo de briefing do formato antigo (o campo saiu do cadastro). */}
+                {anexo?.url && (
+                  <a href={anexo.url} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--blue)', fontFamily: 'var(--fm)', textDecoration: 'none' }}>
+                    <Paperclip size={12} /> {anexo.name}
+                  </a>
+                )}
+              </div>
             )}
           </Section>
         )}

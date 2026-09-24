@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Check, Paperclip, X } from 'lucide-react';
-import { SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE_CONFIG, WD_WEB_SERVICES } from '../../lib/firebase';
+import { Check, Paperclip, X, FolderOpen } from 'lucide-react';
+import { SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE_CONFIG, WD_WEB_SERVICES, normalizaLink, linkValido } from '../../lib/firebase';
 
 const COLOR = 'var(--c)';
 
@@ -16,16 +16,18 @@ const COLOR = 'var(--c)';
  * Etapa 1 — Cliente (nome na base + qualificação do contrato:
  *           empresa, representante legal e endereço destrinchado)
  * Etapa 2 — Serviços contratados e setores envolvidos
- * Etapa 3 — Financeiro, briefing, observações e anexos
+ * Etapa 3 — Financeiro, briefing, pasta do Drive, observações e contrato
  *
  * SOBRE OS SETORES: são sugeridos automaticamente pelos serviços
  * marcados (SERVICE_SECTOR_MAP), mas a CS confirma na mão. SEO,
  * Consultoria e Outro não mapeiam para setor nenhum, e um cliente
  * pode precisar de um setor que não aparece nos serviços vendidos.
  *
- * SOBRE OS ANEXOS: o briefing é visível para todos os responsáveis.
- * O contrato NÃO é renderizado em tela nenhuma do app — fica só
- * guardado no Storage, para consulta pelo console do Firebase.
+ * SOBRE OS ARQUIVOS: briefing é um campo só, o texto. Os arquivos do
+ * cliente vão na pasta do Drive (link visível para os responsáveis) —
+ * o antigo anexo de briefing saiu porque duplicava o campo. O contrato
+ * NÃO é renderizado em tela nenhuma do app — fica só guardado no
+ * Storage, para consulta pelo console do Firebase.
  */
 
 const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
@@ -74,6 +76,7 @@ const empty = {
   customPlan: '',
   // Texto
   briefing: '',
+  driveUrl: '',
   observations: '',
 };
 
@@ -81,7 +84,6 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
   const [step, setStep] = useState(1);
   const [data, setData] = useState(empty);
   const [submitting, setSubmitting] = useState(false);
-  const [anexoBriefing, setAnexoBriefing] = useState(null);
   const [anexoContrato, setAnexoContrato] = useState(null);
   const [uploading, setUploading] = useState('');
   const [uploadError, setUploadError] = useState('');
@@ -139,7 +141,6 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
     setUploading('');
     if (!r.success) { setUploadError(r.error); return; }
     if (kind === 'contrato') setAnexoContrato(r.file);
-    else setAnexoBriefing(r.file);
   };
 
   // ── Validação por etapa ──────────────────────────────────────
@@ -177,6 +178,7 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
     data.contractMonths &&
     data.paymentMethod &&
     (data.briefing || '').trim().length > 0 &&
+    linkValido(data.driveUrl) &&
     (data.paymentType === 'avista' ||
       (data.customInstallment ? data.customPlan.trim() : (instCount > 0 && instValue > 0 && sumMatches)))
   );
@@ -252,8 +254,8 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
         contractMonths: data.contractMonths,
         pagamento,
         briefing: data.briefing.trim(),
+        driveUrl: normalizaLink(data.driveUrl),
         observations: data.observations.trim(),
-        anexoBriefing: anexoBriefing || null,
         anexoContrato: anexoContrato || null,
       },
       // Espelhos no topo do doc: as telas antigas (drawer do CS
@@ -541,20 +543,30 @@ export default function ClientRegisterForm({ onSubmit, onUpload, onCancel, colla
           </div>
 
           <div>
+            <p style={LBL}>PASTA DO CLIENTE NO DRIVE</p>
+            <div style={{ position: 'relative', marginTop: 6 }}>
+              <FolderOpen size={14} color="var(--dim)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+              <input
+                value={data.driveUrl}
+                onChange={e => set('driveUrl', e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/..."
+                style={{ ...INP, paddingLeft: 34, borderColor: linkValido(data.driveUrl) ? 'var(--border)' : 'var(--red)' }}
+              />
+            </div>
+            <p style={{ fontSize: 10, color: linkValido(data.driveUrl) ? 'var(--muted)' : 'var(--red)', marginTop: 5, lineHeight: 1.5 }}>
+              {linkValido(data.driveUrl)
+                ? 'Opcional. Onde ficam os arquivos do cliente (briefing, materiais, referências). O time vê o atalho no card.'
+                : 'Cole o endereço completo da pasta.'}
+            </p>
+          </div>
+
+          <div>
             <p style={LBL}>OBSERVAÇÕES</p>
             <textarea value={data.observations} onChange={e => set('observations', e.target.value)} rows={3} placeholder="Combinados fora do contrato, cuidados, alertas para o CS..." style={{ ...INP, marginTop: 6, resize: 'vertical' }} />
           </div>
 
           {/* Anexos */}
           <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <FileSlot
-              label="ANEXO DO BRIEFING"
-              hint="Visível para todos os responsáveis pelo projeto."
-              file={anexoBriefing}
-              busy={uploading === 'briefing'}
-              onPick={f => pickFile('briefing', f)}
-              onClear={() => setAnexoBriefing(null)}
-            />
             <FileSlot
               label="ANEXO DO CONTRATO"
               hint="Guardado apenas no Storage. Nenhuma tela do app exibe este arquivo."
