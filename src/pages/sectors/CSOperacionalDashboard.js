@@ -28,13 +28,13 @@ import ClienteFicha from '../../components/entregas/ClienteFicha';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { cadastroPendencias, entregasDoMes, resumoMes, mesChave } from '../../lib/entregas';
 import { Aderencia } from '../../components/entregas/EntregasKit';
-import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, stageOf } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, stageOf, driveDoCliente } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
   HEALTH_LEVELS_4, HEALTH_ORDER_4,
 } from '../../hooks/useClientHealth';
 import {
-  Overlay, ModalHeader, ConfirmModal, ScheduleModal, Stat, Tag, Empty, Spinner, Section, RO,
+  Overlay, ModalHeader, ConfirmModal, ScheduleModal, Stat, Tag, Empty, Spinner, Section, RO, LinkDrive,
   fmtDate, fmtDateTime, toLocalInput, money,
   CARD, GRID, MODAL, LBL, INP, BTN_PRIMARY, BTN_GREEN, BTN_CANCEL,
 } from '../../components/commercial/ui';
@@ -1174,9 +1174,10 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth, onOpenFich
           <RO label="Onboarding" value={client.kickoff?.confirmedAt ? `realizado em ${fmtDate(client.kickoff.confirmedAt)} por ${client.kickoff.confirmedBy || '—'}` : null} />
         </Section>
 
-        {client.briefing && (
+        {(client.briefing || driveDoCliente(client)) && (
           <Section title="Briefing" color={COLOR}>
-            <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{client.briefing}</p>
+            {client.briefing && <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{client.briefing}</p>}
+            <LinkDrive url={driveDoCliente(client)} style={{ marginTop: client.briefing ? 12 : 0 }} />
           </Section>
         )}
       </div>
