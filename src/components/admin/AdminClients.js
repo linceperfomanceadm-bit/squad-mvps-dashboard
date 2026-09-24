@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS } from '../../lib/firebase';
+import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw } from 'lucide-react';
+import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
 import ClienteFicha from '../entregas/ClienteFicha';
+import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate } from '../commercial/ui';
 
 // Normaliza responsáveis de um setor para SEMPRE um array.
 // (clientes antigos guardam string; novos guardam array.)
@@ -199,7 +200,118 @@ function EditResponsibleModal({ client, collaborators, onClose, onSave, onRename
   );
 }
 
-export default function AdminClients({ clients, collaborators, onAdd, onUpdate, onDelete, onRename, acoesEntregas, toast }) {
+/*
+ * Inativar: o cliente sai da base ativa sem apagar nada. Encerrar o
+ * contrato junto é escolha de quem inativa — pausa não é churn.
+ */
+function InativarModal({ client, tasksAbertas, onClose, onConfirm }) {
+  const contratoAberto = contractState(client).status !== 'closed';
+  const [motivo, setMotivo] = useState('');
+  const [encerrar, setEncerrar] = useState(contratoAberto);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...MODAL, maxWidth: 480 }}>
+        <ModalHeader title={`Inativar ${client.name}`} onClose={onClose} />
+        <p style={MS2.texto}>
+          O cliente sai da base ativa: some das carteiras, das métricas, das entregas do mês e do Painel de TV.
+          Nada é apagado — dá para reativar depois, com os mesmos responsáveis.
+        </p>
+        {tasksAbertas > 0 && (
+          <p style={MS2.aviso}>
+            {tasksAbertas === 1 ? 'Há 1 task em aberto' : `Há ${tasksAbertas} tasks em aberto`} deste cliente. Elas continuam no quadro até alguém concluir ou apagar.
+          </p>
+        )}
+
+        <p style={{ ...LBL, marginTop: 14 }}>MOTIVO</p>
+        <textarea
+          rows={3}
+          value={motivo}
+          onChange={e => setMotivo(e.target.value)}
+          placeholder="Ex: encerrou o contrato, pausou por 3 meses, trocou de agência..."
+          style={{ ...INP, marginTop: 6, resize: 'vertical' }}
+        />
+
+        {contratoAberto && (
+          <label style={MS2.check}>
+            <input type="checkbox" checked={encerrar} onChange={e => setEncerrar(e.target.checked)} />
+            <span>
+              Encerrar o contrato também
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                Conta como churn do mês. Desmarque se o cliente só pausou.
+              </span>
+            </span>
+          </label>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button
+            type="button"
+            className="ui-btn primary"
+            style={{ flex: 1, justifyContent: 'center' }}
+            disabled={busy}
+            onClick={async () => { setBusy(true); await onConfirm({ motivo, encerrarContrato: encerrar }); setBusy(false); }}
+          >
+            <UserMinus size={14} /> {busy ? 'Inativando...' : 'Inativar cliente'}
+          </button>
+          <button type="button" className="ui-btn" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+function ReativarModal({ client, onClose, onConfirm }) {
+  const ct = contractState(client);
+  const fechado = ct.status === 'closed';
+  // Contrato encerrado no mesmo gesto da inativação volta junto por
+  // padrão; encerrado antes disso é outra história e fica desmarcado.
+  const [reabrir, setReabrir] = useState(fechado && !!client.inativo?.at && ct.closedAt === client.inativo.at);
+  const [busy, setBusy] = useState(false);
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...MODAL, maxWidth: 460 }}>
+        <ModalHeader title={`Reativar ${client.name}`} onClose={onClose} />
+        <p style={MS2.texto}>
+          O cliente volta para a base ativa com os mesmos responsáveis e reaparece nas carteiras, métricas e no Painel de TV.
+        </p>
+        {client.inativo?.at && (
+          <p style={{ ...MS2.texto, marginTop: 8 }}>
+            Inativo desde {fmtDate(client.inativo.at)}{client.inativo.by ? ` por ${client.inativo.by}` : ''}
+            {client.inativo.motivo ? ` · ${client.inativo.motivo}` : ''}.
+          </p>
+        )}
+        {fechado && (
+          <label style={MS2.check}>
+            <input type="checkbox" checked={reabrir} onChange={e => setReabrir(e.target.checked)} />
+            <span>
+              Reabrir o contrato
+              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                Sem isso, o cliente volta com o contrato encerrado — renove pela ficha da CS.
+              </span>
+            </span>
+          </label>
+        )}
+        <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+          <button
+            type="button"
+            className="ui-btn primary"
+            style={{ flex: 1, justifyContent: 'center' }}
+            disabled={busy}
+            onClick={async () => { setBusy(true); await onConfirm({ reabrirContrato: reabrir }); setBusy(false); }}
+          >
+            <RotateCcw size={14} /> {busy ? 'Reativando...' : 'Reativar cliente'}
+          </button>
+          <button type="button" className="ui-btn" onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
+export default function AdminClients({ clients, collaborators, tasks = [], onAdd, onUpdate, onDelete, onRename, onInativar, onReativar, acoesEntregas, toast }) {
   const [showAdd, setShowAdd] = useState(false);
   // Ficha de contrato e entregas — guarda só o id para ler o cliente vivo.
   const [fichaId, setFichaId] = useState(null);
@@ -207,8 +319,17 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
   const [editClient, setEditClient] = useState(null);
   const [search, setSearch] = useState('');
   const [delConfirm, setDelConfirm] = useState(null);
+  // Aba da lista: a base (ativos e em fluxo) ou os inativos.
+  const [aba, setAba] = useState('base');
+  const [inativarId, setInativarId] = useState(null);
+  const [reativarId, setReativarId] = useState(null);
 
-  const filtered = clients.filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
+  const inativos = clients.filter(isInativo);
+  const filtered = clients
+    .filter(c => (aba === 'inativos' ? isInativo(c) : !isInativo(c)))
+    .filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
+  const clienteInativar = inativarId ? clients.find(c => c.id === inativarId) : null;
+  const clienteReativar = reativarId ? clients.find(c => c.id === reativarId) : null;
 
   const wdStatusLabel = s => ({ onboarding:'Onboarding', production:'Produção', inactive:'Inativo', recurrence:'Recorrência', finished:'Finalizado' }[s] || s);
   const wdStatusColor = s => ({ onboarding:'var(--blue)', production:'var(--neon)', inactive:'var(--muted)', recurrence:'var(--purple)', finished:'var(--green)' }[s] || 'var(--muted)');
@@ -219,7 +340,7 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Clientes</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {clients.filter(c => c.active !== false).length} ativos · {clients.filter(c => c.stage === 'staffing').length} aguardando responsáveis · {clients.length} total
+            {clients.filter(c => c.active !== false).length} ativos · {clients.filter(isStaffing).length} aguardando responsáveis · {inativos.length} {inativos.length === 1 ? 'inativo' : 'inativos'}
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
@@ -227,9 +348,15 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
         </button>
       </div>
 
-      <div style={{ position: 'relative', marginBottom: 16 }}>
-        <Search size={15} color="var(--muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
-        <input style={{ ...S.input, paddingLeft: 38, width: '100%', maxWidth: 380 }} placeholder="Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+        <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 380 }}>
+          <Search size={15} color="var(--muted)" style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)' }} />
+          <input style={{ ...S.input, paddingLeft: 38, width: '100%' }} placeholder="Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <button type="button" className={`ui-btn small ${aba === 'base' ? 'on' : ''}`} onClick={() => setAba('base')}>Base ativa</button>
+        <button type="button" className={`ui-btn small ${aba === 'inativos' ? 'on' : ''}`} onClick={() => setAba('inativos')}>
+          Inativos <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: inativos.length ? 'var(--text)' : 'var(--dim)' }}>{inativos.length}</span>
+        </button>
       </div>
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
@@ -247,9 +374,17 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                 <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
                     {c.name}
-                    {c.stage === 'staffing' && (
+                    {isStaffing(c) && (
                       <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)', verticalAlign: 'middle' }}>
                         AGUARDANDO RESPONSÁVEIS
+                      </span>
+                    )}
+                    {isInativo(c) && (
+                      <span
+                        title={[c.inativo.by ? `por ${c.inativo.by}` : '', c.inativo.motivo].filter(Boolean).join(' · ') || undefined}
+                        style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--red-dim)', color: 'var(--red)', fontFamily: 'var(--fm)', verticalAlign: 'middle', cursor: c.inativo.motivo ? 'help' : 'default' }}
+                      >
+                        INATIVO DESDE {fmtDate(c.inativo.at)}
                       </span>
                     )}
                     {c.active !== false && cadastroPendencias(c).length > 0 && (
@@ -295,6 +430,16 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                           <ClipboardCheck size={13} />
                         </button>
                       )}
+                      {onInativar && !isInativo(c) && stageOf(c) === 'live' && (
+                        <button style={S.iconBtn} onClick={() => setInativarId(c.id)} title="Inativar cliente (sai da base ativa)">
+                          <UserMinus size={13} />
+                        </button>
+                      )}
+                      {onReativar && isInativo(c) && (
+                        <button style={{ ...S.iconBtn, color: 'var(--green)' }} onClick={() => setReativarId(c.id)} title="Reativar cliente">
+                          <RotateCcw size={13} />
+                        </button>
+                      )}
                       {delConfirm === c.id
                         ? <>
                             <button style={S.iconBtnRed} onClick={() => { onDelete(c.id); setDelConfirm(null); }}><Check size={13} /></button>
@@ -307,7 +452,7 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan="10" style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Nenhum cliente encontrado.</td></tr>
+                <tr><td colSpan={Object.keys(SECTORS).length + 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{aba === 'inativos' && !search ? 'Nenhum cliente inativo.' : 'Nenhum cliente encontrado.'}</td></tr>
               )}
             </tbody>
           </table>
@@ -328,6 +473,27 @@ export default function AdminClients({ clients, collaborators, onAdd, onUpdate, 
       {ficha && (
         <ClienteFicha client={ficha} acoes={acoesEntregas} toast={toast} onClose={() => setFichaId(null)} />
       )}
+      {clienteInativar && (
+        <InativarModal
+          client={clienteInativar}
+          tasksAbertas={tasks.filter(t => t.clientId === clienteInativar.id && t.status !== 'done').length}
+          onClose={() => setInativarId(null)}
+          onConfirm={async (opcoes) => {
+            const r = await onInativar(clienteInativar.id, opcoes);
+            if (r?.success) setInativarId(null);
+          }}
+        />
+      )}
+      {clienteReativar && (
+        <ReativarModal
+          client={clienteReativar}
+          onClose={() => setReativarId(null)}
+          onConfirm={async (opcoes) => {
+            const r = await onReativar(clienteReativar.id, opcoes);
+            if (r?.success) setReativarId(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -337,6 +503,12 @@ const S = {
   iconBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, padding: '5px 7px', color: 'var(--muted)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   iconBtnBlue: { background: 'rgba(56,189,248,.08)', border: '1px solid rgba(56,189,248,.25)', borderRadius: 6, padding: '5px 7px', color: 'var(--blue)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
   iconBtnRed: { background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 6, padding: '5px 7px', color: 'var(--neon)', display: 'flex', alignItems: 'center', cursor: 'pointer' },
+};
+
+const MS2 = {
+  texto: { fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 },
+  aviso: { fontSize: 12, color: 'var(--amber)', background: 'var(--amber-dim)', border: '1px solid var(--amber-b)', borderRadius: 10, padding: '9px 12px', marginTop: 12, lineHeight: 1.5 },
+  check: { display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'var(--text)', marginTop: 14, cursor: 'pointer' },
 };
 
 const MS = {
