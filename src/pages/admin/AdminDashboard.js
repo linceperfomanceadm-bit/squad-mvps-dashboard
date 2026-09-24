@@ -85,6 +85,7 @@ export default function AdminDashboard() {
     removeBrandMaterial,
     idvAddService,
     saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas,
+    inativarCliente, reativarCliente,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
   const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
@@ -299,6 +300,21 @@ export default function AdminDashboard() {
               return r;
             }}
             onDelete={deleteClient}
+            tasks={tasks}
+            onInativar={async (id, opcoes) => {
+              const nome = clients.find(c => c.id === id)?.name || 'Cliente';
+              const r = await inativarCliente(id, opcoes, user?.name);
+              if (r.success) toast(`${nome} inativado. Ele está na aba Inativos.`);
+              else toast(r.error, 'e');
+              return r;
+            }}
+            onReativar={async (id, opcoes) => {
+              const nome = clients.find(c => c.id === id)?.name || 'Cliente';
+              const r = await reativarCliente(id, opcoes, user?.name);
+              if (r.success) toast(`${nome} voltou para a base ativa.`);
+              else toast(r.error, 'e');
+              return r;
+            }}
             acoesEntregas={acoesEntregas}
             toast={toast}
             onWdMoveToProduction={wdMoveToProduction}
