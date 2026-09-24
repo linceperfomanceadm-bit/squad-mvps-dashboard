@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Calendar, Package, Monitor, FileText, Rocket, ClipboardCheck } from 'lucide-react';
+import { LayoutDashboard, Users, UserCog, BarChart2, Activity, Kanban, BookOpen, Calendar, Package, Monitor, FileText, Rocket, ClipboardCheck, Contact, Layers, FolderOpen, Settings2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
@@ -15,6 +15,7 @@ import AdminCollaborators from '../../components/admin/AdminCollaborators';
 import AdminAgenda from '../../components/admin/AdminAgenda';
 import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import AdminTVControl from '../../components/admin/AdminTVControl';
+import AdminCarteiraSM from '../../components/admin/AdminCarteiraSM';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
@@ -25,22 +26,51 @@ import EntregasPainel from '../../components/entregas/EntregasPainel';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { ComercialTVControlConectado } from '../../components/commercial/ComercialTVControl';
 import { PageHeader } from '../../components/shared/ui';
-import { SECTORS } from '../../lib/firebase';
+import { SECTORS, isStaffing } from '../../lib/firebase';
 
+/*
+ * Menu do admin agrupado por categoria. O admin passou de uma dúzia de
+ * abas soltas, então as ferramentas ficam dentro de grupos que abrem
+ * na sidebar (ver `NavGrupo` no AppShell). O grupo não é página: a
+ * `key` dele (prefixo `g-`) nunca chega ao `setPage`. Ferramenta nova
+ * entra no grupo que faz sentido — trocar de grupo é só mover a linha.
+ * Agenda continua na lista para virar o link da barra superior.
+ */
 const NAV = [
-  { key: 'overview',      label: 'Visão Geral',    icon: LayoutDashboard },
-  { key: 'kanban',        label: 'Tasks',           icon: Kanban },
-  { key: 'feed',          label: 'Extrato Diário',  icon: Activity },
-  { key: 'onboarding',    label: 'Onboarding',      icon: Rocket },
-  { key: 'charts',        label: 'Relatórios',      icon: BarChart2 },
-  { key: 'documentos',    label: 'Documentos',      icon: FileText },
-  { key: 'vault',         label: 'Brand Hub',        icon: BookOpen },
-  { key: 'clients',       label: 'Clientes',        icon: Users },
-  { key: 'entregas',      label: 'Entregas × Contrato', icon: ClipboardCheck },
-  { key: 'portal',        label: 'Portal de Produtos', icon: Package },
-  { key: 'collaborators', label: 'Colaboradores',   icon: UserCog },
-  { key: 'agenda',        label: 'Agenda',          icon: Calendar },
-  { key: 'tv',            label: 'Painel de TV',    icon: Monitor },
+  { key: 'overview', label: 'Visão Geral', icon: LayoutDashboard },
+  {
+    key: 'g-producao', label: 'Produção', icon: Layers,
+    children: [
+      { key: 'kanban',   label: 'Tasks',               icon: Kanban },
+      { key: 'feed',     label: 'Extrato Diário',      icon: Activity },
+      { key: 'entregas', label: 'Entregas × Contrato', icon: ClipboardCheck },
+    ],
+  },
+  {
+    key: 'g-clientes', label: 'Clientes', icon: Users,
+    children: [
+      { key: 'clients',    label: 'Base de clientes',   icon: Users },
+      { key: 'onboarding', label: 'Onboarding',         icon: Rocket },
+      { key: 'carteiraSM', label: 'Carteira Social Media', icon: Contact },
+      { key: 'portal',     label: 'Portal de Produtos', icon: Package },
+    ],
+  },
+  {
+    key: 'g-materiais', label: 'Materiais', icon: FolderOpen,
+    children: [
+      { key: 'vault',      label: 'Brand Hub',  icon: BookOpen },
+      { key: 'documentos', label: 'Documentos', icon: FileText },
+    ],
+  },
+  {
+    key: 'g-gestao', label: 'Gestão', icon: Settings2,
+    children: [
+      { key: 'charts',        label: 'Relatórios',    icon: BarChart2 },
+      { key: 'collaborators', label: 'Colaboradores', icon: UserCog },
+      { key: 'tv',            label: 'Painel de TV',  icon: Monitor },
+    ],
+  },
+  { key: 'agenda', label: 'Agenda', icon: Calendar },
 ];
 
 export default function AdminDashboard() {
@@ -132,13 +162,17 @@ export default function AdminDashboard() {
   const pendingTasks = tasks.filter(t => t.status === 'approval').length;
   // Clientes cadastrados pela CS que ainda esperam indicação de
   // responsável. O admin destrava quando um líder está ausente.
-  const staffingCount = clients.filter(c => c.stage === 'staffing').length;
+  const staffingCount = clients.filter(isStaffing).length;
 
-  const navItems = NAV.map(n => ({
-    ...n,
-    badge: n.key === 'kanban' ? pendingTasks : (n.key === 'onboarding' ? staffingCount : 0),
-    badgeDanger: (n.key === 'kanban' && pendingTasks > 0) || (n.key === 'onboarding' && staffingCount > 0),
-  }));
+  // Avisos vão nas abas; o grupo fechado soma os das abas de dentro.
+  const comAviso = (n) => (Array.isArray(n.children)
+    ? { ...n, children: n.children.map(comAviso) }
+    : {
+      ...n,
+      badge: n.key === 'kanban' ? pendingTasks : (n.key === 'onboarding' ? staffingCount : 0),
+      badgeDanger: (n.key === 'kanban' && pendingTasks > 0) || (n.key === 'onboarding' && staffingCount > 0),
+    });
+  const navItems = NAV.map(comAviso);
 
   return (
     <AppShell
@@ -161,11 +195,11 @@ export default function AdminDashboard() {
             <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
               <select style={S.filterSelect} value={taskSectorFilter} onChange={e => { setTaskSectorFilter(e.target.value); setTaskCollabFilter(''); }}>
                 <option value="">Todos os setores</option>
-                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
               <select style={S.filterSelect} value={taskCollabFilter} onChange={e => setTaskCollabFilter(e.target.value)}>
                 <option value="">Todos os colaboradores</option>
-                {collaborators.filter(c => c.active && (!taskSectorFilter || c.sector === taskSectorFilter)).map(c => (
+                {collaborators.filter(c => c.active !== false && (!taskSectorFilter || c.sector === taskSectorFilter)).map(c => (
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
@@ -291,6 +325,15 @@ export default function AdminDashboard() {
           </div>
         ) : page === 'entregas' ? (
           <EntregasPainel clients={clients} acoes={acoesEntregas} toast={toast} titulo="Entregas × Contrato" />
+        ) : page === 'carteiraSM' ? (
+          <AdminCarteiraSM
+            clients={clients}
+            collaborators={collaborators}
+            tasks={tasks}
+            documents={documents}
+            acoes={acoesEntregas}
+            toast={toast}
+          />
 
         ) : (
           <AdminCollaborators
