@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Paperclip, Trash2, Plus, FileCheck2, X } from 'lucide-react';
+import { Paperclip, Trash2, Plus, FileCheck2, X, FolderOpen, ExternalLink } from 'lucide-react';
 import {
   SECTORS, SALE_SERVICES, ENTREGAVEIS, ENTREGA_SECTORS, CADASTRO_PENDENCIAS, contractState,
+  normalizaLink, linkValido,
 } from '../../lib/firebase';
 import {
   cadastroPendencias, escopoParaEditar, inicioNovaVersao, mesChave, rotuloMes, novoIdItem, versoesDoEscopo,
@@ -22,6 +23,11 @@ import { Tag } from '../shared/ui';
  *
  * O escopo mensal segue a regra da agência: o primeiro escopo vale já;
  * mudança num escopo existente vale a partir do próximo dia 1.
+ *
+ * BRIEFING: um campo só, o texto. O anexo de briefing saiu (era um
+ * segundo "briefing" no formulário) — arquivo do cliente agora vai na
+ * pasta do Drive, cujo link fica logo acima. Cliente que já tinha
+ * arquivo anexado continua vendo o link dele aqui.
  */
 
 const toInputDate = (iso) => {
@@ -47,6 +53,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       contactPhone: contrato.contactPhone || client.contactPhone || '',
       contactEmail: contrato.contactEmail || client.contactEmail || '',
       briefing: contrato.briefing || client.briefing || '',
+      driveUrl: contrato.driveUrl || '',
       servicos: Object.fromEntries((Array.isArray(servicos) ? servicos : []).map(sv => [sv.id, sv.desc || ''])),
       itens: (versao?.itens || []).map(it => ({ ...it, qtd: String(it.qtd) })),
       semRecorrencia: client.escopo?.semRecorrencia === true,
@@ -54,7 +61,6 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
   }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [f, setF] = useState(inicial);
-  const [anexoBriefing, setAnexoBriefing] = useState(null);
   const [anexoContrato, setAnexoContrato] = useState(null);
   const [enviando, setEnviando] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -64,15 +70,14 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
   const desdeNovo = inicioNovaVersao(client);
   const temVersoes = versoesDoEscopo(client).length > 0;
 
-  const enviar = async (kind, file) => {
+  const enviarContrato = async (file) => {
     if (!file) return;
     setErro('');
-    setEnviando(kind);
-    const r = await onUpload(kind, file);
+    setEnviando('contrato');
+    const r = await onUpload('contrato', file);
     setEnviando('');
     if (!r?.success) { setErro(r?.error || 'Não foi possível enviar o arquivo.'); return; }
-    if (kind === 'contrato') setAnexoContrato(r.file);
-    else setAnexoBriefing(r.file);
+    setAnexoContrato(r.file);
   };
 
   // ── Escopo ────────────────────────────────────────────────
@@ -92,18 +97,19 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
 
   const salvar = async () => {
     setErro('');
+    if (!linkValido(f.driveUrl)) { setErro('O link do Drive não parece um endereço válido.'); return; }
     const dados = {};
     if (f.contractMonths !== inicial.contractMonths) dados.contractMonths = f.contractMonths;
     if (f.contractStart !== inicial.contractStart) dados.contractStart = f.contractStart;
     ['contactName', 'contactPhone', 'contactEmail', 'briefing'].forEach(k => {
       if (f[k].trim() !== inicial[k].trim()) dados[k] = f[k];
     });
+    if (normalizaLink(f.driveUrl) !== normalizaLink(inicial.driveUrl)) dados.driveUrl = f.driveUrl;
     if (JSON.stringify(f.servicos) !== JSON.stringify(inicial.servicos)) {
       dados.servicos = Object.entries(f.servicos).map(([id, desc]) => ({
         id, desc, label: SALE_SERVICES.find(s => s.id === id)?.label || id,
       }));
     }
-    if (anexoBriefing) dados.anexoBriefing = anexoBriefing;
     if (anexoContrato) dados.anexoContrato = anexoContrato;
 
     const itensLimpos = f.itens
@@ -139,7 +145,9 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
     onClose();
   };
 
-  const briefingAtual = anexoBriefing || contrato.anexoBriefing;
+  // Anexo de briefing do formato antigo: só leitura.
+  const briefingLegado = contrato.anexoBriefing?.url ? contrato.anexoBriefing : null;
+  const driveOk = linkValido(f.driveUrl);
   const contratoAtual = anexoContrato || contrato.anexoContrato;
 
   return (
@@ -194,7 +202,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
             )}
             <label className="ui-btn small" style={{ cursor: 'pointer' }}>
               <Paperclip size={13} /> {enviando === 'contrato' ? 'Enviando...' : contratoAtual ? 'Substituir' : 'Anexar'}
-              <input type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }} onChange={e => { enviar('contrato', e.target.files?.[0]); e.target.value = ''; }} />
+              <input type="file" accept=".pdf,.doc,.docx,image/*" style={{ display: 'none' }} onChange={e => { enviarContrato(e.target.files?.[0]); e.target.value = ''; }} />
             </label>
           </div>
           <p style={{ ...S.hint, marginTop: 6 }}>Por ter CPF, CNPJ e valores, o contrato fica só guardado — não abre em nenhuma tela do app.</p>
@@ -232,22 +240,39 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
           </div>
         ))}
 
-        {/* ── Briefing ─────────────────────────────── */}
-        <h4 style={S.sec}>Briefing <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>opcional</span></h4>
-        <textarea rows={4} value={f.briefing} onChange={e => set('briefing', e.target.value)} placeholder="Contexto do cliente, objetivos, público, tom de voz..." style={{ ...INP, resize: 'vertical' }} />
-        <div style={{ ...S.arquivo, marginTop: 8 }}>
-          {briefingAtual ? (
-            <a href={briefingAtual.url} target="_blank" rel="noreferrer" style={{ flex: 1, fontSize: 12.5, color: 'var(--c)', textDecoration: 'none' }}>
-              {briefingAtual.name || 'Arquivo do briefing'}
+        {/* ── Drive e briefing ─────────────────────── */}
+        <h4 style={S.sec}>Pasta e briefing</h4>
+        <p style={LBL}>PASTA DO CLIENTE NO DRIVE</p>
+        <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <FolderOpen size={14} color="var(--dim)" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+            <input
+              value={f.driveUrl}
+              onChange={e => set('driveUrl', e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/..."
+              style={{ ...INP, paddingLeft: 34, borderColor: driveOk ? 'var(--border)' : 'var(--red)' }}
+            />
+          </div>
+          {f.driveUrl.trim() && driveOk && (
+            <a className="ui-btn small" href={normalizaLink(f.driveUrl)} target="_blank" rel="noreferrer" style={{ height: 'auto', textDecoration: 'none' }} title="Testar o link">
+              <ExternalLink size={13} /> Abrir
             </a>
-          ) : (
-            <span style={{ flex: 1, fontSize: 12.5, color: 'var(--muted)' }}>Nenhum arquivo de briefing.</span>
           )}
-          <label className="ui-btn small" style={{ cursor: 'pointer' }}>
-            <Paperclip size={13} /> {enviando === 'briefing' ? 'Enviando...' : briefingAtual ? 'Substituir' : 'Anexar'}
-            <input type="file" style={{ display: 'none' }} onChange={e => { enviar('briefing', e.target.files?.[0]); e.target.value = ''; }} />
-          </label>
         </div>
+        <p style={{ ...S.hint, marginTop: 6 }}>
+          {driveOk ? 'Onde ficam os arquivos do cliente. O time vê o atalho no card dele.' : 'Cole o endereço completo da pasta.'}
+        </p>
+
+        <p style={{ ...LBL, marginTop: 14 }}>BRIEFING <span style={{ letterSpacing: 0, fontWeight: 400 }}>(opcional)</span></p>
+        <textarea rows={4} value={f.briefing} onChange={e => set('briefing', e.target.value)} placeholder="Contexto do cliente, objetivos, público, tom de voz..." style={{ ...INP, marginTop: 6, resize: 'vertical' }} />
+        {briefingLegado && (
+          <p style={{ ...S.hint, marginTop: 6 }}>
+            Arquivo anexado antes:{' '}
+            <a href={briefingLegado.url} target="_blank" rel="noreferrer" style={{ color: 'var(--c)', textDecoration: 'none' }}>
+              {briefingLegado.name || 'briefing'}
+            </a>
+          </p>
+        )}
 
         {/* ── Escopo mensal ────────────────────────── */}
         <h4 style={S.sec}>Entregas mensais do contrato</h4>

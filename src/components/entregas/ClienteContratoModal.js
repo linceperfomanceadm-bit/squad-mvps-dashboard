@@ -1,8 +1,8 @@
 import React from 'react';
 import { ClipboardEdit } from 'lucide-react';
-import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState } from '../../lib/firebase';
+import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState, driveDoCliente, isInativo } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
-import { Overlay, ModalHeader, MODAL, fmtDate } from '../commercial/ui';
+import { Overlay, ModalHeader, MODAL, fmtDate, LinkDrive } from '../commercial/ui';
 import { Tag } from '../shared/ui';
 import EntregasCliente from './EntregasCliente';
 
@@ -29,12 +29,18 @@ export default function ClienteContratoModal({ client, onClose, onEditar, onMarc
         <div style={S.topo}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+              {isInativo(client) && <Tag tone="bad">Inativo desde {fmtDate(client.inativo.at)}</Tag>}
               <Tag tone={TOM_CONTRATO[ct.status]}>{cfg.label}</Tag>
               {ct.endAt && ct.status !== 'closed' && (
                 <span style={S.nota}>até {fmtDate(ct.endAt)}{ct.months ? ` · ${ct.months} meses` : ''}</span>
               )}
               {cs.length > 0 && <span style={S.nota}>CS: {cs.join(', ')}</span>}
             </div>
+            {driveDoCliente(client) && (
+              <div style={{ marginTop: 10 }}>
+                <LinkDrive url={driveDoCliente(client)} />
+              </div>
+            )}
             {pend.length > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
                 {pend.map(p => <Tag key={p} tone="warn">Falta: {CADASTRO_PENDENCIAS[p]?.label || p}</Tag>)}
