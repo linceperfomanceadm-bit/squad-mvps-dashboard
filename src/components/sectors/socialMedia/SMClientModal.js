@@ -6,6 +6,8 @@ import { DOC_STATUS } from '../../../hooks/useDocuments';
 import { resolveClientHealth, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
 import { entregasDoSetor, resumoMes, mesChave, rotuloMes, acompanhaEntregas } from '../../../lib/entregas';
 import { LinhaEntrega, Aderencia } from '../../entregas/EntregasKit';
+import { LinkDrive } from '../../commercial/ui';
+import { driveDoCliente } from '../../../lib/firebase';
 
 // ─────────────────────────────────────────────────────────────
 // Mural do Social Media — FICHA DO CLIENTE
@@ -74,9 +76,12 @@ export default function SMClientModal({
               {` · ${abertas.length} ${abertas.length === 1 ? 'task aberta' : 'tasks abertas'}`}
             </p>
           </div>
-          <button type="button" style={S.fechar} onClick={onClose}>
-            <X size={16} color="var(--muted)" />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <LinkDrive url={driveDoCliente(cliente)} />
+            <button type="button" style={S.fechar} onClick={onClose}>
+              <X size={16} color="var(--muted)" />
+            </button>
+          </div>
         </header>
 
         <div style={S.corpo}>
