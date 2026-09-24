@@ -150,7 +150,8 @@ function PortalClientForm({ editing, clients, currentUser, onClose, onCreate, on
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
  
-  const activeClients = useMemo(() => clients.filter(c => c.active), [clients]);
+  // `active !== false`: cliente antigo, sem o campo, também é ativo.
+  const activeClients = useMemo(() => clients.filter(c => c.active !== false), [clients]);
  
   // ao escolher cliente do CRM, herda o nome
   const pickCrm = (id) => {
