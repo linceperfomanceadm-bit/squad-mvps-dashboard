@@ -14,16 +14,15 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-09-1';
+export const PATCH_VERSION = '2026-09-2';
  
 const PATCH_NOTES = {
   date: 'Setembro de 2026',
   title: 'Novidades no painel',
   items: [
-    { emoji: '✅', text: 'Nova aba "Entregas do Mês": o checklist do que o contrato de cada cliente prevê no mês. Cada entrega feita, é só marcar.' },
-    { emoji: '📋', text: 'A CS agora vê o contrato contra o que foi entregue, cliente por cliente, com o histórico de cada mês.' },
-    { emoji: '🗂️', text: 'Clientes antigos podem ter o cadastro completado: tempo de contrato, contrato, briefing, serviços e entregas mensais.' },
-    { emoji: '🌐', text: 'Site e ID Visual aparecem no card do cliente como concluídos ou em andamento, direto dos painéis de Web e Design.' },
+    { emoji: '📁', text: 'Agora o cadastro do cliente tem o link da pasta dele no Drive. O atalho "Pasta no Drive" aparece no card do cliente para todo o time.' },
+    { emoji: '📝', text: 'O briefing ficou num campo só. Arquivos do cliente vão na pasta do Drive.' },
+    { emoji: '⏸️', text: 'Clientes que saíram podem ser marcados como inativos: somem da base ativa, mas o histórico fica guardado.' },
   ],
 };
  
