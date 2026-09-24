@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LogOut, Plus, Bell, BellOff, Sun, Moon, Calendar, Check, Trash2 } from 'lucide-react';
+import { LogOut, Plus, Bell, BellOff, Sun, Moon, Calendar, Check, Trash2, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, useSectorTheme, useBrandLogo } from '../../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../../lib/firebase';
@@ -15,6 +15,12 @@ import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
 // dashboard continua tratando `onNav('agenda')` como sempre.
 // A largura de 224px é a mesma da sidebar antiga, então o
 // `marginLeft: 224` dos dashboards ainda não migrados continua certo.
+//
+// Categorias: um item de `navItems` pode ser um GRUPO, com
+// `children: [...]` no lugar de ser uma aba. O grupo não é página —
+// clicar nele só abre e fecha a lista de ferramentas embaixo. Nasceu
+// porque o admin passou de uma dúzia de abas soltas; painéis que
+// mandam a lista plana continuam exatamente como eram.
 
 export const SIDEBAR_WIDTH = 224;
 
@@ -32,7 +38,7 @@ export default function AppShell({ sectorId, navItems, activeKey, onNav, onAddCl
   useSectorTheme(sectorId);
   const { user } = useAuth();
   const sector = configOf(sectorId);
-  const hasAgenda = navItems.some(n => n.key === 'agenda');
+  const hasAgenda = abasDe(navItems).some(n => n.key === 'agenda');
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
@@ -52,12 +58,27 @@ export default function AppShell({ sectorId, navItems, activeKey, onNav, onAddCl
   );
 }
 
+// Abas de verdade (as folhas), com os grupos abertos.
+const abasDe = (items) => items.flatMap(n => (Array.isArray(n.children) ? n.children : [n]));
+
 // ─── Sidebar ──────────────────────────────────────────────────
 export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addClientLabel = 'Novo Cliente', showUser = false }) {
   const { user, logout } = useAuth();
   const brand = useBrandLogo();
   const sector = configOf(sectorId);
-  const items = navItems.filter(n => n.key !== 'agenda');
+  // Agenda vira link na barra superior — sai da sidebar, esteja solta
+  // ou dentro de um grupo. Grupo que fica vazio some junto.
+  const items = navItems
+    .filter(n => n.key !== 'agenda')
+    .map(n => (Array.isArray(n.children) ? { ...n, children: n.children.filter(c => c.key !== 'agenda') } : n))
+    .filter(n => !Array.isArray(n.children) || n.children.length > 0);
+
+  // Um grupo aberto por vez (acordeão). O grupo da aba ativa abre
+  // sozinho — inclusive quando a navegação vem de fora da sidebar,
+  // como um atalho da Visão Geral.
+  const grupoDaAba = items.find(n => Array.isArray(n.children) && n.children.some(c => c.key === activeKey))?.key || null;
+  const [aberto, setAberto] = useState(grupoDaAba);
+  useEffect(() => { if (grupoDaAba) setAberto(grupoDaAba); }, [grupoDaAba]);
 
   return (
     <aside style={S.aside}>
@@ -76,16 +97,20 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
       )}
 
       <nav style={S.nav}>
-        {items.map(({ key, label, icon: Icon, badge, badgeDanger }) => {
-          const on = activeKey === key;
-          return (
-            <button key={key} className={`sb-item${on ? ' on' : ''}`} onClick={() => onNav(key)}>
-              {Icon && <Icon size={16} strokeWidth={on ? 1.9 : 1.6} />}
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-              {badge > 0 && <span className={`sb-badge${badgeDanger ? ' danger' : ''}`}>{badge}</span>}
-            </button>
-          );
-        })}
+        {items.map(item => (
+          Array.isArray(item.children) ? (
+            <NavGrupo
+              key={item.key}
+              grupo={item}
+              activeKey={activeKey}
+              aberto={aberto === item.key}
+              onToggle={() => setAberto(a => (a === item.key ? null : item.key))}
+              onNav={onNav}
+            />
+          ) : (
+            <NavItem key={item.key} item={item} on={activeKey === item.key} onClick={() => onNav(item.key)} />
+          )
+        ))}
       </nav>
 
       <div style={S.foot}>
@@ -99,6 +124,54 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
         </button>
       </div>
     </aside>
+  );
+}
+
+function NavItem({ item: { label, icon: Icon, badge, badgeDanger }, on, onClick, sub = false }) {
+  return (
+    <button className={`sb-item${on ? ' on' : ''}`} onClick={onClick} style={sub ? S.subItem : undefined}>
+      {Icon && <Icon size={sub ? 15 : 16} strokeWidth={on ? 1.9 : 1.6} />}
+      <span style={S.rotulo}>{label}</span>
+      {badge > 0 && <span className={`sb-badge${badgeDanger ? ' danger' : ''}`}>{badge}</span>}
+    </button>
+  );
+}
+
+// Categoria da sidebar: cabeçalho que abre/fecha + as ferramentas.
+// Fechado, o grupo soma os avisos das abas de dentro para nada ficar
+// escondido; o grupo da aba ativa fica com o texto aceso e um ponto
+// na cor do painel, para a pessoa saber onde está mesmo com ele fechado.
+function NavGrupo({ grupo, activeKey, aberto, onToggle, onNav }) {
+  const { label, icon: Icon, children } = grupo;
+  const contemAtiva = children.some(c => c.key === activeKey);
+  const avisos = children.reduce((s, c) => s + (c.badge > 0 ? c.badge : 0), 0);
+  const perigo = children.some(c => c.badgeDanger && c.badge > 0);
+
+  return (
+    <div>
+      <button
+        className="sb-item"
+        onClick={onToggle}
+        aria-expanded={aberto}
+        style={contemAtiva ? { color: 'var(--text)', fontWeight: 500 } : undefined}
+      >
+        {Icon && <Icon size={16} strokeWidth={contemAtiva ? 1.9 : 1.6} />}
+        <span style={S.rotulo}>{label}</span>
+        {contemAtiva && !aberto && <i style={S.pontoAtivo} />}
+        <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {!aberto && avisos > 0 && <span className={`sb-badge${perigo ? ' danger' : ''}`} style={{ marginLeft: 0 }}>{avisos}</span>}
+          <ChevronDown size={14} style={{ ...S.seta, transform: aberto ? 'rotate(180deg)' : 'none' }} />
+        </span>
+      </button>
+
+      {aberto && (
+        <div className="fade-in" style={S.subLista}>
+          {children.map(c => (
+            <NavItem key={c.key} item={c} sub on={activeKey === c.key} onClick={() => onNav(c.key)} />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -228,6 +301,11 @@ const S = {
   userName: { fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   userTag: { fontSize: 9.5, letterSpacing: '.12em', color: 'var(--c)', fontFamily: 'var(--fm)', marginTop: 1 },
   nav: { display: 'flex', flexDirection: 'column', gap: 2, flex: 1 },
+  rotulo: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  seta: { color: 'var(--dim)', flexShrink: 0, transition: 'transform .18s ease' },
+  pontoAtivo: { width: 6, height: 6, borderRadius: '50%', background: 'var(--c)', flexShrink: 0 },
+  subLista: { display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 6px 19px', paddingLeft: 9, borderLeft: '1px solid var(--border)' },
+  subItem: { padding: '7px 10px', fontSize: 13, gap: 9 },
   foot: { paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 },
   top: { display: 'flex', alignItems: 'center', gap: 6, height: 44, marginBottom: 16 },
   badge: { position: 'absolute', top: 4, right: 3, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 99, background: 'var(--c)', color: 'var(--on)', fontFamily: 'var(--fm)', fontSize: 9.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' },
