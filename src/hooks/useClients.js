@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction, deleteField } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf } from '../lib/firebase';
+import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem } from '../lib/entregas';
 
@@ -924,6 +924,64 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Inativar / reativar ─────────────────────────────────────
+  // Tira o cliente da base sem apagar nada (ver `isInativo` em
+  // firebase.js). O encerramento do contrato é opcional porque nem
+  // toda saída é churn: cliente que pausa volta com o mesmo contrato.
+  // Quando encerra, grava igual ao `closeContract` — é o que o churn do
+  // mês da TV comercial lê.
+  const inativarCliente = async (clientId, { motivo = '', encerrarContrato = false } = {}, byName = null) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    if (isInativo(client)) return { success: false, error: `${client.name} já está inativo.` };
+    if (stageOf(client) !== 'live') return { success: false, error: 'Só cliente que já está na base pode ser inativado.' };
+    const agora = new Date().toISOString();
+    const texto = String(motivo || '').trim();
+    const patch = {
+      active: false,
+      inativo: { at: agora, by: byName || null, motivo: texto },
+      inativoLog: arrayUnion({ acao: 'inativado', at: agora, by: byName || null, motivo: texto }),
+    };
+    const ct = contractState(client);
+    if (encerrarContrato && ct.status !== 'closed') {
+      Object.assign(patch, {
+        'contract.status': 'closed',
+        'contract.baseMonths': ct.baseMonths || 0,
+        'contract.addedMonths': ct.addedMonths || 0,
+        'contract.closedAt': agora,
+        'contract.closedBy': byName || null,
+        'contract.closeReason': texto,
+      });
+    }
+    try {
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  const reativarCliente = async (clientId, { reabrirContrato = false } = {}, byName = null) => {
+    const client = clients.find(c => c.id === clientId);
+    if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    const agora = new Date().toISOString();
+    const patch = {
+      active: true,
+      inativo: null,
+      inativoLog: arrayUnion({ acao: 'reativado', at: agora, by: byName || null }),
+    };
+    if (reabrirContrato && contractState(client).status === 'closed') {
+      Object.assign(patch, {
+        'contract.status': 'active',
+        'contract.closedAt': null,
+        'contract.closedBy': null,
+        'contract.closeReason': '',
+      });
+    }
+    try {
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Completar cadastro ──────────────────────────────────────
   // Clientes antigos nasceram antes de o cadastro ter prazo, anexos e
   // serviços. Esta é a porta para completar qualquer cliente depois,
@@ -969,6 +1027,9 @@ export function useClients() {
       patch['contrato.briefing'] = v;
       patch.briefing = v;
     }
+    // Pasta do cliente no Drive. Campo novo: só existe no bloco
+    // `contrato` (nenhuma tela antiga lê do topo do doc).
+    if ('driveUrl' in dados) patch['contrato.driveUrl'] = normalizaLink(dados.driveUrl);
     if ('servicos' in dados) {
       const lista = (Array.isArray(dados.servicos) ? dados.servicos : [])
         .filter(sv => sv && sv.id)
@@ -1129,6 +1190,7 @@ export function useClients() {
     pendingSectorsOf, uploadClientFile, nudgeSectorLeader,
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
+    inativarCliente, reativarCliente,
     saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, transferirCS,
   };
 }
