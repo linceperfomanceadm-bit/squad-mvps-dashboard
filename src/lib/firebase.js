@@ -463,15 +463,17 @@ export const ENTREGAVEIS = {
 // Setores que podem ter entregas recorrentes no escopo.
 export const ENTREGA_SECTORS = ['socialmedia', 'design', 'videomaker', 'trafego', 'webdesign'];
 
-// Situação de cada item no mês. `tone` segue o kit (good/warn/bad),
-// então a cor sai das variáveis semânticas e funciona no dark e no light.
-export const ENTREGA_STATUS = {
-  entregue: { id: 'entregue', label: 'Entregue',        tone: 'good' },
-  ritmo:    { id: 'ritmo',    label: 'No ritmo',        tone: 'good' },
-  abaixo:   { id: 'abaixo',   label: 'Abaixo do ritmo', tone: 'warn' },
-  atrasado: { id: 'atrasado', label: 'Atrasado',        tone: 'bad' },
-  faltou:   { id: 'faltou',   label: 'Não fechou',      tone: 'bad' },
-};
+// Checklist mensal do Social Media, no card do cliente no Mural.
+// Marcos do mês que não são peça contável (por isso não entram no
+// escopo de entregas): quem marca é a social media, vira no dia 1
+// junto com as entregas e cada mês fica guardado no cliente, em
+// `smMensal['AAAA-MM'][id] = { by, at }`. Vale o que foi feito
+// DENTRO do mês — o relatório de setembro feito em 2 de outubro conta
+// em outubro.
+export const SM_MARCOS_MENSAIS = [
+  { id: 'planejamento', label: 'Planejamento mensal aprovado' },
+  { id: 'relatorio',    label: 'Relatório mensal criado' },
+];
 
 // Pendências de cadastro. Clientes antigos nasceram antes de vários
 // campos existirem; o selo de "cadastro incompleto" aponta o que falta

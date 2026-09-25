@@ -129,17 +129,15 @@ export function fracaoDoMes(mes, agora = new Date()) {
   return Math.min(1, businessMsBetween(ini, agora) / total);
 }
 
-// Situação de um item. Mês fechado: entregou ou não fechou. Mês em
-// andamento: compara com o ritmo esperado para o dia útil de hoje.
-export function statusItem(item, mes, agora = new Date()) {
-  const { qtd, feito } = item;
-  if (feito >= qtd) return 'entregue';
-  if (mes < mesChave(agora)) return 'faltou';
-  const esperado = Math.floor(qtd * fracaoDoMes(mes, agora));
-  if (feito >= esperado) return 'ritmo';
-  if (feito >= Math.floor(esperado / 2)) return 'abaixo';
-  return 'atrasado';
-}
+// Item concluído no mês: feito alcançou o combinado.
+//
+// Não existe "atrasado" nem "abaixo do ritmo" (decisão de set/2026).
+// O ritmo esperado dividia o combinado igualmente pelo mês útil, mas o
+// planejamento de cada cliente tem o seu próprio calendário (3 artes
+// por semana, um lote no fim do mês...). A conta padrão acusava atraso
+// de quem estava seguindo o planejamento. O acompanhamento é só o
+// contador e a barra; o julgamento fica com quem conhece o cliente.
+export const itemConcluido = (item) => item.qtd > 0 && item.feito >= item.qtd;
 
 // Aderência do mês: entregue (limitado ao combinado) / combinado.
 // Entregar a mais num item não compensa o que faltou em outro.
@@ -153,13 +151,19 @@ export function resumoMes(itens) {
   };
 }
 
-// Pior situação entre os itens — é a que colore o cliente nas listas.
-const ORDEM_STATUS = ['atrasado', 'faltou', 'abaixo', 'ritmo', 'entregue'];
-export function statusGeral(itens, mes, agora = new Date()) {
-  if (!itens.length) return null;
-  const st = itens.map(it => statusItem(it, mes, agora));
-  return ORDEM_STATUS.find(s => st.includes(s)) || null;
+// Cor da aderência. Enquanto o mês corre ela é neutra — 40% no dia 10
+// não diz nada sem o planejamento do cliente. Verde ao completar; com
+// o mês fechado, a régua de sempre (âmbar de 70% a 99%, vermelho
+// abaixo), porque aí o número é o resultado final.
+export function tomAderencia(pct, mes = mesChave(), agora = new Date()) {
+  if (pct == null) return undefined;
+  if (pct >= 100) return 'good';
+  if (mes >= mesChave(agora)) return undefined;
+  return pct >= 70 ? 'warn' : 'bad';
 }
+
+// Resumo de um mês fechou 100%? (lista do admin, painel de quem produz)
+export const mesConcluido = (resumo) => resumo.combinado > 0 && resumo.entregue >= resumo.combinado;
 
 // Meses fechados que têm escopo vigente, do mais recente ao mais
 // antigo. Para no mês de encerramento do contrato, se houver.
@@ -204,6 +208,14 @@ export function mesesEditaveis(agora = new Date()) {
 export const entregasDoSetor = (c, sector, mes = mesChave()) => (
   entregasDoMes(c, mes).filter(it => it.sector === sector)
 );
+
+// ─── Checklist mensal do Social Media ─────────────────────────
+// Marcos de `SM_MARCOS_MENSAIS` marcados no mês: { [id]: { by, at } }.
+// Cliente antigo não tem `smMensal` — volta vazio.
+export const marcosDoMes = (c, mes = mesChave()) => {
+  const reg = c?.smMensal?.[mes];
+  return reg && typeof reg === 'object' ? reg : {};
+};
 
 // ─── Entregas únicas (site, ID Visual) ────────────────────────
 // Não têm checklist novo: leem o que os painéis de Web e Design já
