@@ -49,7 +49,7 @@ const HEALTH = {
   red:    { label: 'Crítico', desc: '3 ou mais atrasadas',      color: '#ff5c6c' },
 };
 
-const METRIC_ICON = { entregas: Layers, primeira: BadgeCheck, prazo: Target, velocidade: Zap, cobertura: Users, constancia: Calendar };
+const METRIC_ICON = { entregas: Layers, primeira: BadgeCheck, prazo: Target, velocidade: Zap, cobertura: Users, constancia: Calendar, mesSM: Gem };
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const CONFETTI = ['#EE3363', '#4ade80', '#5cc8ff', '#ffc257', '#b79cff', '#5CFFFF'];
 
@@ -186,6 +186,9 @@ const CSS = `
 .tv-hl .who{font-size:1.05cqw;font-weight:500;margin-top:.9cqw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .tv-hl .v{font-family:'Unbounded',sans-serif;font-size:2.7cqw;font-weight:500;line-height:1;margin-top:.5cqw}
 .tv-hl .sub{font-size:.72cqw;color:#8a7b83;margin-top:.4cqw}
+.tv-hl .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:.4cqw;width:100%;margin-top:.8cqw;padding-top:.7cqw;border-top:1px solid rgba(255,255,255,.08)}
+.tv-hl .mini b{display:block;font-family:'Unbounded',sans-serif;font-size:1.1cqw;font-weight:500;line-height:1}
+.tv-hl .mini span{display:block;font-size:.6cqw;color:#8a7b83;margin-top:.3cqw;line-height:1.25}
 
 .tv-ring{grid-row:1;grid-column:1;padding:1.5cqw 2cqw;display:grid;grid-template-columns:19cqw 1fr;gap:2cqw;align-items:center}
 .tv-ring svg{width:100%;height:auto;overflow:visible;display:block}
@@ -474,6 +477,11 @@ function SceneHighlights({ d }) {
               <div className="who">{h.name || 'Sem destaque ainda'}</div>
               <div className="v" style={{ color: vazio ? '#8a7b83' : sq.c }}>{h.value}</div>
               <div className="sub">{h.caption}</div>
+              {h.stats && (
+                <div className="mini">
+                  {h.stats.map(st => <div key={st.l}><b style={{ color: sq.c }}>{st.v}</b><span>{st.l}</span></div>)}
+                </div>
+              )}
             </section>
           );
         })}
