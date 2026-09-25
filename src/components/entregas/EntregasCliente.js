@@ -3,9 +3,9 @@ import { ChevronDown, ChevronRight, CalendarClock, SlidersHorizontal, CheckCircl
 import { SECTORS } from '../../lib/firebase';
 import {
   rotuloMes, entregasDoMes, resumoMes, historicoMeses, entregasUnicas,
-  escopoAgendado, mesesEditaveis, statusItem, temEscopoDefinido,
+  escopoAgendado, mesesEditaveis, itemConcluido, temEscopoDefinido,
 } from '../../lib/entregas';
-import { LinhaEntrega, Aderencia, StatusEntrega } from './EntregasKit';
+import { LinhaEntrega, Aderencia } from './EntregasKit';
 import { Tag, Empty } from '../shared/ui';
 
 /*
@@ -52,7 +52,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
           <span style={S.mes}>{rotuloMes(mes, true)}</span>
         )}
         <div style={{ flex: 1 }} />
-        <Aderencia pct={resumo.pct} />
+        <Aderencia pct={resumo.pct} mes={mes} />
       </div>
 
       {itens.length === 0 ? (
@@ -80,7 +80,6 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
               <LinhaEntrega
                 key={it.id}
                 item={it}
-                mes={mes}
                 mostrarSetor
                 onMarcar={onMarcar ? (itemId, delta) => onMarcar(mes, itemId, delta) : undefined}
               />
@@ -153,7 +152,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
                   <span style={{ fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{rotuloMes(h.mes, true)}</span>
                   <span style={{ ...S.nota, fontFamily: 'var(--fm)' }}>{h.resumo.entregue} de {h.resumo.combinado}</span>
                   <div style={{ flex: 1 }} />
-                  <Aderencia pct={h.resumo.pct} />
+                  <Aderencia pct={h.resumo.pct} mes={h.mes} />
                 </button>
                 {open && (
                   <div style={{ padding: '4px 0 8px 22px' }}>
@@ -163,10 +162,9 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
                           {it.label}
                           <span style={{ color: 'var(--muted)' }}> · {SECTORS[it.sector]?.label || it.sector}</span>
                         </span>
-                        <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: 'var(--muted)' }}>
+                        <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: itemConcluido(it) ? 'var(--green)' : 'var(--muted)' }}>
                           {it.feito} de {it.qtd}{it.ajustado ? '*' : ''}
                         </span>
-                        <StatusEntrega status={statusItem(it, h.mes)} />
                       </div>
                     ))}
                     {h.itens.some(it => it.ajustado) && (

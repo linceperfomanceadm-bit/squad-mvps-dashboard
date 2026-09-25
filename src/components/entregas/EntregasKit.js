@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
-import { ENTREGA_STATUS, SECTORS } from '../../lib/firebase';
-import { statusItem, fracaoDoMes } from '../../lib/entregas';
+import { SECTORS } from '../../lib/firebase';
+import { tomAderencia } from '../../lib/entregas';
 import { Tag } from '../shared/ui';
 
 /*
@@ -9,56 +9,38 @@ import { Tag } from '../shared/ui';
  * card do cliente (admin/CS), no painel de quem produz e no Mural do
  * Social Media — para que "12 de 16" tenha a mesma cara em todo lugar.
  *
- * Cor com propósito: verde = entregue, âmbar = abaixo do ritmo,
- * vermelho = atrasado / não fechou. "No ritmo" usa o gradiente do
- * painel, porque ainda não é conclusão — é andamento.
+ * Sem situação ("atrasado", "abaixo do ritmo"): o acompanhamento é o
+ * contador e a barra. O ritmo padrão dividia o mês por igual e acusava
+ * atraso de quem seguia um planejamento diferente — ver
+ * `itemConcluido` em lib/entregas.js. A barra usa o gradiente do painel
+ * enquanto anda e fica verde ao completar.
  */
 
-const FILL = {
-  entregue: 'var(--green)',
-  ritmo: 'var(--grad)',
-  abaixo: 'var(--amber)',
-  atrasado: 'var(--red)',
-  faltou: 'var(--red)',
-};
-
-export function StatusEntrega({ status, style }) {
-  const st = ENTREGA_STATUS[status];
-  if (!st) return null;
-  return <Tag tone={st.tone} style={style}>{st.label}</Tag>;
-}
-
-// Barra de progresso com a marca do ritmo esperado (mês em andamento).
-export function BarraEntrega({ feito, qtd, status, esperado }) {
+export function BarraEntrega({ feito, qtd }) {
   const pct = qtd ? Math.min(100, (feito / qtd) * 100) : 0;
-  const marca = esperado != null && qtd ? Math.min(100, (esperado / qtd) * 100) : null;
+  const completo = qtd > 0 && feito >= qtd;
   return (
     <div style={S.trilho}>
-      <div style={{ ...S.fill, width: `${pct}%`, background: FILL[status] || 'var(--c)' }} />
-      {marca != null && marca > 0 && marca < 100 && (
-        <i title="Onde deveria estar hoje" style={{ ...S.marca, left: `${marca}%` }} />
-      )}
+      <div style={{ ...S.fill, width: `${pct}%`, background: completo ? 'var(--green)' : 'var(--grad)' }} />
     </div>
   );
 }
 
-// Aderência do mês em uma etiqueta: verde a partir de 100%, âmbar de
-// 70% a 99%, vermelho abaixo. Sem escopo, não mostra nada.
-export function Aderencia({ pct, style }) {
+// Aderência do mês em uma etiqueta. Neutra enquanto o mês corre; verde
+// ao completar; com `mes` fechado, âmbar/vermelho (`tomAderencia`).
+// Sem escopo, não mostra nada.
+export function Aderencia({ pct, mes, style }) {
   if (pct == null) return null;
-  const tone = pct >= 100 ? 'good' : pct >= 70 ? 'warn' : 'bad';
-  return <Tag tone={tone} style={{ fontFamily: 'var(--fm)', ...style }}>{pct}%</Tag>;
+  return <Tag tone={tomAderencia(pct, mes)} style={{ fontFamily: 'var(--fm)', ...style }}>{pct}%</Tag>;
 }
 
 /*
- * Uma linha de entrega: nome, setor, quantidade, barra e situação.
+ * Uma linha de entrega: nome, setor, quantidade e barra.
  * Com `onMarcar`, ganha os botões de − / +. `mostrarSetor` liga o
  * rótulo do setor (útil no card do cliente, onde há vários setores).
  */
-export function LinhaEntrega({ item, mes, onMarcar, mostrarSetor = false, compacta = false }) {
+export function LinhaEntrega({ item, onMarcar, mostrarSetor = false, compacta = false }) {
   const [busy, setBusy] = useState(false);
-  const status = statusItem(item, mes);
-  const esperado = Math.floor(item.qtd * fracaoDoMes(mes));
   const setor = SECTORS[item.sector];
 
   const clicar = async (delta) => {
@@ -107,20 +89,16 @@ export function LinhaEntrega({ item, mes, onMarcar, mostrarSetor = false, compac
           </div>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-        <div style={{ flex: 1 }}>
-          <BarraEntrega feito={item.feito} qtd={item.qtd} status={status} esperado={status === 'entregue' ? null : esperado} />
-        </div>
-        <StatusEntrega status={status} />
+      <div style={{ marginTop: 8 }}>
+        <BarraEntrega feito={item.feito} qtd={item.qtd} />
       </div>
     </div>
   );
 }
 
 const S = {
-  trilho: { position: 'relative', height: 6, borderRadius: 99, background: 'var(--soft)', overflow: 'visible' },
+  trilho: { height: 6, borderRadius: 99, background: 'var(--soft)', overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 99, transition: 'width .25s ease' },
-  marca: { position: 'absolute', top: -3, width: 2, height: 12, borderRadius: 2, background: 'var(--muted)', transform: 'translateX(-1px)' },
   linha: { borderBottom: '1px solid var(--border)' },
   nome: { fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
   meta: { fontSize: 11, color: 'var(--muted)', marginTop: 2 },

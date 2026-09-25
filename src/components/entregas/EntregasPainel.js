@@ -2,33 +2,36 @@ import React, { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { stageOf, CADASTRO_PENDENCIAS } from '../../lib/firebase';
 import {
-  mesChave, rotuloMes, entregasDoMes, resumoMes, statusGeral, cadastroPendencias,
-  entregasUnicas, temEscopoDefinido,
+  mesChave, rotuloMes, entregasDoMes, resumoMes, cadastroPendencias,
+  entregasUnicas, temEscopoDefinido, tomAderencia, mesConcluido,
 } from '../../lib/entregas';
 import { PageHeader, Grid, Kpi, Tag, Empty } from '../shared/ui';
-import { BarraEntrega, StatusEntrega, Aderencia } from './EntregasKit';
+import { BarraEntrega, Aderencia } from './EntregasKit';
 import ClienteFicha from './ClienteFicha';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
 const FILTROS = [
   { id: 'todos',      label: 'Todos' },
-  { id: 'atrasados',  label: 'Atrasados' },
-  { id: 'abaixo',     label: 'Abaixo do ritmo' },
+  { id: 'completos',  label: 'Mês completo' },
+  { id: 'unicas',     label: 'Entrega única atrasada' },
   { id: 'incompleto', label: 'Cadastro incompleto' },
   { id: 'semEscopo',  label: 'Sem escopo' },
 ];
 
-// Quanto menor, mais para cima na lista.
-const PESO = { atrasado: 0, faltou: 0, abaixo: 1, ritmo: 3, entregue: 4 };
+// Quanto menor, mais para cima na lista. Só o que tem prazo de verdade
+// (entrega única) ou falta de dado sobe; as recorrentes não têm
+// "atrasado" — o planejamento de cada cliente tem o próprio calendário.
+const peso = (l) => (l.unicasAtrasadas > 0 ? 0 : l.pendencias.length ? 1 : l.itens.length ? 2 : 3);
 
 /*
  * ENTREGAS × CONTRATO — a lista de todos os clientes ativos com o que
  * o contrato prevê no mês contra o que já foi entregue. Serve ao admin
  * e à CS (mesmo componente, mesmas regras).
  *
- * A lista abre com o pior em cima: atrasados, abaixo do ritmo e quem
- * ainda tem cadastro incompleto — é o que precisa de ação.
+ * A lista abre com o que pede ação em cima: entrega única com prazo
+ * vencido e cadastro incompleto; depois os clientes com recorrentes,
+ * do menor para o maior percentual entregue.
  */
 export default function EntregasPainel({ clients, acoes, toast, titulo, csInicial = '' }) {
   const mes = mesChave();
@@ -49,7 +52,6 @@ export default function EntregasPainel({ clients, acoes, toast, titulo, csInicia
       client: c,
       itens,
       resumo: resumoMes(itens),
-      status: statusGeral(itens, mes),
       pendencias: cadastroPendencias(c),
       temEscopo: temEscopoDefinido(c),
       unicasAtrasadas,
@@ -71,24 +73,27 @@ export default function EntregasPainel({ clients, acoes, toast, titulo, csInicia
     return {
       acompanhando: comItens.length,
       pct: combinado ? Math.round((entregue / combinado) * 100) : null,
-      atrasados: doCs.filter(l => l.status === 'atrasado').length,
+      unicas: doCs.filter(l => l.unicasAtrasadas > 0).length,
       incompletos: doCs.filter(l => l.pendencias.length).length,
     };
   }, [doCs]);
 
   const visiveis = doCs
     .filter(l => {
-      if (filtro === 'atrasados') return l.status === 'atrasado' || l.unicasAtrasadas > 0;
-      if (filtro === 'abaixo') return l.status === 'abaixo';
+      if (filtro === 'completos') return mesConcluido(l.resumo);
+      if (filtro === 'unicas') return l.unicasAtrasadas > 0;
       if (filtro === 'incompleto') return l.pendencias.length > 0;
       if (filtro === 'semEscopo') return !l.temEscopo;
       return true;
     })
     .filter(l => !busca.trim() || String(l.client.name || '').toLowerCase().includes(busca.trim().toLowerCase()))
     .sort((a, b) => {
-      const pa = a.status ? PESO[a.status] : (a.pendencias.length ? 2 : 5);
-      const pb = b.status ? PESO[b.status] : (b.pendencias.length ? 2 : 5);
+      const pa = peso(a);
+      const pb = peso(b);
       if (pa !== pb) return pa - pb;
+      const qa = a.resumo.pct ?? 101;
+      const qb = b.resumo.pct ?? 101;
+      if (qa !== qb) return qa - qb;
       return String(a.client.name).localeCompare(String(b.client.name));
     });
 
@@ -103,9 +108,9 @@ export default function EntregasPainel({ clients, acoes, toast, titulo, csInicia
         <Kpi
           value={totais.pct == null ? '—' : `${totais.pct}%`}
           label="Entregue do combinado no mês"
-          tone={totais.pct == null ? undefined : totais.pct >= 100 ? 'good' : totais.pct >= 70 ? 'warn' : 'bad'}
+          tone={tomAderencia(totais.pct, mes)}
         />
-        <Kpi value={totais.atrasados} label="Clientes atrasados" tone={totais.atrasados ? 'bad' : undefined} />
+        <Kpi value={totais.unicas} label="Com entrega única atrasada" tone={totais.unicas ? 'bad' : undefined} />
         <Kpi value={totais.incompletos} label="Cadastros incompletos" tone={totais.incompletos ? 'warn' : undefined} />
       </Grid>
 
@@ -143,7 +148,7 @@ export default function EntregasPainel({ clients, acoes, toast, titulo, csInicia
 
             <div style={{ flex: '0 1 220px', minWidth: 120 }}>
               {l.itens.length > 0 ? (
-                <BarraEntrega feito={l.resumo.entregue} qtd={l.resumo.combinado} status={l.status} />
+                <BarraEntrega feito={l.resumo.entregue} qtd={l.resumo.combinado} />
               ) : (
                 <span style={S.sub}>
                   {l.client.escopo?.semRecorrencia ? 'Sem entregas mensais' : l.temEscopo ? 'Nada combinado no mês' : 'Escopo não cadastrado'}
@@ -160,8 +165,7 @@ export default function EntregasPainel({ clients, acoes, toast, titulo, csInicia
                   </span>
                 </Tag>
               )}
-              {l.status && <StatusEntrega status={l.status} />}
-              <Aderencia pct={l.resumo.pct} />
+              <Aderencia pct={l.resumo.pct} mes={mes} />
             </div>
           </button>
         ))}

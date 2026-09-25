@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { SECTORS, naCarteira } from '../../lib/firebase';
 import {
-  mesesEditaveis, rotuloMes, entregasDoSetor, resumoMes, statusGeral, acompanhaEntregas,
+  mesesEditaveis, rotuloMes, entregasDoSetor, resumoMes, acompanhaEntregas, mesConcluido,
 } from '../../lib/entregas';
 import { PageHeader, Grid, Kpi, Empty } from '../shared/ui';
-import { LinhaEntrega, Aderencia, StatusEntrega } from './EntregasKit';
+import { LinhaEntrega, Aderencia } from './EntregasKit';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
@@ -28,7 +28,7 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
     .filter(c => acompanhaEntregas(c, mes))
     .map(c => {
       const itens = entregasDoSetor(c, sectorId, mes);
-      return { client: c, itens, resumo: resumoMes(itens), status: statusGeral(itens, mes) };
+      return { client: c, itens, resumo: resumoMes(itens) };
     })
     .filter(x => x.itens.length)
     .sort((a, b) => (a.resumo.pct ?? 101) - (b.resumo.pct ?? 101)),
@@ -41,7 +41,7 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
       combinado,
       entregue,
       faltam: Math.max(0, combinado - entregue),
-      atrasados: cards.filter(x => x.status === 'atrasado').length,
+      completos: cards.filter(x => mesConcluido(x.resumo)).length,
     };
   }, [cards]);
 
@@ -66,7 +66,11 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
       <Grid cols={3}>
         <Kpi value={`${totais.entregue}/${totais.combinado}`} label="Entregue do combinado" />
         <Kpi value={totais.faltam} label="Entregas faltando no mês" tone={totais.faltam ? undefined : 'good'} />
-        <Kpi value={totais.atrasados} label="Clientes atrasados" tone={totais.atrasados ? 'bad' : undefined} />
+        <Kpi
+          value={`${totais.completos}/${cards.length}`}
+          label="Clientes com o mês completo"
+          tone={cards.length && totais.completos === cards.length ? 'good' : undefined}
+        />
       </Grid>
 
       {cards.length === 0 ? (
@@ -78,20 +82,18 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 14 }}>
-          {cards.map(({ client, itens, resumo, status }) => (
+          {cards.map(({ client, itens, resumo }) => (
             <div key={client.id} className="ui-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {client.name}
                 </p>
-                {status && <StatusEntrega status={status} />}
-                <Aderencia pct={resumo.pct} />
+                <Aderencia pct={resumo.pct} mes={mes} />
               </div>
               {itens.map(it => (
                 <LinhaEntrega
                   key={it.id}
                   item={it}
-                  mes={mes}
                   compacta
                   onMarcar={acoes?.marcar ? (itemId, delta) => acoes.marcar(client.id, mes, itemId, delta) : undefined}
                 />
