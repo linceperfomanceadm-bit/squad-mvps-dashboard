@@ -14,15 +14,16 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-09-2';
+export const PATCH_VERSION = '2026-09-4';
  
 const PATCH_NOTES = {
   date: 'Setembro de 2026',
   title: 'Novidades no painel',
   items: [
-    { emoji: '📁', text: 'Agora o cadastro do cliente tem o link da pasta dele no Drive. O atalho "Pasta no Drive" aparece no card do cliente para todo o time.' },
-    { emoji: '📝', text: 'O briefing ficou num campo só. Arquivos do cliente vão na pasta do Drive.' },
-    { emoji: '⏸️', text: 'Clientes que saíram podem ser marcados como inativos: somem da base ativa, mas o histórico fica guardado.' },
+    { emoji: '📊', text: 'Entregas do mês sem "atrasado" ou "abaixo do ritmo": o acompanhamento agora é só o contador e a barra, respeitando o planejamento de cada cliente.' },
+    { emoji: '🗂️', text: 'Documentos agora ficam em pastas por cliente. A pasta aparece sozinha com o primeiro documento e reúne todos os relatórios daquele cliente.' },
+    { emoji: '✅', text: 'No Mural, o card de cada cliente tem o checklist do mês: planejamento mensal aprovado e relatório mensal criado.' },
+    { emoji: '🏆', text: 'No Painel de TV, a destaque das Social Medias agora é quem tem a melhor média do mês entre planejamentos, relatórios, posts publicados e clientes em operação — tudo com base no que vocês marcam no app.' },
   ],
 };
  
