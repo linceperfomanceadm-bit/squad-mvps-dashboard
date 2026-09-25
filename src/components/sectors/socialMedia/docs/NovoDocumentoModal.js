@@ -14,9 +14,10 @@ import { DOCS } from '../../../../lib/docs/catalogo';
 // por `overflow` de contêiner.
 // ─────────────────────────────────────────────────────────────
 
-export default function NovoDocumentoModal({ clients, onClose, onCreate }) {
+export default function NovoDocumentoModal({ clients, clienteInicial = '', onClose, onCreate }) {
   const [tipo, setTipo] = useState(null);
-  const [clientId, setClientId] = useState('');
+  // Aberto de dentro da pasta de um cliente, já vem com ele escolhido.
+  const [clientId, setClientId] = useState(clienteInicial);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
