@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Monitor, Play, Pause, RefreshCw, PartyPopper, ExternalLink, Lock, Radio, Volume2, Save, Eye, EyeOff, Award } from 'lucide-react';
 import { useAppConfig } from '../../hooks/useAppConfig';
-import { PRODUCTION_SECTORS, HONOR_METRIC_OPTIONS, DEFAULT_HONOR_METRICS } from '../../hooks/useTVData';
+import { PRODUCTION_SECTORS, HONOR_METRIC_OPTIONS, DEFAULT_HONOR_METRICS, FIXED_HONOR_METRICS } from '../../hooks/useTVData';
 
 const SQUAD_NOME = {
   socialmedia: 'Supernovas (Social Media)',
@@ -265,6 +265,18 @@ export default function AdminTVControl({ toast, hideHeader = false }) {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 10 }}>
             {PRODUCTION_SECTORS.map(sector => {
+              // Social Media tem métrica fixa (média do mês com os dados
+              // que ela marca no app) — só explica, sem escolha.
+              const fixa = FIXED_HONOR_METRICS[sector];
+              if (fixa) {
+                return (
+                  <div key={sector} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
+                    <p style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>{SQUAD_NOME[sector]}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--text)', padding: '8px 0 2px' }}>{fixa.label}</p>
+                    <p style={{ fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginTop: 6 }}>{fixa.desc}</p>
+                  </div>
+                );
+              }
               const atual = HONOR_METRIC_OPTIONS.find(o => o.id === honra[sector]) || HONOR_METRIC_OPTIONS[0];
               return (
                 <div key={sector} style={{ background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px' }}>
@@ -284,7 +296,8 @@ export default function AdminTVControl({ toast, hideHeader = false }) {
           </div>
           <p style={{ ...S.boxText, marginTop: 12, marginBottom: 0 }}>
             Métricas em porcentagem exigem pelo menos 3 entregas na semana para alguém concorrer —
-            sem isso, 1 de 1 viraria 100% e ganharia de 11 de 11.
+            sem isso, 1 de 1 viraria 100% e ganharia de 11 de 11. No Social Media, é preciso ter
+            pelo menos 2 clientes na carteira.
           </p>
         </div>
 

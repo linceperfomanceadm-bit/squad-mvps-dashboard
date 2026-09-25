@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, FileText, AlertTriangle, Users } from 'lucide-react';
 import { naCarteira, stageOf, contractState, CLIENT_STAGES } from '../../lib/firebase';
 import { asArray } from '../../lib/wdJobs';
-import { mesChave, rotuloMes, entregasDoSetor, resumoMes, acompanhaEntregas } from '../../lib/entregas';
+import { mesChave, rotuloMes, entregasDoSetor, resumoMes, acompanhaEntregas, tomAderencia } from '../../lib/entregas';
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4, HEALTH_ORDER_4 } from '../../hooks/useClientHealth';
 import { PageHeader, Grid, Kpi, Card, Tag, Row, Empty, Breakdown } from '../shared/ui';
 import { Aderencia } from '../entregas/EntregasKit';
@@ -172,8 +172,6 @@ export default function AdminCarteiraSM({ clients, collaborators, tasks, documen
   };
 
   const ficha = fichaId ? clients.find(c => c.id === fichaId) : null;
-  const tomEntregas = (pct) => (pct == null ? undefined : pct >= 100 ? 'good' : pct >= 70 ? 'warn' : 'bad');
-
   return (
     <div className="fade-up">
       <PageHeader
@@ -199,7 +197,7 @@ export default function AdminCarteiraSM({ clients, collaborators, tasks, documen
         <Kpi
           value={totais.entregas.pct == null ? '—' : `${totais.entregas.pct}%`}
           label="Entregas do Social Media no mês"
-          tone={tomEntregas(totais.entregas.pct)}
+          tone={tomAderencia(totais.entregas.pct, mes)}
         >
           <Breakdown rows={[['Entregas', totais.entregas.combinado ? `${totais.entregas.entregue} de ${totais.entregas.combinado}` : 'sem escopo']]} />
         </Kpi>
