@@ -2,7 +2,9 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { isSameDay, startOfWeek, subWeeks, startOfMonth, isAfter } from 'date-fns';
-import { db, auth } from '../lib/firebase';
+import { db, auth, stageOf } from '../lib/firebase';
+import { mesChave, entregasDoSetor, resumoMes, marcosDoMes, acompanhaEntregas } from '../lib/entregas';
+import { asArray } from '../lib/wdJobs';
 import {
   computeOpsHealth, resolveClientHealth, HEALTH_ORDER_4, isTaskOverdue, overdueDays,
 } from './useClientHealth';
@@ -35,6 +37,12 @@ import {
  *    comparado só consigo mesmo, numa métrica escolhida no admin. Nunca
  *    há ranking entre squads — o que faz um social media ser bom é
  *    diferente do que faz um web designer ser bom.
+ *
+ * 5. SOCIAL MEDIA TEM MÉTRICA FIXA (decisão de set/2026). O destaque é
+ *    quem tem a melhor MÉDIA entre quatro medidas do mês, tiradas do que
+ *    ela marca no app: planejamento aprovado, relatório criado, posts
+ *    publicados e clientes em operação. A TV mostra só a destaque, nunca
+ *    uma lista ordenada — e só números absolutos, sem porcentagem.
  */
 
 // Setores que entram na produção. CS e Comercial ficam fora.
@@ -57,6 +65,19 @@ export const DEFAULT_HONOR_METRICS = {
   design: 'entregas',
   trafego: 'constancia',
 };
+
+// Squads com métrica fixa, sem escolha no admin (ver decisão 5).
+export const FIXED_HONOR_METRICS = {
+  socialmedia: {
+    id: 'mesSM',
+    label: 'Média do mês',
+    desc: 'Melhor média entre planejamento aprovado, relatório criado, posts publicados e clientes em operação, cada um medido sobre a carteira da própria pessoa.',
+  },
+};
+
+// Carteira mínima para concorrer à média do Social Media — com um
+// cliente só, qualquer marcação vira 100% em tudo.
+const MIN_CLIENTES_SM = 2;
 
 // Mínimo de entregas para concorrer a uma métrica percentual — sem
 // isso, 1 de 1 vira 100% e ganha de 11 de 11.
@@ -181,6 +202,72 @@ const METRICS = {
     caption: () => 'dias úteis com entrega',
   },
 };
+
+/*
+ * Destaque do Social Media no mês (decisão 5).
+ *
+ * Por que a média de TAXAS e não de números absolutos: somar posts ou
+ * clientes premiaria sempre quem tem a maior carteira. Cada medida vira
+ * a fração da carteira da pessoa — clientes com planejamento aprovado,
+ * com relatório criado, com pelo menos um post marcado, e posts
+ * marcados sobre o combinado no contrato — e a destaque é a maior média.
+ * Cliente sem escopo mensal fica fora só da medida de posts. Empate:
+ * mais posts publicados, depois carteira maior.
+ *
+ * Cliente com duas social medias conta para as duas.
+ */
+function destaqueSocialMedia(clients, mes) {
+  const mapa = {};
+  clients
+    .filter(c => c.active !== false && stageOf(c) === 'live')
+    .forEach(c => {
+      const nomes = asArray(c.responsibles?.socialmedia);
+      if (!nomes.length) return;
+      const marcos = marcosDoMes(c, mes);
+      const itens = acompanhaEntregas(c, mes) ? entregasDoSetor(c, 'socialmedia', mes) : [];
+      const resumo = resumoMes(itens);
+      const posts = itens.reduce((soma, it) => soma + it.feito, 0);
+      nomes.forEach(nome => {
+        if (!mapa[nome]) {
+          mapa[nome] = { name: nome, clientes: 0, planejamento: 0, relatorio: 0, operacao: 0, posts: 0, combinado: 0, entregue: 0 };
+        }
+        const p = mapa[nome];
+        p.clientes += 1;
+        if (marcos.planejamento) p.planejamento += 1;
+        if (marcos.relatorio) p.relatorio += 1;
+        if (posts > 0) p.operacao += 1;
+        p.posts += posts;
+        p.combinado += resumo.combinado;
+        p.entregue += resumo.entregue;
+      });
+    });
+
+  const candidatos = Object.values(mapa)
+    .filter(p => p.clientes >= MIN_CLIENTES_SM && (p.posts + p.planejamento + p.relatorio) > 0)
+    .map(p => {
+      const taxas = [p.planejamento / p.clientes, p.relatorio / p.clientes, p.operacao / p.clientes];
+      if (p.combinado) taxas.push(p.entregue / p.combinado);
+      return { ...p, media: taxas.reduce((a, b) => a + b, 0) / taxas.length };
+    })
+    .sort((a, b) => (b.media - a.media) || (b.posts - a.posts) || (b.clientes - a.clientes));
+
+  const lider = candidatos[0] || null;
+  const fixa = FIXED_HONOR_METRICS.socialmedia;
+  return {
+    sector: 'socialmedia',
+    metricId: fixa.id,
+    metricLabel: fixa.label,
+    name: lider ? lider.name : null,
+    value: lider ? pad2(lider.posts) : '—',
+    caption: lider ? (lider.posts === 1 ? 'post publicado no mês' : 'posts publicados no mês') : 'sem marcações no mês ainda',
+    // Números absolutos da destaque — nunca porcentagem na TV.
+    stats: lider ? [
+      { v: pad2(lider.planejamento), l: lider.planejamento === 1 ? 'planejamento' : 'planejamentos' },
+      { v: pad2(lider.relatorio), l: lider.relatorio === 1 ? 'relatório' : 'relatórios' },
+      { v: pad2(lider.operacao), l: lider.operacao === 1 ? 'cliente em operação' : 'clientes em operação' },
+    ] : null,
+  };
+}
 
 export function useTVData() {
   const [openTasks, setOpenTasks] = useState([]);
@@ -472,7 +559,9 @@ export function useTVData() {
 
     // ── Destaques: métrica de honra por squad ─────────────────
     const ctx = { diasUteisAteHoje };
+    const mesAtual = mesChave(now);
     const highlights = PRODUCTION_SECTORS.map(id => {
+      if (id === 'socialmedia') return destaqueSocialMedia(clients, mesAtual);
       const metricId = METRICS[config.tvHonorMetrics[id]] ? config.tvHonorMetrics[id] : DEFAULT_HONOR_METRICS[id];
       const metric = METRICS[metricId];
       const opt = HONOR_METRIC_OPTIONS.find(o => o.id === metricId);

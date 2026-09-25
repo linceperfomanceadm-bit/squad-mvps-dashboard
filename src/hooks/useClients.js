@@ -1140,6 +1140,22 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Checklist mensal do Social Media ────────────────────────
+  // Liga/desliga um marco de `SM_MARCOS_MENSAIS` no mês. Grava só o
+  // caminho do marco, então duas pessoas marcando itens diferentes ao
+  // mesmo tempo não se sobrescrevem. Desmarcar apaga o campo — mês sem
+  // marca fica igual a cliente antigo, que nunca teve `smMensal`.
+  const marcarMarcoSM = async (clientId, mes, marcoId, feito, byName) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), {
+        [`smMensal.${mes}.${marcoId}`]: feito
+          ? { by: byName || null, at: new Date().toISOString() }
+          : deleteField(),
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── Transferir carteira entre CSs ───────────────────────────
   // Usado pelo líder da CS. Troca quem sai por quem entra em
   // `responsibles.cs`, preservando outras CSs que já dividam o cliente.
@@ -1191,6 +1207,6 @@ export function useClients() {
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
     inativarCliente, reativarCliente,
-    saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, transferirCS,
+    saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, marcarMarcoSM, transferirCS,
   };
 }
