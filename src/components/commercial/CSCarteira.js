@@ -7,7 +7,7 @@ import {
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
 import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
-import { mesChave, entregasDoMes, resumoMes, statusGeral, cadastroPendencias } from '../../lib/entregas';
+import { mesChave, entregasDoMes, resumoMes, cadastroPendencias } from '../../lib/entregas';
 import { BarraEntrega, Aderencia } from '../entregas/EntregasKit';
 
 const COLOR = 'var(--c)';
@@ -21,7 +21,6 @@ const STATUS_FILTERS = [
   { id: 'entrada', label: 'Entrando' },
   { id: 'atraso',  label: 'Com atraso' },
   { id: 'vencendo', label: 'Contrato vencendo' },
-  { id: 'entregas', label: 'Entregas atrasadas' },
   { id: 'incompleto', label: 'Cadastro incompleto' },
 ];
 
@@ -100,7 +99,6 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       contrato: contractState(c),
       entregas,
       entregasResumo: resumoMes(entregas),
-      entregasStatus: statusGeral(entregas, mes),
       pendencias: stage === 'live' ? cadastroPendencias(c) : [],
     };
   }), [carteira, tasks, hoje, mes]);
@@ -120,7 +118,6 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         if (statusFilter === 'entrada') return EM_ENTRADA.includes(it.stage);
         if (statusFilter === 'atraso') return it.atrasadas.length > 0;
         if (statusFilter === 'vencendo') return ['ending', 'expired'].includes(it.contrato.status);
-        if (statusFilter === 'entregas') return ['atrasado', 'abaixo'].includes(it.entregasStatus);
         if (statusFilter === 'incompleto') return it.pendencias.length > 0;
         return true;
       })
@@ -222,7 +219,7 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
 
 function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFicha }) {
   const [aberto, setAberto] = useState(false);
-  const { client, stage, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, entregasStatus, pendencias } = item;
+  const { client, stage, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, pendencias } = item;
   const opsLv = HEALTH_LEVELS_4[ops.level];
   const manLv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const ctSt = CONTRACT_STATUS[contrato.status] || CONTRACT_STATUS.unknown;
@@ -293,7 +290,7 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
               <span style={{ fontSize: 11.5, fontFamily: 'var(--fm)', color: 'var(--text)' }}>{entregasResumo.entregue}/{entregasResumo.combinado}</span>
               <Aderencia pct={entregasResumo.pct} />
             </div>
-            <BarraEntrega feito={entregasResumo.entregue} qtd={entregasResumo.combinado} status={entregasStatus} />
+            <BarraEntrega feito={entregasResumo.entregue} qtd={entregasResumo.combinado} />
           </div>
         )}
         {pendencias.length > 0 && (

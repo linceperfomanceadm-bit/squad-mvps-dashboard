@@ -5,7 +5,7 @@ import {
 } from '../../lib/firebase';
 import { businessMsBetween } from '../../lib/taskTime';
 import {
-  mesChave, rotuloMes, entregasDoMes, resumoMes, cadastroPendencias, saudeDesatualizada,
+  mesChave, rotuloMes, entregasDoMes, resumoMes, cadastroPendencias, saudeDesatualizada, tomAderencia,
 } from '../../lib/entregas';
 import { computeOpsHealth, resolveClientHealth, isCritical, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { PageHeader, Grid, Kpi, Card, Tag, Empty, Breakdown } from '../shared/ui';
@@ -173,7 +173,7 @@ export default function CSLiderPanel({ clients, tasks, requests, collaborators, 
         <Kpi
           value={totais.entregas.pct == null ? '—' : `${totais.entregas.pct}%`}
           label="Entregue do combinado no mês"
-          tone={totais.entregas.pct == null ? undefined : totais.entregas.pct >= 100 ? 'good' : totais.entregas.pct >= 70 ? 'warn' : 'bad'}
+          tone={tomAderencia(totais.entregas.pct)}
         >
           <Breakdown rows={[['Entregas', `${totais.entregas.entregue} de ${totais.entregas.combinado}`]]} />
         </Kpi>
