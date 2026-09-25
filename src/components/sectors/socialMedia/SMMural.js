@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Users, FileText, Kanban, AlertTriangle } from 'lucide-react';
+import { Users, FileText, Kanban, AlertTriangle, CheckCircle2, Circle } from 'lucide-react';
 import { resolveClientHealth, isTaskOverdue, HEALTH_LEVELS_4 } from '../../../hooks/useClientHealth';
 import SMClientModal from './SMClientModal';
-import { entregasDoSetor, resumoMes, statusGeral, mesChave, acompanhaEntregas } from '../../../lib/entregas';
+import { SM_MARCOS_MENSAIS } from '../../../lib/firebase';
+import { entregasDoSetor, resumoMes, mesChave, acompanhaEntregas, marcosDoMes, rotuloMes } from '../../../lib/entregas';
 import { BarraEntrega } from '../../entregas/EntregasKit';
 
 // ─────────────────────────────────────────────────────────────
@@ -11,12 +12,33 @@ import { BarraEntrega } from '../../entregas/EntregasKit';
 // Um card por cliente sob responsabilidade da pessoa. Substitui o
 // Kanban de posts: a unidade de trabalho do social media passou a ser
 // o cliente, não a peça avulsa.
+//
+// O card traz o checklist mensal (planejamento aprovado, relatório
+// criado — `SM_MARCOS_MENSAIS`), marcado ali mesmo sem abrir a ficha.
+// Por isso o card é um <div role="button">: um <button> não pode ter
+// os botões do checklist dentro.
 // ─────────────────────────────────────────────────────────────
 
+const quando = (iso) => {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '';
+};
+
 export default function SMMural({
-  clients, documents, tasks, onAbrirDocumento, onNovoDocumento, acoesEntregas,
+  clients, documents, tasks, onAbrirDocumento, onNovoDocumento, acoesEntregas, onMarcarMarco,
 }) {
   const [aberto, setAberto] = useState(null);
+  const [salvando, setSalvando] = useState(null);
+  const mes = mesChave();
+
+  const alternar = async (e, clientId, marcoId, feito) => {
+    e.stopPropagation();
+    if (!onMarcarMarco || salvando) return;
+    const chave = `${clientId}_${marcoId}`;
+    setSalvando(chave);
+    await onMarcarMarco(clientId, mes, marcoId, !feito);
+    setSalvando(null);
+  };
 
   const docsDo = (id) => documents.filter((d) => d.clientId === id);
   const tasksDo = (id) => tasks.filter((t) => t.clientId === id);
@@ -53,13 +75,20 @@ export default function SMMural({
             const saude = resolveClientHealth(c);
             const nivel = saude && HEALTH_LEVELS_4[saude.level];
             const semBase = !c.sm?.baseCalculo;
+            const marcos = marcosDoMes(c, mes);
             // Entregas do mês do Social Media (escopo do contrato).
-            const mes = mesChave();
             const entregas = acompanhaEntregas(c, mes) ? entregasDoSetor(c, 'socialmedia', mes) : [];
             const resumo = resumoMes(entregas);
 
             return (
-              <button key={c.id} type="button" style={S.card} onClick={() => setAberto(c.id)}>
+              <div
+                key={c.id}
+                role="button"
+                tabIndex={0}
+                style={S.card}
+                onClick={() => setAberto(c.id)}
+                onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setAberto(c.id); } }}
+              >
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9 }}>
                   <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
                     <span style={S.nome}>{c.name}</span>
@@ -89,9 +118,35 @@ export default function SMMural({
                       <span>Entregas do mês</span>
                       <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{resumo.entregue}/{resumo.combinado}</span>
                     </div>
-                    <BarraEntrega feito={resumo.entregue} qtd={resumo.combinado} status={statusGeral(entregas, mes)} />
+                    <BarraEntrega feito={resumo.entregue} qtd={resumo.combinado} />
                   </div>
                 )}
+
+                <div style={S.checklist}>
+                  <span style={S.checkTit}>Checklist de {rotuloMes(mes)}</span>
+                  {SM_MARCOS_MENSAIS.map((m) => {
+                    const reg = marcos[m.id];
+                    const feito = !!reg;
+                    const ocupado = salvando === `${c.id}_${m.id}`;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        style={{ ...S.check, opacity: ocupado ? 0.5 : 1, cursor: onMarcarMarco ? 'pointer' : 'default' }}
+                        disabled={!onMarcarMarco || ocupado}
+                        onClick={(e) => alternar(e, c.id, m.id, feito)}
+                        title={feito ? `Marcado${reg.by ? ` por ${reg.by}` : ''}${reg.at ? ` em ${quando(reg.at)}` : ''}` : 'Marcar como feito'}
+                        aria-pressed={feito}
+                      >
+                        {feito
+                          ? <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0 }} />
+                          : <Circle size={15} color="var(--dim)" style={{ flexShrink: 0 }} />}
+                        <span style={{ flex: 1, minWidth: 0, color: feito ? 'var(--text)' : 'var(--muted)' }}>{m.label}</span>
+                        {feito && reg.at && <span style={S.checkData}>{quando(reg.at)}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
 
                 {(atrasadas > 0 || semBase) && (
                   <div style={S.avisos}>
@@ -108,7 +163,7 @@ export default function SMMural({
                     )}
                   </div>
                 )}
-              </button>
+              </div>
             );
           })}
         </div>
@@ -139,7 +194,7 @@ const S = {
   grade: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(250px,1fr))', gap: 12 },
   card: {
     background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14,
-    padding: 16, display: 'flex', flexDirection: 'column', gap: 11, textAlign: 'left',
+    padding: 16, display: 'flex', flexDirection: 'column', gap: 11, textAlign: 'left', cursor: 'pointer',
   },
   nome: {
     display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--text)', letterSpacing: '-.2px',
@@ -150,6 +205,13 @@ const S = {
   numeros: { display: 'flex', gap: 14 },
   num: { display: 'flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: 'var(--muted)', fontFamily: 'var(--fm)' },
   avisos: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  checklist: { display: 'flex', flexDirection: 'column', gap: 2, paddingTop: 10, borderTop: '1px solid var(--border)' },
+  checkTit: { fontSize: 11, color: 'var(--muted)', marginBottom: 4 },
+  check: {
+    display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none',
+    padding: '5px 0', fontSize: 12.5, textAlign: 'left', fontFamily: 'var(--f)',
+  },
+  checkData: { fontSize: 10.5, color: 'var(--muted)', fontFamily: 'var(--fm)', flexShrink: 0 },
   aviso: {
     display: 'flex', alignItems: 'center', gap: 4, fontSize: 10,
     border: '1px solid', borderRadius: 100, padding: '3px 8px',
