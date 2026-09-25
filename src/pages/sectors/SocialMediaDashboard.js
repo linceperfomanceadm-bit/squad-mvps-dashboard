@@ -40,7 +40,7 @@ export default function SocialMediaDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { clients, loading, updateBrandbook, addBrandMaterial, removeBrandMaterial, marcarEntrega } = useClients();
+  const { clients, loading, updateBrandbook, addBrandMaterial, removeBrandMaterial, marcarEntrega, marcarMarcoSM } = useClients();
   const { collaborators } = useCollaborators();
   const {
     tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval,
@@ -125,6 +125,13 @@ export default function SocialMediaDashboard() {
     });
   };
 
+  // Checklist mensal do card do cliente no Mural.
+  const handleMarcarMarco = async (clientId, mes, marcoId, feito) => {
+    const res = await marcarMarcoSM(clientId, mes, marcoId, feito, user?.name);
+    if (!res.success) toast(res.error || 'Não foi possível salvar.', 'e');
+    return res;
+  };
+
   const navItems = NAV.map(n => ({
     ...n,
     badge: n.key === 'kanban' ? pendingApproval
@@ -156,6 +163,7 @@ export default function SocialMediaDashboard() {
             onAbrirDocumento={(id) => navigate(`/documentos/${id}`)}
             onNovoDocumento={handleNovoDocDoCliente}
             acoesEntregas={acoesEntregas}
+            onMarcarMarco={handleMarcarMarco}
           />
         ) : page === 'entregas' ? (
           <EntregasSetor clients={clients} sectorId="socialmedia" me={user?.name} acoes={acoesEntregas} />
