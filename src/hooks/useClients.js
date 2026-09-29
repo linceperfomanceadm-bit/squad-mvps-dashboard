@@ -244,9 +244,21 @@ export function useClients() {
     catch (err) { return { success: false, error: err.message }; }
   };
 
+  // Ao concluir, grava `finishedAt` (igual ao ID Visual): é a data que
+  // o card de entregas únicas e o histórico do cliente usam para dizer
+  // quando o site foi entregue. Recorrência mantém a data da conclusão
+  // original; site que já nasceu sem a data ganha a do momento.
   const wdMoveStatus = async (clientId, newStatus, extra = {}, jobId = 'main') => {
     try {
-      await wdPatch(clientId, jobId, { ...stripWd(extra), status: newStatus });
+      const fields = { ...stripWd(extra), status: newStatus };
+      if (!fields.finishedAt) {
+        const client = clients.find(c => c.id === clientId);
+        const job = client ? wdJobsOf(client).find(j => j.id === jobId) : null;
+        if (newStatus === 'finished' || (newStatus === 'recurrence' && !job?.finishedAt)) {
+          fields.finishedAt = new Date().toISOString();
+        }
+      }
+      await wdPatch(clientId, jobId, fields);
       return { success: true };
     } catch (err) { return { success: false, error: err.message }; }
   };
