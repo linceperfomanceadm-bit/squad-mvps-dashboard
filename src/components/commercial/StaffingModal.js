@@ -57,6 +57,9 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
   const peopleOf = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active !== false);
 
   const temIdVisual = !!contrato.hasIdVisual;
+  // ID Visual já existe (inclusive sem dono, quando o designer saiu do
+  // app): quem o líder indicar precisa receber a marca.
+  const temIdv = !!(client.idv?.status || client.idv?.responsible);
 
   // Quadro do projeto fora dos setores que esta pessoa preenche: o
   // líder enxerga o que os outros líderes já decidiram (e quem ainda
@@ -72,7 +75,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
     setBusy(sectorId);
     // Na troca o ID Visual pode existir mesmo sem a marcação no
     // contrato (admin adicionou depois), então o dono vai junto.
-    const opts = sectorId === 'design' && (temIdVisual || client.idv?.responsible)
+    const opts = sectorId === 'design' && (temIdVisual || temIdv)
       ? { idvResponsible: idvOwner || nomes[0] }
       : {};
     const r = await onConfirm(sectorId, nomes, opts);
@@ -216,7 +219,7 @@ export default function StaffingModal({ client, sectors, collaborators, onClose,
                         );
                       })}
                     </div>
-                    {sid === 'design' && (temIdVisual || client.idv?.responsible) && escolhidos.length > 1 && (
+                    {sid === 'design' && (temIdVisual || temIdv) && escolhidos.length > 1 && (
                       <div style={{ marginTop: 10, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 9, padding: 12 }}>
                         <p style={LBL}>QUEM FICA COM A ID VISUAL?</p>
                         <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, marginBottom: 8, lineHeight: 1.5 }}>

@@ -14,12 +14,13 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-09-4';
+export const PATCH_VERSION = '2026-09-5';
  
 const PATCH_NOTES = {
   date: 'Setembro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '👤', text: 'Quando alguém sai da agência e é excluído do app, o nome sai também da carteira dos clientes. Se o cliente ficar sem ninguém no seu setor, ele aparece para o líder em "Clientes sem responsável", na aba de Onboarding, para indicar outra pessoa.' },
     { emoji: '📊', text: 'Entregas do mês sem "atrasado" ou "abaixo do ritmo": o acompanhamento agora é só o contador e a barra, respeitando o planejamento de cada cliente.' },
     { emoji: '🗂️', text: 'Documentos agora ficam em pastas por cliente. A pasta aparece sozinha com o primeiro documento e reúne todos os relatórios daquele cliente.' },
     { emoji: '✅', text: 'No Mural, o card de cada cliente tem o checklist do mês: planejamento mensal aprovado e relatório mensal criado.' },

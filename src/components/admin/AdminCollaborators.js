@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff, Crown } from 'lucide-react';
 import { SECTORS } from '../../lib/firebase';
+import { nomesDoCliente } from '../../lib/responsaveis';
 
-export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onResetPassword, onDelete }) {
+export default function AdminCollaborators({ collaborators, clients = [], onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '', leaderOf: [] });
   const [showPw, setShowPw] = useState(false);
@@ -13,6 +14,9 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
   const [delConfirm, setDelConfirm] = useState(null);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  // Quantos clientes carregam o nome — mostrado na confirmação da
+  // exclusão, porque o nome sai de todos eles.
+  const carteiraDe = (nome) => clients.filter(c => nomesDoCliente(c).has(nome)).length;
 
   const handleAdd = async (e) => {
     e.preventDefault();
@@ -159,6 +163,7 @@ export default function AdminCollaborators({ collaborators, onAdd, onUpdate, onR
                   onConfirmDelete={() => { onDelete(collab.id); setDelConfirm(null); }}
                   onCancelDelete={() => setDelConfirm(null)}
                   confirmDelete={delConfirm === collab.id}
+                  carteira={delConfirm === collab.id ? carteiraDe(collab.name) : 0}
                   onResetPassword={(pw) => handleResetPassword(collab.id, pw)}
                 />
               ))}
@@ -192,7 +197,7 @@ function LeaderPicker({ value, onChange }) {
   );
 }
 
-function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, onCancelEdit, onEditFormChange, onToggleActive, onDelete, onConfirmDelete, onCancelDelete, confirmDelete, onResetPassword }) {
+function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, onCancelEdit, onEditFormChange, onToggleActive, onDelete, onConfirmDelete, onCancelDelete, confirmDelete, carteira = 0, onResetPassword }) {
   const [resetPw, setResetPw] = useState('');
   const [showReset, setShowReset] = useState(false);
 
@@ -245,6 +250,13 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
               }
             </div>
           </div>
+          {confirmDelete && (
+            <p style={{ fontSize: 12, color: 'var(--amber)', lineHeight: 1.5, marginBottom: 10 }}>
+              {carteira > 0
+                ? `Sai de ${carteira} ${carteira === 1 ? 'cliente' : 'clientes'}. Onde ficar sem ninguém, o líder do setor é avisado para indicar outra pessoa.`
+                : 'Não está em nenhum cliente.'}
+            </p>
+          )}
           {collab.phone && <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>📱 {collab.phone}</p>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: collab.active ? 'var(--green-dim)' : 'var(--surface)', color: collab.active ? 'var(--green)' : 'var(--muted)', border: `1px solid ${collab.active ? 'var(--green-b)' : 'var(--border)'}`, fontFamily: 'var(--fm)' }}>

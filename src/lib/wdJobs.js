@@ -12,22 +12,21 @@ export const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 export const WD_ACTIVE_STATUSES = ['onboarding', 'production'];
 
 // Lista normalizada de serviços de Web de um cliente.
-// No principal legado sem `wd.responsibles`, vale o responsável de
-// Web do cliente (`responsibles.webdesign`), como sempre foi.
+// Serviço sem responsável próprio vale o responsável de Web do
+// cliente (`responsibles.webdesign`): é o caso do principal legado,
+// que nunca teve `wd.responsibles`, e do serviço cujo responsável saiu
+// do app — assim ele segue para quem o líder indicar no lugar, em vez
+// de ficar sem dono e sumir de todas as carteiras.
 export function wdJobsOf(client) {
   if (!client) return [];
+  const doCliente = asArray(client.responsibles?.webdesign);
+  const donos = (v) => (asArray(v).length ? asArray(v) : doCliente);
   const list = [];
   if (client.wd?.status) {
-    list.push({
-      ...client.wd,
-      id: 'main',
-      responsibles: client.wd.responsibles !== undefined
-        ? asArray(client.wd.responsibles)
-        : asArray(client.responsibles?.webdesign),
-    });
+    list.push({ ...client.wd, id: 'main', responsibles: donos(client.wd.responsibles) });
   }
   (client.wdJobs || []).forEach(j => {
-    if (j?.id && j.status) list.push({ ...j, responsibles: asArray(j.responsibles) });
+    if (j?.id && j.status) list.push({ ...j, responsibles: donos(j.responsibles) });
   });
   return list;
 }

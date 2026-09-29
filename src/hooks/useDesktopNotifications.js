@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { SECTORS, STAFFING_ALERT_DAYS, stageOf, contractState } from '../lib/firebase';
+import { vagasAbertas } from '../lib/responsaveis';
 
 /*
  * useDesktopNotifications — notificação nativa do navegador.
@@ -20,6 +21,8 @@ import { SECTORS, STAFFING_ALERT_DAYS, stageOf, contractState } from '../lib/fir
  *   · Task devolvida para ajuste na sua mão
  *   · Call de Kick Off ou Onboarding agendada em cliente seu
  *   · Cobrança de staffing parado (admin e líder do setor travado)
+ *   · Cliente da base sem responsável porque a pessoa saiu do app
+ *     (admin e líder do setor vazio)
  *   · Contrato vencendo ou vencido (CS e admin)
  *   · Lembrete da Tarefa do Dia na hora marcada (via notifyLocal)
  *
@@ -295,6 +298,21 @@ export function useDesktopNotifications({ tasks = [], requests = [], clients = [
     let mudou = false;
 
     clients.forEach(c => {
+      // Vaga: não espera os dias do staffing — o cliente já está
+      // rodando e ficou sem ninguém. Chave própria no mesmo log diário.
+      const vagas = vagasAbertas(c).map(v => v.sector);
+      const minhasVagas = isAdmin ? vagas : vagas.filter(s => myLeaderSectors.includes(s));
+      const chaveVaga = `vaga_${c.id}`;
+      if (minhasVagas.length && log[chaveVaga] !== hoje) {
+        log[chaveVaga] = hoje;
+        mudou = true;
+        fire(
+          'Cliente sem responsável',
+          `${c.name} ficou sem ninguém em: ${minhasVagas.map(s => SECTORS[s]?.label || s).join(', ')}`,
+          `vaga-${c.id}-${hoje}`
+        );
+      }
+
       if (stageOf(c) !== 'staffing') return;
       const startedAt = c.staffing?.startedAt;
       if (!startedAt) return;

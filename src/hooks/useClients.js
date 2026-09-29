@@ -4,6 +4,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem } from '../lib/entregas';
+import { planoSemNomes } from '../lib/responsaveis';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -529,13 +530,17 @@ export function useClients() {
           at: new Date().toISOString(),
           ...(troca ? { anteriores } : {}),
         },
+        // Setor preenchido fecha a vaga aberta pela saída de alguém.
+        [`vagas.${sector}`]: deleteField(),
       };
 
       // ID Visual na troca: o dono muda, o relógio não. Se quem tinha
       // a marca saiu da lista, ela passa para quem o líder indicou (ou
       // para o primeiro da lista), mantendo status e datas — o prazo
       // combinado com o cliente não reinicia porque mudou o designer.
-      if (sector === 'design' && client.idv?.responsible && !lista.includes(client.idv.responsible)) {
+      // ID Visual sem dono (o designer saiu do app) entra aqui também.
+      const temIdv = !!(client.idv?.status || client.idv?.responsible);
+      if (sector === 'design' && temIdv && !lista.includes(client.idv.responsible)) {
         const novoDono = opts.idvResponsible && lista.includes(opts.idvResponsible) ? opts.idvResponsible : lista[0];
         patch['idv.responsible'] = novoDono;
         patch['idv.reassignedAt'] = new Date().toISOString();
@@ -546,7 +551,7 @@ export function useClients() {
       // ID Visual vendido: o bloco `idv` nasce agora, com o designer
       // que o líder escolheu. É o mesmo formato de antes, só que o
       // dono é definido aqui em vez de no cadastro da CS.
-      if (sector === 'design' && client.contrato?.hasIdVisual && !client.idv?.responsible) {
+      if (sector === 'design' && client.contrato?.hasIdVisual && !temIdv) {
         const dono = opts.idvResponsible && lista.includes(opts.idvResponsible) ? opts.idvResponsible : lista[0];
         patch.idv = {
           responsible: dono,
@@ -1192,6 +1197,42 @@ export function useClients() {
     } catch (err) { return { success: false, error: err.message }; }
   };
 
+  // ── Ex-colaboradores ────────────────────────────────────────
+  // Tira os nomes de todos os clientes (setores, serviços de site e ID
+  // Visual). Usado quando um colaborador é excluído e na limpeza dos
+  // nomes que ficaram presos antes disso existir. Setor que fica vazio
+  // abre vaga para o líder indicar outra pessoa (ver lib/responsaveis).
+  // Lotes de 400 para ficar abaixo do limite de 500 escritas do batch.
+  const removerResponsaveis = async (nomes = [], byName) => {
+    const alvo = new Set(asArray(nomes).filter(Boolean));
+    if (!alvo.size) return { success: true, clientes: 0 };
+    const at = new Date().toISOString();
+    const planos = clients
+      .map(c => ({ id: c.id, plano: planoSemNomes(c, alvo, { at, by: byName }) }))
+      .filter(x => x.plano.mudou);
+    try {
+      for (let i = 0; i < planos.length; i += 400) {
+        const batch = writeBatch(db);
+        planos.slice(i, i + 400).forEach(({ id, plano }) => {
+          const patch = { ...plano.set };
+          plano.apagar.forEach(k => { patch[k] = deleteField(); });
+          batch.update(doc(db, 'clients', id), patch);
+        });
+        await batch.commit();
+      }
+      return { success: true, clientes: planos.length };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
+  // O líder (ou o admin) diz que a vaga não precisa de ninguém — o
+  // serviço daquele setor acabou para o cliente.
+  const dispensarVaga = async (clientId, sector) => {
+    try {
+      await updateDoc(doc(db, 'clients', clientId), { [`vagas.${sector}`]: deleteField() });
+      return { success: true };
+    } catch (err) { return { success: false, error: err.message }; }
+  };
+
   // ── CS Operacional: Saúde do Cliente (farol manual) ─────────
   // level: 'green' | 'yellow' | 'orange' | 'red' | null (limpar)
   const setClientHealth = async (clientId, level, note, byName) => {
@@ -1220,5 +1261,6 @@ export function useClients() {
     renewContract, closeContract, reopenContract,
     inativarCliente, reativarCliente,
     saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, marcarMarcoSM, transferirCS,
+    removerResponsaveis, dispensarVaga,
   };
 }

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { UserPlus, Clock, RefreshCw } from 'lucide-react';
+import { UserPlus, Clock, RefreshCw, UserX } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../shared/Toast';
 import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES, onboardingAgendado } from '../../lib/firebase';
+import { vagasAbertas } from '../../lib/responsaveis';
 import StaffingModal from './StaffingModal';
 import ClientOnboardingModal from './ClientOnboardingModal';
 import {
@@ -23,6 +24,10 @@ const KICKOFF_COLOR = 'var(--purple)';
 /*
  * ONBOARDING DE CLIENTES — a mesma tela para todo mundo, mudando só
  * o que cada pessoa enxerga:
+ *
+ *  0. "Clientes sem responsável" — clientes que perderam a pessoa de
+ *     um setor desta pessoa porque ela foi excluída do app. O líder
+ *     indica outra pessoa ou dispensa a vaga (serviço encerrado).
  *
  *  1. "Aguardando sua indicação" — aparece para quem LIDERA algum
  *     setor (`leaderOf`) e para o admin. Lista os clientes em staffing
@@ -46,7 +51,7 @@ const KICKOFF_COLOR = 'var(--purple)';
 export default function OnboardingBoard({ sectorId, isAdminView = false }) {
   const { user } = useAuth();
   const {
-    clients, setSectorResponsibles, pendingSectorsOf,
+    clients, setSectorResponsibles, pendingSectorsOf, dispensarVaga,
     scheduleKickoffCall, cancelKickoffCall, confirmKickoffCall,
   } = useClients();
   const { collaborators } = useCollaborators();
@@ -56,6 +61,7 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
   const [openId, setOpenId] = useState(null);
   const [kickoffSchedule, setKickoffSchedule] = useState(null);
   const [kickoffCancel, setKickoffCancel] = useState(null);
+  const [vagaDispensar, setVagaDispensar] = useState(null);
 
   const me = user?.name;
   const isAdmin = isAdminView || !!user?.isAdmin;
@@ -66,6 +72,16 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
     if (isAdmin) return Object.keys(SECTORS);
     return asArray(user?.leaderOf);
   }, [isAdmin, user]);
+
+  // 0. Clientes que ficaram sem ninguém num setor meu porque a pessoa
+  //    saiu do app. Vem antes de tudo: é cliente sem quem produza.
+  const semResponsavel = useMemo(() => {
+    if (!mySectors.length) return [];
+    return clients
+      .map(c => ({ client: c, vagas: vagasAbertas(c).filter(v => mySectors.includes(v.sector)) }))
+      .filter(x => x.vagas.length > 0)
+      .sort((a, b) => (a.client.name || '').localeCompare(b.client.name || '', 'pt-BR'));
+  }, [clients, mySectors]);
 
   // 1. Clientes em staffing esperando algum setor meu.
   const aguardando = useMemo(() => {
@@ -137,7 +153,7 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
 
   const openClient = openId ? clients.find(c => c.id === openId) || null : null;
   const vazio = aguardando.length === 0 && emKickoff.length === 0 && emOnboarding.length === 0
-    && recentes.length === 0 && minhasIndicacoes.length === 0;
+    && recentes.length === 0 && minhasIndicacoes.length === 0 && semResponsavel.length === 0;
 
   return (
     <div className="fade-up">
@@ -150,6 +166,27 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
 
       {vazio && (
         <Empty msg="Nenhum cliente em onboarding agora. ✨" />
+      )}
+
+      {/* 0. Setor que ficou vazio com a saída de alguém */}
+      {semResponsavel.length > 0 && (
+        <Bloco
+          title="Clientes sem responsável"
+          sub="Quem cuidava destes clientes saiu do app. Indique outra pessoa, ou dispense a vaga se o serviço daquele setor acabou."
+          color="var(--red)"
+        >
+          <div style={GRID}>
+            {semResponsavel.map(({ client, vagas }) => (
+              <VagaCard
+                key={client.id}
+                client={client}
+                vagas={vagas}
+                onOpen={() => setStaffingTarget({ client, sectors: vagas.map(v => v.sector) })}
+                onDispensar={(sector) => setVagaDispensar({ client, sector })}
+              />
+            ))}
+          </div>
+        </Bloco>
       )}
 
       {/* 1. Staffing */}
@@ -281,6 +318,21 @@ export default function OnboardingBoard({ sectorId, isAdminView = false }) {
         />
       )}
 
+      {vagaDispensar && (
+        <ConfirmModal
+          title="Dispensar vaga"
+          text={`${vagaDispensar.client.name} continua sem ninguém em ${SECTORS[vagaDispensar.sector]?.label || vagaDispensar.sector} e sai desta lista. Use quando o cliente não tem mais esse serviço.`}
+          confirmLabel="Dispensar"
+          onClose={() => setVagaDispensar(null)}
+          onConfirm={async () => {
+            const r = await dispensarVaga(vagaDispensar.client.id, vagaDispensar.sector);
+            if (r.success) toast('Vaga dispensada.');
+            else toast(r.error, 'e');
+            setVagaDispensar(null);
+          }}
+        />
+      )}
+
       {kickoffSchedule && ReactDOM.createPortal(
         <ScheduleModal
           title={kickoffSchedule.kickoffCall?.at ? 'Reagendar Kick Off' : 'Agendar Kick Off'}
@@ -361,6 +413,46 @@ function Bloco({ title, sub, color, children }) {
   );
 }
 
+// ── Card do setor que ficou vazio (vaga) ───────────────────────
+function VagaCard({ client, vagas, onOpen, onDispensar }) {
+  return (
+    <div style={{ ...CARD, border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)' }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</h3>
+        <Tag text="SEM RESPONSÁVEL" color="var(--red)" />
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+        {vagas.map(v => {
+          const s = SECTORS[v.sector] || { label: v.sector, color: 'var(--muted)' };
+          return (
+            <div key={v.sector} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <p style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.45, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <UserX size={13} color="var(--dim)" />
+                <span style={{ color: s.color, fontWeight: 600 }}>{s.label}</span>
+                <span style={{ color: 'var(--muted)' }}>
+                  {v.saiu.length ? `· era ${v.saiu.join(', ')}` : ''}{v.desde ? ` · desde ${fmtDate(v.desde)}` : ''}
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={() => onDispensar(v.sector)}
+                style={{ background: 'none', border: 'none', color: 'var(--muted)', fontSize: 11, cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}
+              >
+                Dispensar
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <button onClick={onOpen} style={{ ...BTN_PRIMARY, width: '100%', marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+        <UserPlus size={13} /> Indicar responsável
+      </button>
+    </div>
+  );
+}
+
 // ── Card da indicação já feita (troca) ─────────────────────────
 // Mostra quem ESTÁ no cliente hoje, por setor desta pessoa, e abre o
 // mesmo modal da indicação — só que com a lista já marcada.
@@ -372,7 +464,7 @@ function IndicacaoCard({ client, setores, onOpen }) {
     <div style={CARD}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
         <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</h3>
-        {estagioInfo && <Tag color={estagioInfo.color}>{estagioInfo.label}</Tag>}
+        {estagioInfo && <Tag text={estagioInfo.label} color={estagioInfo.color} />}
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>

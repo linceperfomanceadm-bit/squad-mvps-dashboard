@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw } from 'lucide-react';
+import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
+import { exColaboradores } from '../../lib/responsaveis';
 import ClienteFicha from '../entregas/ClienteFicha';
-import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate } from '../commercial/ui';
+import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, BTN_PRIMARY, BTN_CANCEL } from '../commercial/ui';
 
 // Normaliza responsáveis de um setor para SEMPRE um array.
 // (clientes antigos guardam string; novos guardam array.)
@@ -13,10 +14,25 @@ export function asArray(val) {
   return Array.isArray(val) ? val : [val];
 }
 
+// Por que um nome gravado no cliente não aparece entre as opções do
+// setor: a pessoa foi excluída, está inativa ou mudou de setor.
+function motivoFora(nome, collaborators) {
+  const c = collaborators.find(x => x.name === nome);
+  if (!c) return 'saiu do app';
+  if (c.active === false) return 'inativo';
+  return 'outro setor';
+}
+
 // Seletor de múltiplos responsáveis (chips clicáveis) de um setor.
+//
+// Nomes gravados no cliente que não estão entre as opções (ex-
+// colaborador, inativo) aparecem à parte, riscados, com X para tirar.
+// Antes eles ficavam invisíveis aqui e eram regravados a cada salvar,
+// sem jeito de remover.
 function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
   const sectorCollabs = collaborators.filter(c => c.sector === sector.id && c.active !== false);
   const sel = asArray(selected);
+  const fora = sel.filter(n => !sectorCollabs.some(c => c.name === n));
   const toggle = (name) => {
     if (sel.includes(name)) onChange(sel.filter(n => n !== name));
     else onChange([...sel, name]);
@@ -25,8 +41,20 @@ function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
       <span style={{ fontSize: 13, color: sector.color, minWidth: 110, display: 'flex', alignItems: 'center', gap: 5, paddingTop: 4 }}>{sector.emoji} {sector.label}</span>
       <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+        {fora.map(nome => (
+          <button key={`fora-${nome}`} type="button" onClick={() => toggle(nome)} title="Clique para tirar deste cliente" style={{
+            fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 16, cursor: 'pointer',
+            background: 'var(--red-dim)', color: 'var(--red)',
+            border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
+            display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <span style={{ textDecoration: 'line-through' }}>{nome}</span>
+            <span style={{ fontWeight: 400, fontSize: 11 }}>· {motivoFora(nome, collaborators)}</span>
+            <X size={11} />
+          </button>
+        ))}
         {sectorCollabs.length === 0
-          ? <span style={{ fontSize: 12, color: 'var(--muted)', paddingTop: 4 }}>Sem colaboradores</span>
+          ? (fora.length === 0 && <span style={{ fontSize: 12, color: 'var(--muted)', paddingTop: 4 }}>Sem colaboradores</span>)
           : sectorCollabs.map(c => {
               const active = sel.includes(c.name);
               return (
@@ -311,7 +339,7 @@ function ReativarModal({ client, onClose, onConfirm }) {
   );
 }
 
-export default function AdminClients({ clients, collaborators, tasks = [], onAdd, onUpdate, onDelete, onRename, onInativar, onReativar, acoesEntregas, toast }) {
+export default function AdminClients({ clients, collaborators, tasks = [], onAdd, onUpdate, onDelete, onRename, onInativar, onReativar, onLimparExColaboradores, acoesEntregas, toast }) {
   const [showAdd, setShowAdd] = useState(false);
   // Ficha de contrato e entregas — guarda só o id para ler o cliente vivo.
   const [fichaId, setFichaId] = useState(null);
@@ -323,6 +351,14 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
   const [aba, setAba] = useState('base');
   const [inativarId, setInativarId] = useState(null);
   const [reativarId, setReativarId] = useState(null);
+  const [showLimpeza, setShowLimpeza] = useState(false);
+
+  // Nomes presos em clientes que não existem mais como colaborador.
+  const orfaos = exColaboradores(clients, collaborators);
+  // Sem a lista carregada ninguém é riscado (senão todo nome pareceria
+  // de ex-colaborador por um instante).
+  const existe = collaborators?.length ? new Set(collaborators.map(c => c.name)) : null;
+  const clientesComOrfao = new Set(orfaos.flatMap(o => o.clientes.map(c => c.id))).size;
 
   const inativos = clients.filter(isInativo);
   const filtered = clients
@@ -358,6 +394,16 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
           Inativos <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: inativos.length ? 'var(--text)' : 'var(--dim)' }}>{inativos.length}</span>
         </button>
       </div>
+
+      {onLimparExColaboradores && orfaos.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', background: 'var(--amber-dim)', border: '1px solid var(--amber-b)', borderRadius: 12, padding: '12px 16px', marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8, lineHeight: 1.5 }}>
+            <UserX size={15} color="var(--amber)" style={{ flexShrink: 0 }} />
+            {orfaos.length === 1 ? '1 ex-colaborador continua' : `${orfaos.length} ex-colaboradores continuam`} como responsável em {clientesComOrfao} {clientesComOrfao === 1 ? 'cliente' : 'clientes'}.
+          </p>
+          <button type="button" className="ui-btn small" onClick={() => setShowLimpeza(true)}>Revisar e limpar</button>
+        </div>
+      )}
 
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
@@ -415,7 +461,14 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
                     return (
                       <td key={s.id} style={{ padding: '12px 14px', fontSize: 12, whiteSpace: 'nowrap' }}>
                         {names.length > 0
-                          ? <span style={{ color: s.color, fontWeight: 500 }}>{names.join(', ')}</span>
+                          ? names.map((n, i) => (
+                            <span key={n}>
+                              {i > 0 && <span style={{ color: s.color }}>, </span>}
+                              {!existe || existe.has(n)
+                                ? <span style={{ color: s.color, fontWeight: 500 }}>{n}</span>
+                                : <span title="Não está mais no app" style={{ color: 'var(--muted)', textDecoration: 'line-through' }}>{n}</span>}
+                            </span>
+                          ))
                           : <span style={{ color: 'var(--muted)' }}>—</span>}
                       </td>
                     );
@@ -494,7 +547,67 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
           }}
         />
       )}
+      {showLimpeza && (
+        <LimpezaModal
+          orfaos={orfaos}
+          onClose={() => setShowLimpeza(false)}
+          onConfirm={async (nomes) => {
+            const r = await onLimparExColaboradores(nomes);
+            if (r?.success) setShowLimpeza(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// Revisão dos ex-colaboradores antes de limpar. Cada nome vem marcado;
+// o admin desmarca o que não deve sair — por exemplo, alguém que só
+// mudou de nome no cadastro e ainda está na agência.
+function LimpezaModal({ orfaos, onClose, onConfirm }) {
+  const [marcados, setMarcados] = useState(() => orfaos.map(o => o.nome));
+  const [salvando, setSalvando] = useState(false);
+  const alterna = (nome) => setMarcados(m => (m.includes(nome) ? m.filter(n => n !== nome) : [...m, nome]));
+  const confirmar = async () => {
+    setSalvando(true);
+    await onConfirm(marcados);
+    setSalvando(false);
+  };
+
+  return (
+    <Overlay onClose={onClose}>
+      <div style={{ ...MODAL, maxWidth: 520 }}>
+        <ModalHeader title="Limpar ex-colaboradores" onClose={onClose} />
+        <p style={{ ...MS2.texto, marginBottom: 14 }}>
+          Estes nomes não existem mais no app, mas continuam como responsáveis nos clientes abaixo.
+          Ao limpar, eles saem dos clientes. Onde o setor ficar sem ninguém, o líder é avisado para indicar outra pessoa.
+        </p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          {orfaos.map(o => {
+            const on = marcados.includes(o.nome);
+            return (
+              <label key={o.nome} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border)', background: on ? 'var(--surface)' : 'transparent', cursor: 'pointer' }}>
+                <input type="checkbox" checked={on} onChange={() => alterna(o.nome)} style={{ marginTop: 3, accentColor: 'var(--c)' }} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                    {o.nome} <span style={{ fontWeight: 400, color: 'var(--muted)', fontFamily: 'var(--fm)', fontSize: 11 }}>· {o.clientes.length} {o.clientes.length === 1 ? 'cliente' : 'clientes'}</span>
+                  </p>
+                  <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.5, marginTop: 2 }}>
+                    {o.clientes.map(c => c.name).join(', ')}
+                  </p>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={{ ...BTN_PRIMARY, flex: 1, opacity: marcados.length && !salvando ? 1 : 0.5 }} disabled={!marcados.length || salvando} onClick={confirmar}>
+            {salvando ? 'Limpando…' : `Limpar ${marcados.length} ${marcados.length === 1 ? 'nome' : 'nomes'}`}
+          </button>
+          <button style={BTN_CANCEL} onClick={onClose}>Cancelar</button>
+        </div>
+      </div>
+    </Overlay>
   );
 }
 

@@ -85,7 +85,7 @@ export default function AdminDashboard() {
     removeBrandMaterial,
     idvAddService,
     saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas,
-    inativarCliente, reativarCliente,
+    inativarCliente, reativarCliente, removerResponsaveis,
   } = useClients();
   const { collaborators, loading: loadingCollabs, addCollaborator, updateCollaborator, resetPassword, deleteCollaborator } = useCollaborators();
   const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
@@ -128,10 +128,26 @@ export default function AdminDashboard() {
     if (!res.success) toast(res.error, 'e');
     return res;
   };
+  // Excluir alguém também tira o nome dele dos clientes — os clientes
+  // guardam o responsável pelo nome, e sem isso o nome ficava preso na
+  // carteira. Setor que fica vazio vai para o líder indicar outra
+  // pessoa. Se outro colaborador tem exatamente o mesmo nome, os
+  // clientes ficam como estão: não dá para saber de quem é cada um.
   const handleDeleteCollab = async (id) => {
+    const collab = collaborators.find(c => c.id === id);
     const res = await deleteCollaborator(id);
-    if (res.success) toast('Colaborador removido.', 'e');
-    else toast(res.error, 'e');
+    if (!res.success) { toast(res.error, 'e'); return res; }
+    const nome = collab?.name;
+    const homonimo = nome && collaborators.some(c => c.id !== id && c.name === nome);
+    if (!nome || homonimo) { toast('Colaborador removido.', 'e'); return res; }
+    const limpeza = await removerResponsaveis([nome], user?.name);
+    if (!limpeza.success) {
+      toast('Colaborador removido, mas o nome ficou em alguns clientes. Use "Limpar ex-colaboradores" em Clientes.', 'e');
+    } else if (limpeza.clientes) {
+      toast(`${nome} removido e retirado de ${limpeza.clientes} ${limpeza.clientes === 1 ? 'cliente' : 'clientes'}.`, 'e');
+    } else {
+      toast('Colaborador removido.', 'e');
+    }
     return res;
   };
   const handleResetCollabPassword = async (id, newPw) => {
@@ -300,6 +316,12 @@ export default function AdminDashboard() {
               return r;
             }}
             onDelete={deleteClient}
+            onLimparExColaboradores={async (nomes) => {
+              const r = await removerResponsaveis(nomes, user?.name);
+              if (r.success) toast(r.clientes ? `Nomes retirados de ${r.clientes} ${r.clientes === 1 ? 'cliente' : 'clientes'}.` : 'Nada para limpar.');
+              else toast(r.error, 'e');
+              return r;
+            }}
             tasks={tasks}
             onInativar={async (id, opcoes) => {
               const nome = clients.find(c => c.id === id)?.name || 'Cliente';
@@ -354,6 +376,7 @@ export default function AdminDashboard() {
         ) : (
           <AdminCollaborators
             collaborators={collaborators}
+            clients={clients}
             onAdd={handleAddCollab}
             onUpdate={handleUpdateCollab}
             onResetPassword={handleResetCollabPassword}

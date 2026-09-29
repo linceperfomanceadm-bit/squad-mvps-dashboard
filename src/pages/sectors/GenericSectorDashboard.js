@@ -13,6 +13,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import { SECTORS, TASK_PRIORITIES, ENTREGA_SECTORS, naCarteira } from '../../lib/firebase';
 import EntregasSetor from '../../components/entregas/EntregasSetor';
+import { vagasAbertas } from '../../lib/responsaveis';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { differenceInDays } from 'date-fns';
 
@@ -141,7 +142,9 @@ export default function GenericSectorDashboard({ sectorId }) {
       || (c.staffing?.sectors || []).some(sid => lidero.includes(sid) && !(Array.isArray(c.responsibles?.[sid]) ? c.responsibles[sid].length : !!c.responsibles?.[sid]))
     );
     const agendadoMeu = c.active !== false && c.kickoff?.pending && (user?.isAdmin || souResp(c));
-    return liderPendente || agendadoMeu;
+    // Cliente da base que ficou sem ninguém num setor que eu lidero.
+    const vagaMinha = vagasAbertas(c).some(v => user?.isAdmin || lidero.includes(v.sector));
+    return liderPendente || agendadoMeu || vagaMinha;
   }).length;
   // Reporte da CS: só setores de produção recebem solicitação.
   const showRequests = showOnboarding;
