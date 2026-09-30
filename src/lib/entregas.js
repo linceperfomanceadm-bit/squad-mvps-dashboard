@@ -1,8 +1,9 @@
 import {
-  stageOf, contractState, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, HEALTH_STALE_DAYS,
+  stageOf, contractState, naCarteira, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, HEALTH_STALE_DAYS,
+  SETORES_ENTREGA_UNICA, TERMOS_ENTREGA_UNICA,
 } from './firebase';
 import { businessMsBetween } from './taskTime';
-import { wdJobsOf, asArray } from './wdJobs';
+import { wdJobsOf, asArray, WD_ACTIVE_STATUSES } from './wdJobs';
 
 /*
  * ENTREGAS DO CONTRATO — funções puras, sem Firestore.
@@ -97,13 +98,27 @@ export const inicioNovaVersao = (c, agora = new Date()) => (
   versoesDoEscopo(c).length ? somaMeses(mesChave(agora), 1) : mesChave(agora)
 );
 
+// Item de escopo que na verdade é serviço único (site, ID Visual) —
+// regra em SETORES_ENTREGA_UNICA / TERMOS_ENTREGA_UNICA (firebase.js).
+// Nome comparado sem acento e sem caixa: o escopo é texto livre.
+const semAcento = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+export function ehEntregaUnica(item) {
+  if (!item) return false;
+  if (SETORES_ENTREGA_UNICA.includes(item.sector)) return true;
+  const nome = semAcento(item.label);
+  return TERMOS_ENTREGA_UNICA.some(t => nome.includes(t));
+}
+
 // ─── Entregas de um mês ───────────────────────────────────────
 // Lista de itens do mês com quantidade combinada e quantidade feita.
+// Serviço único cadastrado no escopo por engano (ou antes da regra)
+// fica de fora: a entrega dele vem do painel, em `entregasUnicasDoMes`.
 export function entregasDoMes(c, mes = mesChave()) {
   const versao = escopoVigente(c, mes);
   if (!versao) return [];
   const reg = c?.entregas?.[mes] || {};
   return (versao.itens || [])
+    .filter(it => !ehEntregaUnica(it))
     .map(it => {
       const ajuste = reg.qtd?.[it.id];
       const qtd = ajuste != null ? num(ajuste) : num(it.qtd);
@@ -220,7 +235,8 @@ export const marcosDoMes = (c, mes = mesChave()) => {
 // ─── Entregas únicas (site, ID Visual) ────────────────────────
 // Não têm checklist novo: leem o que os painéis de Web e Design já
 // controlam. Prazo com a mesma regra do card do Web: 7 dias no
-// onboarding, `days` do serviço na produção.
+// onboarding, `days` do serviço na produção. Regra de negócio em
+// SETORES_ENTREGA_UNICA (firebase.js).
 const WD_FASE = {
   onboarding: 'Onboarding',
   production: 'Produção',
@@ -252,6 +268,7 @@ export function entregasUnicas(c) {
       id: `wd_${job.id}`,
       sector: 'webdesign',
       label: cfg.label || job.service || 'Site',
+      status: job.status,
       fase: WD_FASE[job.status] || job.status || '—',
       concluido: CONCLUIDO.includes(job.status),
       checklist: { feito: check.filter(i => i?.checked).length, total: check.length },
@@ -274,6 +291,7 @@ export function entregasUnicas(c) {
       id: 'idv',
       sector: 'design',
       label: ID_VISUAL_CONFIG.label,
+      status,
       fase: WD_FASE[status] || status,
       concluido: CONCLUIDO.includes(status),
       checklist: { feito: check.filter(i => i?.checked).length, total: check.length },
@@ -284,6 +302,39 @@ export function entregasUnicas(c) {
     });
   }
   return lista;
+}
+
+// Entregas únicas que contam num mês, no formato das recorrentes
+// ({ qtd: 1, feito: 0 | 1 }) para somar no mesmo resumo:
+//   · finalizada DENTRO do mês → 1 de 1, naquele mês e só nele;
+//   · em onboarding ou produção → 0 de 1, só no mês corrente (a
+//     entrega é esperada agora; meses passados não guardam o estado
+//     que o card tinha, então lá conta só o que foi finalizado);
+//   · parada (Inativo) não conta — o serviço está suspenso;
+//   · finalizada sem data (legado anterior ao `finishedAt`) não conta
+//     em mês nenhum, porque não dá para saber quando foi.
+// Web segue o filtro do painel do Web (cliente liberado, `active`);
+// ID Visual segue a carteira do Design (`naCarteira`).
+// `sector` filtra o setor e `dono` o responsável (null = todos).
+export function entregasUnicasDoMes(c, mes = mesChave(), { sector = null, dono = null } = {}) {
+  if (!c || !naCarteira(c)) return [];
+  const ini = inicioDoMes(mes);
+  const fim = fimDoMes(mes);
+  const corrente = mes === mesChave();
+  return entregasUnicas(c)
+    .filter(u => !sector || u.sector === sector)
+    .filter(u => u.sector !== 'webdesign' || c.active !== false)
+    .filter(u => !dono || u.responsaveis.includes(dono))
+    .map(u => {
+      if (u.concluido) {
+        const em = u.concluidoEm ? new Date(u.concluidoEm) : null;
+        if (!em || Number.isNaN(em.getTime()) || em < ini || em >= fim) return null;
+        return { ...u, unica: true, qtd: 1, feito: 1, concluidoEm: em };
+      }
+      if (!corrente || !WD_ACTIVE_STATUSES.includes(u.status)) return null;
+      return { ...u, unica: true, qtd: 1, feito: 0 };
+    })
+    .filter(Boolean);
 }
 
 // ─── Pendências de cadastro ───────────────────────────────────

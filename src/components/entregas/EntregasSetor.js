@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { SECTORS, naCarteira } from '../../lib/firebase';
 import {
-  mesesEditaveis, rotuloMes, entregasDoSetor, resumoMes, acompanhaEntregas, mesConcluido,
+  mesesEditaveis, rotuloMes, entregasDoSetor, entregasUnicasDoMes, resumoMes, acompanhaEntregas, mesConcluido,
 } from '../../lib/entregas';
 import { PageHeader, Grid, Kpi, Empty } from '../shared/ui';
-import { LinhaEntrega, Aderencia } from './EntregasKit';
+import { LinhaEntrega, LinhaEntregaUnica, Aderencia } from './EntregasKit';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
@@ -12,9 +12,14 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  * ENTREGAS DO MÊS — o checklist de quem produz.
  *
  * Um card por cliente da carteira da pessoa, só com os itens do setor
- * dela. Cada "+" marca uma entrega; o card do cliente no admin e na
- * CS atualiza na hora. O mês vira no dia 1 para todos; até o dia 5 o
- * mês anterior ainda aceita marcação atrasada.
+ * dela. Duas fontes no mesmo card:
+ *
+ *   · Recorrentes do escopo — cada "+" marca uma entrega; o card do
+ *     cliente no admin e na CS atualiza na hora. O mês vira no dia 1
+ *     para todos; até o dia 5 o mês anterior ainda aceita marcação.
+ *   · Serviços únicos (site, ID Visual) — sem botão: contam 1 de 1 no
+ *     mês em que o serviço é finalizado no painel de Web ou de Design
+ *     (regra em `entregasUnicasDoMes`).
  *
  * `todos` (líder do setor / admin) mostra a carteira inteira do setor.
  */
@@ -24,13 +29,16 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
   const setor = SECTORS[sectorId];
 
   const cards = useMemo(() => clients
-    .filter(c => naCarteira(c) && (todos || asArray(c.responsibles?.[sectorId]).includes(me)))
-    .filter(c => acompanhaEntregas(c, mes))
+    .filter(c => naCarteira(c))
     .map(c => {
-      const itens = entregasDoSetor(c, sectorId, mes);
-      return { client: c, itens, resumo: resumoMes(itens) };
+      // Recorrente segue a carteira do setor; serviço único segue o
+      // responsável do próprio serviço (no Web cada site tem os seus).
+      const doSetor = todos || asArray(c.responsibles?.[sectorId]).includes(me);
+      const recorrentes = doSetor && acompanhaEntregas(c, mes) ? entregasDoSetor(c, sectorId, mes) : [];
+      const unicas = entregasUnicasDoMes(c, mes, { sector: sectorId, dono: todos ? null : me });
+      return { client: c, recorrentes, unicas, resumo: resumoMes([...unicas, ...recorrentes]) };
     })
-    .filter(x => x.itens.length)
+    .filter(x => x.recorrentes.length || x.unicas.length)
     .sort((a, b) => (a.resumo.pct ?? 101) - (b.resumo.pct ?? 101)),
   [clients, sectorId, me, todos, mes]);
 
@@ -76,13 +84,13 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
       {cards.length === 0 ? (
         <div className="ui-card">
           <Empty>
-            Nenhum cliente da sua carteira tem entregas mensais de {setor?.label || 'seu setor'} no contrato.
-            Quando a CS cadastrar o escopo, o checklist aparece aqui.
+            Nenhuma entrega de {setor?.label || 'seu setor'} para você neste mês. Entregas mensais aparecem quando a CS
+            cadastra o escopo; sites e ID Visual aparecem sozinhos a partir do painel.
           </Empty>
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 14 }}>
-          {cards.map(({ client, itens, resumo }) => (
+          {cards.map(({ client, recorrentes, unicas, resumo }) => (
             <div key={client.id} className="ui-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)', flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -90,7 +98,10 @@ export default function EntregasSetor({ clients, sectorId, me, acoes, todos = fa
                 </p>
                 <Aderencia pct={resumo.pct} mes={mes} />
               </div>
-              {itens.map(it => (
+              {unicas.map(it => (
+                <LinhaEntregaUnica key={it.id} item={it} compacta />
+              ))}
+              {recorrentes.map(it => (
                 <LinhaEntrega
                   key={it.id}
                   item={it}

@@ -6,6 +6,7 @@ import {
 } from '../../lib/firebase';
 import {
   cadastroPendencias, escopoParaEditar, inicioNovaVersao, mesChave, rotuloMes, novoIdItem, versoesDoEscopo,
+  ehEntregaUnica,
 } from '../../lib/entregas';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate } from '../commercial/ui';
 import { Tag } from '../shared/ui';
@@ -55,7 +56,10 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       briefing: contrato.briefing || client.briefing || '',
       driveUrl: contrato.driveUrl || '',
       servicos: Object.fromEntries((Array.isArray(servicos) ? servicos : []).map(sv => [sv.id, sv.desc || ''])),
-      itens: (versao?.itens || []).map(it => ({ ...it, qtd: String(it.qtd) })),
+      // Site e ID Visual cadastrados como mensais (antes da regra de
+      // serviço único) não abrem no formulário: ao salvar, a nova versão
+      // do escopo já nasce sem eles.
+      itens: (versao?.itens || []).filter(it => !ehEntregaUnica(it)).map(it => ({ ...it, qtd: String(it.qtd) })),
       semRecorrencia: client.escopo?.semRecorrencia === true,
     };
   }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -117,6 +121,11 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       .filter(it => it.label || it.qtd);
     if (itensLimpos.some(it => !it.label || it.qtd <= 0)) {
       setErro('Cada entrega precisa de nome e quantidade maior que zero.');
+      return;
+    }
+    const unica = itensLimpos.find(ehEntregaUnica);
+    if (unica) {
+      setErro(`"${unica.label}" é serviço único: a entrega conta quando o serviço é finalizado no painel, não entra nas entregas mensais.`);
       return;
     }
     const escopoMudou = f.semRecorrencia !== inicial.semRecorrencia
@@ -280,7 +289,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
           {temVersoes
             ? `Mudanças aqui valem a partir de ${rotuloMes(desdeNovo, true).toLowerCase()}. O mês em andamento e o histórico não mudam.`
             : 'Este é o primeiro escopo do cliente: vale já para este mês.'}
-          {' '}Site e ID Visual não entram aqui — eles aparecem sozinhos a partir dos painéis de Web e Design.
+          {' '}Landing Page, E-commerce e ID Visual são serviço único e não entram aqui: a entrega conta sozinha quando o serviço é finalizado no painel de Web ou de Design.
         </p>
 
         {f.itens.map(it => (

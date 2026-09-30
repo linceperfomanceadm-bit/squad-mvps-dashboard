@@ -457,11 +457,28 @@ export const ENTREGAVEIS = {
   design:      ['Peças gráficas', 'Criativos para anúncio', 'Materiais impressos'],
   videomaker:  ['Vídeos editados', 'Reels', 'Captações'],
   trafego:     ['Relatórios de desempenho', 'Reuniões de resultado', 'Campanhas novas'],
-  webdesign:   ['Atualizações de site', 'Landing pages'],
 };
 
-// Setores que podem ter entregas recorrentes no escopo.
-export const ENTREGA_SECTORS = ['socialmedia', 'design', 'videomaker', 'trafego', 'webdesign'];
+// Setores que podem ter entregas recorrentes no escopo. WebDesign
+// saiu (decisão de set/2026): tudo o que o Web faz é serviço único.
+export const ENTREGA_SECTORS = ['socialmedia', 'design', 'videomaker', 'trafego'];
+
+// ─── Entregas únicas: site e ID Visual ────────────────────────
+// Landing Page, LP Catálogo, E-commerce (WD_SERVICE_CONFIG) e ID
+// Visual são SEMPRE serviço único, com ou sem manutenção depois. A
+// entrega é a FINALIZAÇÃO do serviço no painel de Web ou de Design
+// (`finishedAt`, gravado ao ir para Finalizado ou Recorrência) e conta
+// no mês em que aconteceu. Ninguém marca nada à mão.
+//
+// Escopos antigos cadastraram esses serviços como "1 por mês". Em vez
+// de migrar, `ehEntregaUnica` (lib/entregas.js) tira esses itens das
+// contas mensais: qualquer item de um setor de SETORES_ENTREGA_UNICA e
+// qualquer item cujo nome traga um de TERMOS_ENTREGA_UNICA. Os termos
+// são só os inequívocos — "e-commerce" ou "landing page" aparecem em
+// entregas legítimas de outros setores (campanha de e-commerce, arte
+// para LP) e por isso não entram.
+export const SETORES_ENTREGA_UNICA = ['webdesign'];
+export const TERMOS_ENTREGA_UNICA = ['id visual', 'identidade visual'];
 
 // Checklist mensal do Social Media, no card do cliente no Mural.
 // Marcos do mês que não são peça contável (por isso não entram no

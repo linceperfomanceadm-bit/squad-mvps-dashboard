@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Minus, Plus } from 'lucide-react';
+import { Minus, Plus, CheckCircle2 } from 'lucide-react';
 import { SECTORS } from '../../lib/firebase';
 import { tomAderencia } from '../../lib/entregas';
 import { Tag } from '../shared/ui';
@@ -14,6 +14,10 @@ import { Tag } from '../shared/ui';
  * atraso de quem seguia um planejamento diferente — ver
  * `itemConcluido` em lib/entregas.js. A barra usa o gradiente do painel
  * enquanto anda e fica verde ao completar.
+ *
+ * Serviço único (site, ID Visual) usa `LinhaEntregaUnica`: mesmo
+ * "0 de 1" e mesma barra, sem − / +, porque quem conclui é o card do
+ * serviço no painel de Web ou de Design.
  */
 
 export function BarraEntrega({ feito, qtd }) {
@@ -91,6 +95,51 @@ export function LinhaEntrega({ item, onMarcar, mostrarSetor = false, compacta = 
       </div>
       <div style={{ marginTop: 8 }}>
         <BarraEntrega feito={item.feito} qtd={item.qtd} />
+      </div>
+    </div>
+  );
+}
+
+/*
+ * Linha de serviço único. A barra acompanha as etapas do checklist do
+ * card, mas só fica cheia e verde quando o serviço é finalizado — todas
+ * as etapas marcadas ainda não é entrega.
+ */
+export function LinhaEntregaUnica({ item, mostrarSetor = false, compacta = false }) {
+  const setor = SECTORS[item.sector];
+  const { feito: etapas = 0, total = 0 } = item.checklist || {};
+  const pct = item.feito ? 100 : total ? Math.min(90, (etapas / total) * 100) : 0;
+  const data = (d) => (d ? new Date(d).toLocaleDateString('pt-BR') : '');
+  const vencido = !item.feito && item.atrasado;
+
+  return (
+    <div style={{ ...S.linha, padding: compacta ? '9px 0' : '11px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <p style={S.nome}>{item.label}</p>
+          <p style={S.meta}>
+            {mostrarSetor && setor ? `${setor.label} · ` : ''}
+            Serviço único
+            {item.feito
+              ? ` · finalizado em ${data(item.concluidoEm)}`
+              : ` · ${item.fase}${total ? ` · ${etapas} de ${total} etapas` : ''}`}
+            {!item.feito && item.prazo && (
+              <span style={{ color: vencido ? 'var(--red)' : 'var(--muted)' }}>
+                {vencido ? ' · prazo venceu em ' : ' · prazo '}{data(item.prazo)}
+              </span>
+            )}
+          </p>
+        </div>
+        {item.feito ? <CheckCircle2 size={15} color="var(--green)" style={{ flexShrink: 0 }} /> : null}
+        <span style={S.qtd} title="Conta como entregue quando o serviço é finalizado no painel">
+          <b style={{ color: 'var(--text)', fontWeight: 500 }}>{item.feito}</b>
+          <span style={{ color: 'var(--muted)' }}> de 1</span>
+        </span>
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <div style={S.trilho}>
+          <div style={{ ...S.fill, width: `${pct}%`, background: item.feito ? 'var(--green)' : 'var(--grad)' }} />
+        </div>
       </div>
     </div>
   );
