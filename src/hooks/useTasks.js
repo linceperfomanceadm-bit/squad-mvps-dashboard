@@ -88,46 +88,54 @@ export function entregadoresDe(task) {
   return principal ? [principal] : [];
 }
 
-// ─── Responsáveis adicionais (depois da task já criada) ────────
-// Só o CRIADOR da task (requestedBy) e o admin chamam esta função —
-// a permissão é validada na UI (TaskModal).
+// ─── Responsáveis (depois da task já criada) ──────────────────
+// Só o CRIADOR da task (requestedBy) e o admin chamam esta função, e
+// só com a task em "Não Iniciada" ou "Em Produção" — a permissão é
+// validada na UI (TaskModal). Em aprovação o responsável é o aprovador
+// e mexer ali trocaria quem revisa, não quem produz.
 //
-// REGRA IMPORTANTE: o responsável PRINCIPAL (responsibleName) é sempre
-// preservado como primeiro item do array. Ele é quem entrega, quem vira
-// deliveredBy e quem conta nas métricas (Hall da Fama, Extrato,
-// Relatórios). Aqui só se somam/removem responsáveis EXTRAS. Isso
-// mantém intactos o fluxo de aprovação/refação e o auto-reparo de
-// dessincronização (hasNameMismatch) definido acima.
+// `people` é a lista COMPLETA e ordenada: o primeiro é o responsável
+// principal (responsibleName — quem entrega e vira deliveredBy). Antes
+// o principal era intocável e só os extras mudavam; na prática, quando
+// a task passava para outra pessoa, o principal antigo não tinha como
+// sair e seguia creditado — inclusive nas refações (set/2026).
+//
+// REGRA: quem SAI da task sai também de `deliveredByNames`, o crédito
+// usado nas métricas por pessoa (entregas, ajustes, aprovação de
+// primeira — ver entregadoresDe). Tirar alguém da task é dizer que ele
+// não fez parte dela. Quem saiu por uma refação (rejectTask troca o
+// responsável) não passa por aqui e mantém o crédito da rodada que
+// entregou. Tudo fica registrado na timeline e no chat da task.
 //
 // É uma função solta (não faz parte do hook) para que o TaskModal possa
 // usá-la direto, sem precisar passar prop nova por TaskKanban, pelos 5
 // dashboards e pelo AdminFeed.
-export async function updateTaskResponsibles(task, extraPeople, byName, bySector) {
+export async function updateTaskResponsibles(task, people, byName, bySector) {
   try {
     if (!task || !task.id) return { success: false, error: 'Task não encontrada.' };
+    if (task.status === 'approval' || task.status === 'done') {
+      return { success: false, error: 'Os responsáveis só mudam com a task não iniciada ou em produção.' };
+    }
 
-    const principal = task.responsibleName
-      || (Array.isArray(task.responsibleNames) ? task.responsibleNames[0] : null);
-    if (!principal) return { success: false, error: 'Task sem responsável principal.' };
-
-    // Normaliza a lista de extras: sem vazios, sem duplicados e sem
-    // repetir o principal.
-    const seen = new Set([principal]);
-    const extras = [];
-    (extraPeople || []).forEach(p => {
+    // Normaliza: sem vazios e sem duplicados, mantendo a ordem.
+    const seen = new Set();
+    const lista = [];
+    (people || []).forEach(p => {
       const name = String(p?.name || '').trim();
       if (!name || seen.has(name)) return;
       seen.add(name);
-      extras.push({ name, sector: p?.sector || null });
+      lista.push({ name, sector: p?.sector || null });
     });
+    if (!lista.length) return { success: false, error: 'A task precisa de ao menos um responsável.' };
 
-    const names = [principal, ...extras.map(p => p.name)];
-    const sectors = [task.responsibleSector, ...extras.map(p => p.sector)].filter(Boolean);
-    const uniqueSectors = Array.from(new Set(sectors));
+    const principal = lista[0];
+    const names = lista.map(p => p.name);
+    const uniqueSectors = Array.from(new Set(lista.map(p => p.sector).filter(Boolean)));
 
     const before = (Array.isArray(task.responsibleNames) && task.responsibleNames.length)
       ? task.responsibleNames
-      : [principal];
+      : (task.responsibleName ? [task.responsibleName] : []);
+    const principalAntes = task.responsibleName || before[0] || null;
 
     // Nada mudou — não escreve nem polui o chat com comentário repetido.
     const unchanged = before.length === names.length && before.every((n, i) => n === names[i]);
@@ -136,10 +144,12 @@ export async function updateTaskResponsibles(task, extraPeople, byName, bySector
     const now = new Date().toISOString();
     const added   = names.filter(n => !before.includes(n));
     const removed = before.filter(n => !names.includes(n));
+    const trocouPrincipal = principal.name !== principalAntes;
 
     const parts = [];
     if (added.length)   parts.push(`entrou: ${added.join(', ')}`);
     if (removed.length) parts.push(`saiu: ${removed.join(', ')}`);
+    if (trocouPrincipal) parts.push(`principal: ${principal.name}`);
 
     const timeline = [...(task.timeline || []), {
       action: 'responsibles_changed',
@@ -148,6 +158,7 @@ export async function updateTaskResponsibles(task, extraPeople, byName, bySector
       at: now,
       added,
       removed,
+      principal: principal.name,
       to: names,
     }];
 
@@ -160,14 +171,25 @@ export async function updateTaskResponsibles(task, extraPeople, byName, bySector
       isSystem: true,
     }];
 
-    await updateDoc(doc(db, 'tasks', task.id), {
-      responsibleName: principal,        // principal nunca muda por aqui
+    const patch = {
+      responsibleName: principal.name,
+      // Setor do principal: o que veio da tela; se não veio (pessoa
+      // desativada), mantém o atual quando o principal não mudou.
+      responsibleSector: principal.sector || (trocouPrincipal ? null : task.responsibleSector) || null,
       responsibleNames: names,
-      responsibleSectors: uniqueSectors, // novo: todos os setores envolvidos
+      responsibleSectors: uniqueSectors,
       timeline,
       comments,
-    });
-    return { success: true };
+    };
+
+    // Quem saiu deixa de contar nas métricas desta task. Task antiga
+    // sem o campo não tem o que limpar.
+    if (removed.length && Array.isArray(task.deliveredByNames)) {
+      patch.deliveredByNames = task.deliveredByNames.filter(n => n && !removed.includes(n));
+    }
+
+    await updateDoc(doc(db, 'tasks', task.id), patch);
+    return { success: true, removed };
   } catch (err) { return { success: false, error: err.message }; }
 }
 

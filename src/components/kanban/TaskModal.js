@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Send, Plus, Trash2, ExternalLink } from 'lucide-react';
+import { X, Send, Plus, Trash2, ExternalLink, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
@@ -130,14 +130,18 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
     ? businessMsBetween(task.approvalStartedAt, new Date())
     : 0;
 
-  // ── Responsáveis: principal + extras ─────────────────────────
-  // Só o criador da task e o admin podem mexer. O principal (quem
-  // entrega e conta nas métricas) não sai por aqui — só os extras.
+  // ── Responsáveis: principal + demais ─────────────────────────
+  // Só o criador da task e o admin podem mexer, e só antes da
+  // aprovação: em aprovação o "responsável" é quem revisa. Qualquer um
+  // pode sair (desde que fique alguém) e qualquer um pode virar o
+  // principal — quem entrega a task. Quem sai deixa de contar nas
+  // métricas da task; ver updateTaskResponsibles.
   const principalName = task.responsibleName || respNames[0] || '';
-  const extraNames    = respNames.filter(n => n !== principalName);
   // readOnly: modo acompanhamento da CS. Ela lê tudo e comenta, mas não
   // mexe em nada — nem responsáveis, nem prazo, nem status.
-  const canEditResponsibles = (isAdmin || isRequester) && task.status !== 'done' && !readOnly;
+  const canEditResponsibles = (isAdmin || isRequester)
+    && task.status !== 'done' && task.status !== 'approval' && !readOnly;
+  const creditados = Array.isArray(task.deliveredByNames) ? task.deliveredByNames : [];
 
   // Realtime: scroll chat to bottom when comments change
   useEffect(() => {
@@ -194,14 +198,15 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   // Setor de um colaborador pelo nome (para colorir o chip e gravar
   // responsibleSectors). Cai em null se a pessoa foi desativada.
   const sectorOfName = (name) => {
-    if (name === principalName) return task.responsibleSector || null;
+    if (name === principalName && task.responsibleSector) return task.responsibleSector;
     return collaborators.find(c => c.name === name)?.sector || null;
   };
 
-  const saveResponsibles = async (nextExtras) => {
+  // Recebe a lista completa, na ordem: o primeiro é o principal.
+  const saveResponsibles = async (nextNames) => {
     setRespBusy(true);
     setRespError('');
-    const people = nextExtras.map(n => ({ name: n, sector: sectorOfName(n) }));
+    const people = nextNames.map(n => ({ name: n, sector: sectorOfName(n) }));
     const r = await updateTaskResponsibles(task, people, currentUser, currentUserSector);
     setRespBusy(false);
     if (!r?.success) { setRespError(r?.error || 'Falha ao atualizar responsáveis.'); return false; }
@@ -211,12 +216,21 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const handleAddResponsible = async () => {
     if (!respPick.name) return;
     if (respNames.includes(respPick.name)) { setRespError('Essa pessoa já é responsável nesta task.'); return; }
-    const ok = await saveResponsibles([...extraNames, respPick.name]);
+    const ok = await saveResponsibles([...respNames, respPick.name]);
     if (ok) { setRespPick({ sector: '', name: '' }); setShowRespForm(false); }
   };
 
+  // Quem já entregou alguma rodada tem crédito (e ajustes) nesta task;
+  // tirar essa pessoa apaga isso, então pede confirmação.
   const handleRemoveResponsible = async (name) => {
-    await saveResponsibles(extraNames.filter(n => n !== name));
+    if (respNames.length <= 1) return;
+    if (creditados.includes(name)
+      && !window.confirm(`${name} sai da task e deixa de contar nas métricas dela (entregas e ajustes). Continuar?`)) return;
+    await saveResponsibles(respNames.filter(n => n !== name));
+  };
+
+  const handleMakePrincipal = async (name) => {
+    await saveResponsibles([name, ...respNames.filter(n => n !== name)]);
   };
 
   const content = (
@@ -370,6 +384,16 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                       )}
                       {!isPrincipal && canEditResponsibles && (
                         <button
+                          onClick={() => handleMakePrincipal(name)}
+                          disabled={respBusy}
+                          title="Tornar responsável principal"
+                          style={{ background: 'none', border: 'none', padding: 0, display: 'flex', alignItems: 'center', color: 'var(--muted)', cursor: respBusy ? 'not-allowed' : 'pointer', opacity: respBusy ? .4 : .8 }}
+                        >
+                          <Star size={12} />
+                        </button>
+                      )}
+                      {canEditResponsibles && respNames.length > 1 && (
+                        <button
                           onClick={() => handleRemoveResponsible(name)}
                           disabled={respBusy}
                           title="Remover responsável"
@@ -424,7 +448,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               )}
               {canEditResponsibles && respNames.length > 1 && !showRespForm && (
                 <p style={{ fontSize: 10, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
-                  O responsável principal é quem entrega a task e conta nas métricas. Os demais enxergam a task no kanban e participam do chat.
+                  O principal é quem entrega a task. Toque na estrela para trocar o principal e no X para tirar alguém — quem sai deixa de contar nas métricas desta task.
                 </p>
               )}
             </div>

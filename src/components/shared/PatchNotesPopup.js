@@ -14,12 +14,13 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-09-6';
+export const PATCH_VERSION = '2026-09-7';
  
 const PATCH_NOTES = {
   date: 'Setembro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '👥', text: 'Nas tasks, quem criou a task (ou o admin) agora pode tirar qualquer responsável e escolher quem é o principal, tocando na estrela. Quem sai da task deixa de contar nas entregas e ajustes dela.' },
     { emoji: '🚀', text: 'Landing Page, E-commerce e ID Visual agora contam sozinhos em "Entregas do mês": o serviço aparece como 0 de 1 enquanto está em andamento e vira 1 de 1 no mês em que você finaliza o card no painel. Não precisa marcar nada.' },
     { emoji: '👤', text: 'Quando alguém sai da agência e é excluído do app, o nome sai também da carteira dos clientes. Se o cliente ficar sem ninguém no seu setor, ele aparece para o líder em "Clientes sem responsável", na aba de Onboarding, para indicar outra pessoa.' },
     { emoji: '📊', text: 'Entregas do mês sem "atrasado" ou "abaixo do ritmo": o acompanhamento agora é só o contador e a barra, respeitando o planejamento de cada cliente.' },
