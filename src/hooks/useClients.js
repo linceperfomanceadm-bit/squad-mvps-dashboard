@@ -3,7 +3,7 @@ import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimest
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
-import { versoesDoEscopo, inicioNovaVersao, novoIdItem } from '../lib/entregas';
+import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
 import { planoSemNomes } from '../lib/responsaveis';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
@@ -1076,15 +1076,20 @@ export function useClients() {
   // já; mudança num escopo existente vale no próximo dia 1 (regra da
   // agência) — o mês em andamento e o histórico ficam como estavam.
   // Salvar de novo antes do dia 1 substitui a versão agendada.
+  // Exceção: correção de setor, nome ou "entrega única" de um item que
+  // continua no escopo vale já (`aplicarCorrecoesNoMes`).
   const saveEscopo = async (clientId, { itens = [], semRecorrencia = false } = {}, byName) => {
     const client = clients.find(c => c.id === clientId);
     if (!client) return { success: false, error: 'Cliente não encontrado.' };
+    // Entrega única é sempre 1; o campo só é gravado quando true, para
+    // os itens mensais continuarem iguais aos dos docs antigos.
     const limpos = (Array.isArray(itens) ? itens : [])
       .map(it => ({
         id: it.id || novoIdItem(),
         sector: it.sector,
         label: String(it.label || '').trim(),
-        qtd: Math.max(0, Math.round(Number(it.qtd) || 0)),
+        qtd: it.unica ? 1 : Math.max(0, Math.round(Number(it.qtd) || 0)),
+        ...(it.unica ? { unica: true } : {}),
       }))
       .filter(it => it.sector && it.label && it.qtd > 0);
 
@@ -1093,17 +1098,33 @@ export function useClients() {
     }
 
     const desde = inicioNovaVersao(client);
-    const anteriores = versoesDoEscopo(client).filter(v => v.desde < desde);
+    const atual = mesChave();
+    let anteriores = versoesDoEscopo(client).filter(v => v.desde < desde);
+    let corrigiuAtual = false;
+    if (desde > atual) {
+      const r = aplicarCorrecoesNoMes(anteriores, limpos, atual, byName);
+      anteriores = r.versoes;
+      corrigiuAtual = r.corrigiu;
+    }
+    // Se só havia correção, a versão do mês já ficou igual ao que foi
+    // salvo: não agenda uma cópia para o próximo dia 1 (o card mostraria
+    // "novo escopo" sem nada novo).
+    const chave = (lista) => JSON.stringify((lista || []).map(({ id, sector, label, qtd, unica }) => [id, sector, label, Number(qtd), unica === true]));
+    const vigente = anteriores[anteriores.length - 1];
+    const soCorrecao = desde > atual && limpos.length > 0 && vigente && chave(vigente.itens) === chave(limpos);
+
     // Sem recorrência e sem histórico: basta a marcação, não há versão.
     const versoes = (!limpos.length && !anteriores.length)
       ? []
-      : [...anteriores, { desde, itens: limpos, por: byName || null, em: new Date().toISOString() }];
+      : soCorrecao
+        ? anteriores
+        : [...anteriores, { desde, itens: limpos, por: byName || null, em: new Date().toISOString() }];
 
     try {
       await updateDoc(doc(db, 'clients', clientId), {
         escopo: { versoes, semRecorrencia: limpos.length === 0 },
       });
-      return { success: true, desde };
+      return { success: true, desde: soCorrecao ? atual : desde, corrigiuAtual };
     } catch (err) { return { success: false, error: err.message }; }
   };
 

@@ -11,7 +11,7 @@ import { wdJobsOf, asArray, WD_ACTIVE_STATUSES } from './wdJobs';
  * Formato no documento do cliente:
  *
  *   escopo: {
- *     versoes: [{ desde: 'AAAA-MM', itens: [{ id, sector, label, qtd }], por, em }],
+ *     versoes: [{ desde: 'AAAA-MM', itens: [{ id, sector, label, qtd, unica? }], por, em }],
  *     semRecorrencia: bool,   // cliente sem entrega mensal (só site, p.ex.)
  *   }
  *   entregas: {
@@ -30,6 +30,13 @@ import { wdJobsOf, asArray, WD_ACTIVE_STATUSES } from './wdJobs';
  *
  * O id do item se mantém entre versões quando a CS só muda a
  * quantidade, então o que já foi marcado continua ligado a ele.
+ *
+ * ENTREGA ÚNICA MANUAL (`unica: true`, sempre qtd 1): coisa que se
+ * entrega uma vez só mas não tem card em painel nenhum (ex.: Google
+ * Meu Negócio). Fica pendente, 0 de 1, no mês corrente até alguém
+ * marcar; conta 1 de 1 no mês em que foi marcada e some dos meses
+ * seguintes. Não confundir com `ehEntregaUnica` — site e ID Visual,
+ * que o painel de Web/Design conclui sozinho e nem entram no escopo.
  */
 
 const pad2 = (n) => String(n).padStart(2, '0');
@@ -98,6 +105,50 @@ export const inicioNovaVersao = (c, agora = new Date()) => (
   versoesDoEscopo(c).length ? somaMeses(mesChave(agora), 1) : mesChave(agora)
 );
 
+// Correções que valem JÁ, mesmo com o escopo esperando o próximo dia 1.
+//
+// A regra do "próximo dia 1" protege o combinado do mês (quantidades,
+// entregas novas ou removidas). Trocar o setor de quem marca, corrigir
+// o nome ou dizer que um item de 1 por mês é entrega única não muda o
+// combinado — e esperar o mês virar deixava o item no setor errado,
+// sem ninguém conseguir marcar. Então, para os itens que continuam no
+// escopo (mesmo id), setor, nome e "única" (só se já era 1 por mês)
+// passam também para o mês em andamento.
+//
+// O histórico não muda: se a versão vigente começou num mês passado,
+// a correção entra como uma versão nova a partir do mês atual, com as
+// mesmas quantidades. Devolve { versoes, corrigiu }.
+const semUnica = ({ unica, ...resto }) => resto;
+const comUnica = (it, unica) => (unica ? { ...semUnica(it), unica: true } : semUnica(it));
+
+export function aplicarCorrecoesNoMes(versoes, itensNovos, mes = mesChave(), por = null) {
+  const ordenadas = [...(versoes || [])].filter(v => v && v.desde).sort((a, b) => a.desde.localeCompare(b.desde));
+  const vigentes = ordenadas.filter(v => v.desde <= mes);
+  const vig = vigentes[vigentes.length - 1];
+  if (!vig) return { versoes: ordenadas, corrigiu: false };
+
+  const novos = new Map((itensNovos || []).map(it => [it.id, it]));
+  let corrigiu = false;
+  const itens = (vig.itens || []).map(it => {
+    const n = novos.get(it.id);
+    if (!n) return it;
+    const unica = num(it.qtd) === 1 ? n.unica === true : it.unica === true;
+    if (n.sector === it.sector && n.label === it.label && unica === (it.unica === true)) return it;
+    corrigiu = true;
+    return comUnica({ ...it, sector: n.sector, label: n.label }, unica);
+  });
+  if (!corrigiu) return { versoes: ordenadas, corrigiu: false };
+
+  const corrigida = vig.desde === mes
+    ? { ...vig, itens }
+    : { desde: mes, itens, por: por || null, em: new Date().toISOString(), correcao: true };
+  const resto = ordenadas.filter(v => v !== vig || vig.desde !== mes);
+  return {
+    versoes: [...resto, corrigida].sort((a, b) => a.desde.localeCompare(b.desde)),
+    corrigiu: true,
+  };
+}
+
 // Item de escopo que na verdade é serviço único (site, ID Visual) —
 // regra em SETORES_ENTREGA_UNICA / TERMOS_ENTREGA_UNICA (firebase.js).
 // Nome comparado sem acento e sem caixa: o escopo é texto livre.
@@ -110,9 +161,19 @@ export function ehEntregaUnica(item) {
 }
 
 // ─── Entregas de um mês ───────────────────────────────────────
+// Mês em que a entrega única manual foi marcada (o primeiro com
+// marcação), ou null se ainda está pendente.
+export function mesDaEntregaUnica(c, itemId) {
+  const meses = Object.keys(c?.entregas || {}).sort();
+  return meses.find(m => num(c.entregas[m]?.feito?.[itemId]) > 0) || null;
+}
+
 // Lista de itens do mês com quantidade combinada e quantidade feita.
 // Serviço único cadastrado no escopo por engano (ou antes da regra)
 // fica de fora: a entrega dele vem do painel, em `entregasUnicasDoMes`.
+// Entrega única manual segue a regra do cabeçalho: pendente só no mês
+// corrente (meses passados não guardam que ela estava pendente) e
+// 1 de 1 no mês em que foi marcada. Ajuste do mês não se aplica a ela.
 export function entregasDoMes(c, mes = mesChave()) {
   const versao = escopoVigente(c, mes);
   if (!versao) return [];
@@ -120,6 +181,11 @@ export function entregasDoMes(c, mes = mesChave()) {
   return (versao.itens || [])
     .filter(it => !ehEntregaUnica(it))
     .map(it => {
+      if (it.unica === true) {
+        const feitaEm = mesDaEntregaUnica(c, it.id);
+        if (feitaEm ? feitaEm !== mes : mes !== mesChave()) return null;
+        return { ...it, qtd: 1, qtdContrato: 1, ajustado: false, feito: feitaEm ? 1 : 0 };
+      }
       const ajuste = reg.qtd?.[it.id];
       const qtd = ajuste != null ? num(ajuste) : num(it.qtd);
       return {
@@ -130,7 +196,7 @@ export function entregasDoMes(c, mes = mesChave()) {
         feito: num(reg.feito?.[it.id]),
       };
     })
-    .filter(it => it.qtd > 0 || it.feito > 0);
+    .filter(it => it && (it.qtd > 0 || it.feito > 0));
 }
 
 // Quanto do mês (em tempo ÚTIL) já passou: 0 a 1.

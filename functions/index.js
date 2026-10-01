@@ -272,6 +272,11 @@ const contratoDe = (c) => {
 
 // Mesma regra de escopoVigente() + entregasDoMes(): vale a versão mais
 // recente com desde <= mês; o ajuste do mês (qtd) sobrepõe o contrato.
+// Entrega única (`unica`) aparece pendente só no mês corrente e 1 de 1
+// no mês em que foi marcada; nos outros meses fica de fora.
+const mesDaEntregaUnica = (c, itemId) => Object.keys(c.entregas || {}).sort()
+  .find(m => num(c.entregas[m] && c.entregas[m].feito ? c.entregas[m].feito[itemId] : 0) > 0) || null;
+
 const escopoDoMes = (c, mes) => {
   const versoes = (Array.isArray(c.escopo && c.escopo.versoes) ? c.escopo.versoes : [])
     .filter(v => v && v.desde && v.desde <= mes)
@@ -281,6 +286,14 @@ const escopoDoMes = (c, mes) => {
 
   const itens = (versao && Array.isArray(versao.itens) ? versao.itens : [])
     .map(it => {
+      if (it.unica === true) {
+        const feitaEm = mesDaEntregaUnica(c, it.id);
+        if (feitaEm ? feitaEm !== mes : mes !== mesChaveSP()) return null;
+        return {
+          id: it.id, setor: it.sector || null, item: it.label || '', unica: true,
+          qtd: 1, qtdContrato: 1, ajustadoNoMes: false, feito: feitaEm ? 1 : 0,
+        };
+      }
       const ajuste = reg.qtd ? reg.qtd[it.id] : undefined;
       const qtd = ajuste != null ? num(ajuste) : num(it.qtd);
       return {
@@ -293,7 +306,7 @@ const escopoDoMes = (c, mes) => {
         feito: num(reg.feito ? reg.feito[it.id] : 0),
       };
     })
-    .filter(it => it.qtd > 0 || it.feito > 0);
+    .filter(it => it && (it.qtd > 0 || it.feito > 0));
 
   const totaisPorSetor = {};
   itens.forEach(it => {

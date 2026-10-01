@@ -1,12 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Paperclip, Trash2, Plus, FileCheck2, X, FolderOpen, ExternalLink } from 'lucide-react';
+import { Paperclip, Trash2, Plus, FileCheck2, X, FolderOpen, ExternalLink, Repeat, CircleDot } from 'lucide-react';
 import {
   SECTORS, SALE_SERVICES, ENTREGAVEIS, ENTREGA_SECTORS, CADASTRO_PENDENCIAS, contractState,
   normalizaLink, linkValido,
 } from '../../lib/firebase';
 import {
   cadastroPendencias, escopoParaEditar, inicioNovaVersao, mesChave, rotuloMes, novoIdItem, versoesDoEscopo,
-  ehEntregaUnica,
+  ehEntregaUnica, aplicarCorrecoesNoMes,
 } from '../../lib/entregas';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate } from '../commercial/ui';
 import { Tag } from '../shared/ui';
@@ -23,7 +23,13 @@ import { Tag } from '../shared/ui';
  * aqui só aparece que ele foi anexado, quando e por quem.
  *
  * O escopo mensal segue a regra da agência: o primeiro escopo vale já;
- * mudança num escopo existente vale a partir do próximo dia 1.
+ * mudança num escopo existente vale a partir do próximo dia 1. Correção
+ * de setor, nome ou "única" num item que já existe vale também para o
+ * mês em andamento (ver `aplicarCorrecoesNoMes`).
+ *
+ * Cada item é MENSAL (N por mês) ou ÚNICO (entrega uma vez só, sem
+ * card em painel — ex.: Google Meu Negócio). O único tem quantidade 1
+ * fixa; site e ID Visual continuam fora, porque o painel conclui.
  *
  * BRIEFING: um campo só, o texto. O anexo de briefing saiu (era um
  * segundo "briefing" no formulário) — arquivo do cliente agora vai na
@@ -59,7 +65,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       // Site e ID Visual cadastrados como mensais (antes da regra de
       // serviço único) não abrem no formulário: ao salvar, a nova versão
       // do escopo já nasce sem eles.
-      itens: (versao?.itens || []).filter(it => !ehEntregaUnica(it)).map(it => ({ ...it, qtd: String(it.qtd) })),
+      itens: (versao?.itens || []).filter(it => !ehEntregaUnica(it)).map(it => ({ ...it, qtd: String(it.qtd), unica: it.unica === true })),
       semRecorrencia: client.escopo?.semRecorrencia === true,
     };
   }, [client]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -88,9 +94,13 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
   const addItem = () => setF(x => ({
     ...x,
     semRecorrencia: false,
-    itens: [...x.itens, { id: novoIdItem(), sector: ENTREGA_SECTORS[0], label: '', qtd: '' }],
+    itens: [...x.itens, { id: novoIdItem(), sector: ENTREGA_SECTORS[0], label: '', qtd: '', unica: false }],
   }));
   const setItem = (id, k, v) => setF(x => ({ ...x, itens: x.itens.map(it => (it.id === id ? { ...it, [k]: v } : it)) }));
+  const toggleUnica = (id) => setF(x => ({
+    ...x,
+    itens: x.itens.map(it => (it.id === id ? { ...it, unica: !it.unica, qtd: !it.unica ? '1' : it.qtd } : it)),
+  }));
   const delItem = (id) => setF(x => ({ ...x, itens: x.itens.filter(it => it.id !== id) }));
 
   const toggleServico = (id) => setF(x => {
@@ -117,7 +127,7 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
     if (anexoContrato) dados.anexoContrato = anexoContrato;
 
     const itensLimpos = f.itens
-      .map(it => ({ ...it, label: it.label.trim(), qtd: Math.round(Number(it.qtd) || 0) }))
+      .map(it => ({ ...it, label: it.label.trim(), qtd: it.unica ? 1 : Math.round(Number(it.qtd) || 0) }))
       .filter(it => it.label || it.qtd);
     if (itensLimpos.some(it => !it.label || it.qtd <= 0)) {
       setErro('Cada entrega precisa de nome e quantidade maior que zero.');
@@ -128,9 +138,15 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       setErro(`"${unica.label}" é serviço único: a entrega conta quando o serviço é finalizado no painel, não entra nas entregas mensais.`);
       return;
     }
+    // Também conta como mudança quando o formulário já está certo mas o
+    // mês em andamento ainda tem o setor/nome antigo (escopo salvo antes
+    // de a correção valer já) — salvar leva a correção para o mês atual.
+    const chave = (lista) => JSON.stringify(lista.map(({ id, sector, label, qtd, unica }) => ({ id, sector, label, qtd: Number(qtd), unica: unica === true })));
+    const corrigeMesAtual = temVersoes && desdeNovo > mesChave()
+      && aplicarCorrecoesNoMes(versoesDoEscopo(client).filter(v => v.desde < desdeNovo), itensLimpos, mesChave()).corrigiu;
     const escopoMudou = f.semRecorrencia !== inicial.semRecorrencia
-      || JSON.stringify(itensLimpos.map(({ id, sector, label, qtd }) => ({ id, sector, label, qtd })))
-        !== JSON.stringify(inicial.itens.map(({ id, sector, label, qtd }) => ({ id, sector, label, qtd: Number(qtd) })));
+      || chave(itensLimpos) !== chave(inicial.itens)
+      || corrigeMesAtual;
 
     if (!Object.keys(dados).length && !escopoMudou) { onClose(); return; }
 
@@ -140,16 +156,21 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
       if (!r?.success) { setSalvando(false); setErro(r?.error || 'Não foi possível salvar.'); return; }
     }
     let desde = null;
+    let corrigiuAtual = false;
     if (escopoMudou) {
       const r = await onSaveEscopo({ itens: itensLimpos, semRecorrencia: f.semRecorrencia && !itensLimpos.length });
       if (!r?.success) { setSalvando(false); setErro(r?.error || 'Não foi possível salvar o escopo.'); return; }
       desde = r.desde;
+      corrigiuAtual = !!r.corrigiuAtual;
     }
     setSalvando(false);
     if (toast) {
-      toast(desde && desde > mesChave()
-        ? `Cadastro salvo. O novo escopo vale a partir de ${rotuloMes(desde, true).toLowerCase()}.`
-        : 'Cadastro salvo.');
+      const futuro = desde && desde > mesChave();
+      toast(futuro && corrigiuAtual
+        ? `Cadastro salvo. Setor e nome já valem neste mês; o resto do novo escopo vale a partir de ${rotuloMes(desde, true).toLowerCase()}.`
+        : futuro
+          ? `Cadastro salvo. O novo escopo vale a partir de ${rotuloMes(desde, true).toLowerCase()}.`
+          : 'Cadastro salvo.');
     }
     onClose();
   };
@@ -284,12 +305,15 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
         )}
 
         {/* ── Escopo mensal ────────────────────────── */}
-        <h4 style={S.sec}>Entregas mensais do contrato</h4>
-        <p style={{ ...S.hint, marginBottom: 10 }}>
+        <h4 style={S.sec}>Entregas do contrato</h4>
+        <p style={{ ...S.hint, marginBottom: 6 }}>
           {temVersoes
-            ? `Mudanças aqui valem a partir de ${rotuloMes(desdeNovo, true).toLowerCase()}. O mês em andamento e o histórico não mudam.`
+            ? `Quantidades e entregas novas ou removidas valem a partir de ${rotuloMes(desdeNovo, true).toLowerCase()}. Correção de setor ou de nome vale já, inclusive neste mês. O histórico não muda.`
             : 'Este é o primeiro escopo do cliente: vale já para este mês.'}
-          {' '}Landing Page, E-commerce e ID Visual são serviço único e não entram aqui: a entrega conta sozinha quando o serviço é finalizado no painel de Web ou de Design.
+        </p>
+        <p style={{ ...S.hint, marginBottom: 10 }}>
+          Use <b style={{ color: 'var(--text)', fontWeight: 500 }}>Única</b> para o que se entrega uma vez só (ex.: Google Meu Negócio): fica pendente até alguém marcar e conta no mês em que foi feita.
+          {' '}Landing Page, E-commerce e ID Visual não entram aqui: contam sozinhos quando o serviço é finalizado no painel de Web ou de Design.
         </p>
 
         {f.itens.map(it => (
@@ -308,12 +332,25 @@ export default function ClienteCadastroModal({ client, onClose, onSaveCadastro, 
             <input
               type="number"
               min={1}
-              value={it.qtd}
+              value={it.unica ? '1' : it.qtd}
+              disabled={it.unica}
               onChange={e => setItem(it.id, 'qtd', e.target.value)}
               placeholder="Qtd"
-              style={{ ...INP, width: 76, flexShrink: 0, fontFamily: 'var(--fm)' }}
+              style={{ ...INP, width: 64, flexShrink: 0, fontFamily: 'var(--fm)', opacity: it.unica ? 0.5 : 1 }}
               aria-label="Quantidade por mês"
+              title={it.unica ? 'Entrega única: sempre 1' : 'Quantidade por mês'}
             />
+            <button
+              type="button"
+              onClick={() => toggleUnica(it.id)}
+              className={`ui-btn small ${it.unica ? 'on' : ''}`}
+              style={{ ...S.tipo, ...(it.unica ? { borderColor: 'var(--c-border)', color: 'var(--c)' } : null) }}
+              aria-pressed={it.unica}
+              title={it.unica ? 'Entrega única — clique para voltar a mensal' : 'Mensal — clique para marcar como entrega única'}
+            >
+              {it.unica ? <CircleDot size={13} /> : <Repeat size={13} />}
+              {it.unica ? 'Única' : 'Mensal'}
+            </button>
             <button type="button" onClick={() => delItem(it.id)} style={S.iconBtn} title="Remover entrega" aria-label="Remover entrega">
               <Trash2 size={14} />
             </button>
@@ -371,5 +408,6 @@ const S = {
   grid3: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12 },
   arquivo: { display: 'flex', alignItems: 'center', gap: 10, background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 8px 8px 12px', marginTop: 6 },
   itemLinha: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 },
+  tipo: { width: 86, flexShrink: 0, justifyContent: 'center', height: 'auto', alignSelf: 'stretch' },
   iconBtn: { width: 34, height: 34, flexShrink: 0, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
 };

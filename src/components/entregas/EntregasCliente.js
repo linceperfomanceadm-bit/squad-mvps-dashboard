@@ -65,7 +65,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
         </Empty>
       ) : ajustando ? (
         <AjusteMes
-          itens={itens}
+          itens={itens.filter(it => !it.unica)}
           mes={mes}
           onCancel={() => setAjustando(false)}
           onSave={async (qtds) => {
@@ -88,7 +88,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
             <span style={S.nota}>{resumo.entregue} de {resumo.combinado} entregas combinadas</span>
             <div style={{ flex: 1 }} />
-            {onAjustar && (
+            {onAjustar && itens.some(it => !it.unica) && (
               <button type="button" className="ui-btn small" onClick={() => setAjustando(true)}>
                 <SlidersHorizontal size={13} /> Ajustar este mês
               </button>
@@ -160,7 +160,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
                       <div key={it.id} style={S.histLinha}>
                         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--text)' }}>
                           {it.label}
-                          <span style={{ color: 'var(--muted)' }}> · {SECTORS[it.sector]?.label || it.sector}</span>
+                          <span style={{ color: 'var(--muted)' }}> · {SECTORS[it.sector]?.label || it.sector}{it.unica ? ' · entrega única' : ''}</span>
                         </span>
                         <span style={{ fontFamily: 'var(--fm)', fontSize: 12, color: itemConcluido(it) ? 'var(--green)' : 'var(--muted)' }}>
                           {it.feito} de {it.qtd}{it.ajustado ? '*' : ''}
@@ -182,7 +182,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
 }
 
 // Ajuste de quantidades só do mês em tela. Deixar igual ao contrato
-// remove o ajuste.
+// remove o ajuste. Entrega única fica de fora: é sempre 1.
 function AjusteMes({ itens, mes, onCancel, onSave }) {
   const [valores, setValores] = useState(() => Object.fromEntries(itens.map(it => [it.id, String(it.qtd)])));
   const [salvando, setSalvando] = useState(false);

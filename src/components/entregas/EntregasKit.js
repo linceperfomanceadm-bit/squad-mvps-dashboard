@@ -18,6 +18,9 @@ import { Tag } from '../shared/ui';
  * Serviço único (site, ID Visual) usa `LinhaEntregaUnica`: mesmo
  * "0 de 1" e mesma barra, sem − / +, porque quem conclui é o card do
  * serviço no painel de Web ou de Design.
+ *
+ * Entrega única do escopo (`item.unica`, ex.: Google Meu Negócio) usa
+ * `LinhaEntrega` normal — alguém marca — mas trava em 1 de 1.
  */
 
 export function BarraEntrega({ feito, qtd }) {
@@ -46,6 +49,8 @@ export function Aderencia({ pct, mes, style }) {
 export function LinhaEntrega({ item, onMarcar, mostrarSetor = false, compacta = false }) {
   const [busy, setBusy] = useState(false);
   const setor = SECTORS[item.sector];
+  const unica = item.unica === true;
+  const podeMais = !busy && !(unica && item.feito >= 1);
 
   const clicar = async (delta) => {
     if (busy || !onMarcar) return;
@@ -61,7 +66,7 @@ export function LinhaEntrega({ item, onMarcar, mostrarSetor = false, compacta = 
           <p style={S.nome}>{item.label}</p>
           <p style={S.meta}>
             {mostrarSetor && setor ? `${setor.label} · ` : ''}
-            {item.ajustado ? `ajustado neste mês (contrato: ${item.qtdContrato})` : `${item.qtd} por mês`}
+            {unica ? 'Entrega única' : item.ajustado ? `ajustado neste mês (contrato: ${item.qtdContrato})` : `${item.qtd} por mês`}
           </p>
         </div>
         <span style={S.qtd}>
@@ -82,8 +87,8 @@ export function LinhaEntrega({ item, onMarcar, mostrarSetor = false, compacta = 
             </button>
             <button
               type="button"
-              style={{ ...S.btn, ...S.btnMais, opacity: busy ? 0.5 : 1 }}
-              disabled={busy}
+              style={{ ...S.btn, ...S.btnMais, opacity: podeMais ? 1 : 0.4 }}
+              disabled={!podeMais}
               onClick={() => clicar(1)}
               title="Marcar uma entrega"
               aria-label={`Marcar uma entrega de ${item.label}`}
