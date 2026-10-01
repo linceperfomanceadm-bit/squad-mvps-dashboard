@@ -4,6 +4,8 @@
  * com o que a pessoa pode fazer:
  *
  *   acoesDeEntregas(useClientsResult, me, toast)            → tudo (CS, líder, admin)
+ *     (renomear e salvarEquipe só existem se a tela passar renameClient
+ *     e updateClient — hoje só o admin passa)
  *   acoesDeEntregas(useClientsResult, me, toast, { soMarcar: true }) → quem produz
  *
  * Ação que não vem no objeto some da tela (sem botão).
@@ -36,5 +38,18 @@ export function acoesDeEntregas(fns, me, toast, { soMarcar = false } = {}) {
       ? async (clientId, escopo) => fns.saveEscopo(clientId, escopo, me)
       : undefined,
     upload: fns.uploadClientFile,
+    // Só o admin recebe estas duas (formulário único: nome e equipe).
+    // O nome vai pelo renameClient porque está copiado em tasks,
+    // requests e documents, e só ele propaga.
+    renomear: fns.renameClient
+      ? async (clientId, nome) => {
+        const r = await fns.renameClient(clientId, nome, me);
+        if (r?.success && r.warning && toast) toast(r.warning, 'e');
+        return r;
+      }
+      : undefined,
+    salvarEquipe: fns.updateClient
+      ? async (clientId, responsibles) => fns.updateClient(clientId, { responsibles })
+      : undefined,
   };
 }

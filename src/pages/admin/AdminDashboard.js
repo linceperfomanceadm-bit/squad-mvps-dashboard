@@ -103,9 +103,10 @@ export default function AdminDashboard() {
   // Aba Painel de TV: qual das duas TVs o admin está controlando.
   const [tvAlvo, setTvAlvo] = useState('operacional');
 
-  // Admin completa cadastro, define escopo, ajusta mês e corrige marcação.
+  // Admin completa cadastro, define escopo, ajusta mês e corrige
+  // marcação. Só ele recebe renomear e equipe no formulário único.
   const acoesEntregas = acoesDeEntregas(
-    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas },
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, renameClient, updateClient },
     user?.name, toast
   );
 
@@ -307,14 +308,8 @@ export default function AdminDashboard() {
           <AdminClients
             clients={clients}
             collaborators={collaborators}
+            me={user?.name}
             onAdd={handleAddClient}
-            onUpdate={updateClient}
-            onRename={async (id, nome) => {
-              const r = await renameClient(id, nome, user?.name);
-              if (r.success) toast(r.warning || `Cliente renomeado para ${nome}.`, r.warning ? 'e' : undefined);
-              else toast(r.error, 'e');
-              return r;
-            }}
             onDelete={deleteClient}
             onLimparExColaboradores={async (nomes) => {
               const r = await removerResponsaveis(nomes, user?.name);

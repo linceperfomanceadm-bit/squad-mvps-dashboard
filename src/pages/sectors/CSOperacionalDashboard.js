@@ -18,7 +18,7 @@ import TaskKanban from '../../components/kanban/TaskKanban';
 import TaskModal from '../../components/kanban/TaskModal';
 import CSCarteira from '../../components/commercial/CSCarteira';
 import CSRequests from '../../components/commercial/CSRequests';
-import ClientRegisterForm from '../../components/commercial/ClientRegisterForm';
+import ClienteForm from '../../components/cadastro/ClienteForm';
 import ClientOnboardingModal from '../../components/commercial/ClientOnboardingModal';
 import StaffingModal from '../../components/commercial/StaffingModal';
 import ContractBlock from '../../components/commercial/ContractBlock';
@@ -530,19 +530,19 @@ export default function CSOperacionalDashboard() {
           </>
         )}
 
-      {/* Cadastro de cliente */}
-      {showForm && ReactDOM.createPortal(
-        <Overlay onClose={() => setShowForm(false)}>
-          <div style={{ ...MODAL, maxWidth: 660 }}>
-            <ModalHeader title="Cadastrar Cliente" onClose={() => setShowForm(false)} />
-            <ClientRegisterForm
-              onSubmit={handleAdd}
-              onUpload={uploadClientFile}
-              onCancel={() => setShowForm(false)}
-              collaborators={collaborators}
-            />
-          </div>
-        </Overlay>, document.body)}
+      {/* Cadastro de cliente — formulário único (o mesmo da edição e do
+          admin). Pela CS o cliente nasce no Kick Off. */}
+      {showForm && (
+        <ClienteForm
+          modo="novo"
+          collaborators={collaborators}
+          me={me}
+          toast={toast}
+          onClose={() => setShowForm(false)}
+          onUpload={uploadClientFile}
+          onCriar={handleAdd}
+        />
+      )}
 
       {openClient && ReactDOM.createPortal(
         <ClientDrawer

@@ -4,6 +4,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage
 import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
+import { linhaEndereco } from '../lib/cadastro';
 import { planoSemNomes } from '../lib/responsaveis';
 
 // Responsável pode estar salvo como string (docs antigos) ou array.
@@ -1039,6 +1040,40 @@ export function useClients() {
         patch[k] = v;
       }
     });
+    // Qualificação do contratante (formulário único de cadastro). CPF,
+    // CNPJ, valor e pagamento chegam só quando alguém digitou um valor
+    // novo — a tela nunca recebe o que está gravado.
+    if ('personType' in dados) patch['contrato.personType'] = dados.personType === 'pf' ? 'pf' : 'pj';
+    if ('razaoSocial' in dados) patch['contrato.razaoSocial'] = String(dados.razaoSocial || '').trim();
+    if ('tradeName' in dados) {
+      const v = String(dados.tradeName || '').trim();
+      patch['contrato.tradeName'] = v;
+      patch['contrato.companyName'] = v;
+    }
+    if ('cnpj' in dados) {
+      const v = String(dados.cnpj || '').trim();
+      patch['contrato.cnpj'] = v;
+      patch.cnpj = v;
+    }
+    if ('contactCpf' in dados) patch['contrato.contactCpf'] = String(dados.contactCpf || '').trim();
+    if ('endereco' in dados) {
+      const e = Object.fromEntries(Object.entries(dados.endereco || {}).map(([k, v]) => [k, String(v || '').trim()]));
+      const linha = linhaEndereco(e);
+      patch['contrato.endereco'] = e;
+      patch['contrato.address'] = linha;
+      patch.address = linha;
+    }
+    if ('saleTotal' in dados) {
+      const v = Number(dados.saleTotal) || 0;
+      patch['contrato.saleTotal'] = v;
+      patch.saleTotal = v;
+    }
+    if ('pagamento' in dados) patch['contrato.pagamento'] = dados.pagamento || null;
+    if ('observations' in dados) {
+      const v = String(dados.observations || '').trim();
+      patch['contrato.observations'] = v;
+      patch.observations = v;
+    }
     if ('briefing' in dados) {
       const v = String(dados.briefing || '').trim();
       patch['contrato.briefing'] = v;

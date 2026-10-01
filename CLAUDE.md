@@ -184,13 +184,24 @@ Persistência em `useDocuments.js`: o documento inteiro (dados, slides extras, s
 
 `src/lib/entregas.js` (funções puras) + `src/components/entregas/` (telas). Responde "o cliente está recebendo o que contratou?".
 
-- **Escopo mensal** no cliente: `escopo.versoes[{ desde: 'AAAA-MM', itens: [{ id, sector, label, qtd }] }]` e `escopo.semRecorrencia`. Versões, e não um escopo só, para reconstruir qualquer mês passado — inclusive os meses em que ninguém marcou nada. O primeiro escopo vale no mês atual; mudança vale no próximo dia 1 (`inicioNovaVersao`). O id do item se mantém entre versões.
+- **Escopo** no cliente: `escopo.versoes[{ desde: 'AAAA-MM', itens: [{ id, sector, label, qtd, unica? }] }]` e `escopo.semRecorrencia`. Versões, e não um escopo só, para reconstruir qualquer mês passado — inclusive os meses em que ninguém marcou nada. O primeiro escopo vale no mês atual; mudança de quantidade ou de itens vale no próximo dia 1 (`inicioNovaVersao`), mas correção de setor, nome ou "única" de um item existente vale já (`aplicarCorrecoesNoMes`). O id do item se mantém entre versões.
+- **Entrega única manual** (`unica: true`, qtd 1): algo entregue uma vez só sem card em painel (ex.: Google Meu Negócio). Pendente só no mês corrente, 1 de 1 no mês em que foi marcada, some depois (`mesDaEntregaUnica`). Não confundir com `ehEntregaUnica` (site e ID Visual, que nem entram no escopo).
 - **Marcações** em `entregas['AAAA-MM'] = { feito: {itemId: n}, qtd: {itemId: n}, log: [...] }`. `qtd` é ajuste só daquele mês (cliente que entrou no meio do mês). O que falta não acumula para o mês seguinte.
 - Regras da agência: o mês vira no dia 1 para todos; o mês anterior aceita marcação até o dia 5 (`mesesEditaveis`); o ritmo esperado usa tempo útil (`fracaoDoMes` → `businessMsBetween`).
 - Entregas únicas (site, ID Visual) **não** têm checklist novo: `entregasUnicas` lê `wdJobsOf` e o bloco `idv`.
-- `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Contam só prazo, serviços e escopo; arquivo do contrato e briefing são opcionais. Completar é o `ClienteCadastroModal` (CS, líder e admin).
+- `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Contam só prazo, serviços e escopo; arquivo do contrato e briefing são opcionais. Completar é o formulário único de cadastro (ver abaixo).
 - Escrita no `useClients`: `saveCadastro`, `saveEscopo`, `ajustarMesEntregas`, `marcarEntrega` (transação), `transferirCS`. As telas recebem essas funções já embrulhadas por `acoesDeEntregas` (`components/entregas/acoes.js`); ação ausente esconde o botão.
 - Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin; na CS o acompanhamento fica no card da Carteira de Clientes, por decisão de produto), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
+
+### Cadastro do cliente — formulário único
+
+`src/components/cadastro/ClienteForm.js` (+ peças em `cadastro/kit.js`, regras puras em `src/lib/cadastro.js`). Um formulário em abas — Cliente · Serviços · Contrato · Entregas · Equipe — para as três portas:
+
+- `modo="novo"` pela CS → nasce em `kickoff` e segue o fluxo.
+- `modo="novo"` + `admin` → mesmos dados obrigatórios, mas nasce `live` com a equipe definida (pula só Kick Off e onboarding).
+- `modo="editar"` (via `ClienteFicha`) → CS, líder e admin completam ou corrigem; só formato é validado. Aba Equipe e troca de nome só para o admin (`acoes.salvarEquipe` / `acoes.renomear`, que só o `AdminDashboard` passa para `acoesDeEntregas`).
+
+CPF, CNPJ, valor e pagamento são só escrita na edição: a tela diz "já cadastrado" e aceita valor novo, nunca mostra o gravado. A gravação da edição é o `saveCadastro` (bloco `contrato` + espelhos do topo do doc).
 
 ### Comercial (Hunters)
 

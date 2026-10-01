@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import ReactDOM from 'react-dom';
 import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX } from 'lucide-react';
 import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
 import { exColaboradores } from '../../lib/responsaveis';
 import ClienteFicha from '../entregas/ClienteFicha';
+import ClienteForm from '../cadastro/ClienteForm';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, BTN_PRIMARY, BTN_CANCEL } from '../commercial/ui';
 
 // Normaliza responsáveis de um setor para SEMPRE um array.
@@ -12,220 +12,6 @@ import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, BTN_PRIMARY, BTN_CANCEL
 export function asArray(val) {
   if (!val) return [];
   return Array.isArray(val) ? val : [val];
-}
-
-// Por que um nome gravado no cliente não aparece entre as opções do
-// setor: a pessoa foi excluída, está inativa ou mudou de setor.
-function motivoFora(nome, collaborators) {
-  const c = collaborators.find(x => x.name === nome);
-  if (!c) return 'saiu do app';
-  if (c.active === false) return 'inativo';
-  return 'outro setor';
-}
-
-// Seletor de múltiplos responsáveis (chips clicáveis) de um setor.
-//
-// Nomes gravados no cliente que não estão entre as opções (ex-
-// colaborador, inativo) aparecem à parte, riscados, com X para tirar.
-// Antes eles ficavam invisíveis aqui e eram regravados a cada salvar,
-// sem jeito de remover.
-function MultiResponsibleSelect({ sector, collaborators, selected, onChange }) {
-  const sectorCollabs = collaborators.filter(c => c.sector === sector.id && c.active !== false);
-  const sel = asArray(selected);
-  const fora = sel.filter(n => !sectorCollabs.some(c => c.name === n));
-  const toggle = (name) => {
-    if (sel.includes(name)) onChange(sel.filter(n => n !== name));
-    else onChange([...sel, name]);
-  };
-  return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10 }}>
-      <span style={{ fontSize: 13, color: sector.color, minWidth: 110, display: 'flex', alignItems: 'center', gap: 5, paddingTop: 4 }}>{sector.emoji} {sector.label}</span>
-      <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-        {fora.map(nome => (
-          <button key={`fora-${nome}`} type="button" onClick={() => toggle(nome)} title="Clique para tirar deste cliente" style={{
-            fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 16, cursor: 'pointer',
-            background: 'var(--red-dim)', color: 'var(--red)',
-            border: '1px solid color-mix(in srgb, var(--red) 35%, transparent)',
-            display: 'flex', alignItems: 'center', gap: 5,
-          }}>
-            <span style={{ textDecoration: 'line-through' }}>{nome}</span>
-            <span style={{ fontWeight: 400, fontSize: 11 }}>· {motivoFora(nome, collaborators)}</span>
-            <X size={11} />
-          </button>
-        ))}
-        {sectorCollabs.length === 0
-          ? (fora.length === 0 && <span style={{ fontSize: 12, color: 'var(--muted)', paddingTop: 4 }}>Sem colaboradores</span>)
-          : sectorCollabs.map(c => {
-              const active = sel.includes(c.name);
-              return (
-                <button key={c.id} type="button" onClick={() => toggle(c.name)} style={{
-                  fontSize: 12, fontWeight: 600, padding: '5px 11px', borderRadius: 16, cursor: 'pointer',
-                  background: active ? `color-mix(in srgb, ${sector.color} 13%, transparent)` : 'var(--surface)',
-                  color: active ? sector.color : 'var(--muted)',
-                  border: `1px solid ${active ? `color-mix(in srgb, ${sector.color} 40%, transparent)` : 'var(--border)'}`,
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}>
-                  {active && <Check size={11} />} {c.name}
-                </button>
-              );
-            })}
-      </div>
-    </div>
-  );
-}
-
-function AddClientModal({ collaborators, onClose, onAdd }) {
-  const [form, setForm] = useState({ name: '', wdService: '', responsibles: {} });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim()) { setError('Preencha o nome do cliente.'); return; }
-    setLoading(true);
-    const res = await onAdd(form);
-    setLoading(false);
-    if (res.success) onClose();
-    else setError(res.error);
-  };
-
-  return (
-    <div style={MS.overlay} onClick={onClose}>
-      <div style={MS.modal} onClick={e => e.stopPropagation()} className="fade-up">
-        <div style={MS.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={MS.icon}><Plus size={18} color="var(--neon)" /></div>
-            <h2 style={MS.title}>Novo Cliente</h2>
-          </div>
-          <button style={MS.closeBtn} onClick={onClose}><X size={16} color="var(--muted)" /></button>
-        </div>
-        <form onSubmit={handleSubmit} style={MS.body}>
-          <div style={MS.field}>
-            <label style={MS.label}>NOME DO CLIENTE *</label>
-            <input style={MS.input} value={form.name} onChange={e => set('name', e.target.value)} placeholder="Ex: Empresa XYZ" autoFocus />
-          </div>
-          <div style={MS.field}>
-            <label style={MS.label}>SERVIÇO WEBDESIGN</label>
-            <select style={MS.select} value={form.wdService} onChange={e => set('wdService', e.target.value)}>
-              <option value="">Nenhum (sem WebDesign)</option>
-              {Object.entries(WD_SERVICE_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </div>
-          <div style={MS.field}>
-            <label style={MS.label}>RESPONSÁVEIS POR SETOR</label>
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Clique para adicionar/remover. Pode escolher mais de um por setor.</p>
-            {Object.values(SECTORS).map(s => (
-              <MultiResponsibleSelect
-                key={s.id}
-                sector={s}
-                collaborators={collaborators}
-                selected={form.responsibles[s.id]}
-                onChange={(arr) => set('responsibles', { ...form.responsibles, [s.id]: arr })}
-              />
-            ))}
-          </div>
-          {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button type="button" style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button type="submit" style={MS.submitBtn} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Cadastrar Cliente'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-function EditResponsibleModal({ client, collaborators, onClose, onSave, onRename }) {
-  const [responsibles, setResponsibles] = useState({ ...(client.responsibles || {}) });
-  const [name, setName] = useState(client.name || '');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  // O nome vai por `onRename` e não por `onSave`: ele está copiado em
-  // tasks, requests e documents, e só o renameClient propaga isso.
-  //
-  // O `if (onRename && ...)` que existia aqui engolia o problema: sem
-  // o handler, a troca de nome era pulada, o modal fechava limpo e o
-  // nome continuava o mesmo, sem nenhum aviso. Agora a ausência do
-  // handler é erro na cara, não silêncio.
-  const handleSave = async () => {
-    setError('');
-    const novoNome = name.trim();
-    if (!novoNome) { setError('O nome não pode ficar vazio.'); return; }
-
-    const mudouNome = novoNome !== (client.name || '');
-    if (mudouNome && !onRename) {
-      setError('A renomeação não está ligada nesta tela — o AdminDashboard.js atualizado não subiu junto.');
-      return;
-    }
-
-    setLoading(true);
-    if (mudouNome) {
-      const r = await onRename(client.id, novoNome);
-      if (!r || r.success === false) {
-        setLoading(false);
-        setError(r?.error || 'Não foi possível renomear.');
-        return;
-      }
-    }
-    const salvo = await onSave(client.id, { responsibles });
-    setLoading(false);
-    if (salvo && salvo.success === false) {
-      setError(salvo.error || 'O nome foi salvo, mas os responsáveis não.');
-      return;
-    }
-    onClose();
-  };
-
-  return (
-    <div style={MS.overlay} onClick={onClose}>
-      <div style={MS.modal} onClick={e => e.stopPropagation()} className="fade-up">
-        <div style={MS.header}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ ...MS.icon, background: 'rgba(56,189,248,.12)', border: '1px solid rgba(56,189,248,.3)' }}>
-              <Edit2 size={16} color="var(--blue)" />
-            </div>
-            <div>
-              <h2 style={MS.title}>Editar Cliente</h2>
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{client.name}</p>
-            </div>
-          </div>
-          <button style={MS.closeBtn} onClick={onClose}><X size={16} color="var(--muted)" /></button>
-        </div>
-        <div style={MS.body}>
-          <div style={MS.field}>
-            <label style={MS.label}>NOME DO CLIENTE *</label>
-            <input style={MS.input} value={name} onChange={e => setName(e.target.value)} placeholder="Ex: Empresa XYZ" />
-            <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
-              Renomear também atualiza o nome nos cards, solicitações e documentos já criados para este cliente.
-            </p>
-          </div>
-          <div style={MS.field}>
-            <label style={MS.label}>RESPONSÁVEIS POR SETOR</label>
-            {Object.values(SECTORS).map(s => (
-              <MultiResponsibleSelect
-                key={s.id}
-                sector={s}
-                collaborators={collaborators}
-                selected={responsibles[s.id]}
-                onChange={(arr) => setResponsibles(r => ({ ...r, [s.id]: arr }))}
-              />
-            ))}
-          </div>
-          {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button style={MS.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button style={{ ...MS.submitBtn, background: 'linear-gradient(135deg,var(--blue),#0284c7)', boxShadow: '0 4px 14px rgba(56,189,248,.3)' }} onClick={handleSave} disabled={loading}>
-              {loading ? <span className="spinner" style={{ width: 16, height: 16, borderTopColor: '#fff', borderColor: 'var(--dim)' }} /> : 'Salvar Alterações'}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /*
@@ -339,12 +125,15 @@ function ReativarModal({ client, onClose, onConfirm }) {
   );
 }
 
-export default function AdminClients({ clients, collaborators, tasks = [], onAdd, onUpdate, onDelete, onRename, onInativar, onReativar, onLimparExColaboradores, acoesEntregas, toast }) {
+export default function AdminClients({ clients, collaborators, tasks = [], me, onAdd, onDelete, onInativar, onReativar, onLimparExColaboradores, acoesEntregas, toast }) {
   const [showAdd, setShowAdd] = useState(false);
   // Ficha de contrato e entregas — guarda só o id para ler o cliente vivo.
   const [fichaId, setFichaId] = useState(null);
   const ficha = fichaId ? clients.find(c => c.id === fichaId) : null;
-  const [editClient, setEditClient] = useState(null);
+  // "Editar" abre o formulário único direto (aba Equipe), sem passar
+  // pelo card de contrato.
+  const [editarId, setEditarId] = useState(null);
+  const editar = editarId ? clients.find(c => c.id === editarId) : null;
   const [search, setSearch] = useState('');
   const [delConfirm, setDelConfirm] = useState(null);
   // Aba da lista: a base (ativos e em fluxo) ou os inativos.
@@ -475,7 +264,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
                   })}
                   <td style={{ padding: '12px 14px' }}>
                     <div style={{ display: 'flex', gap: 6 }}>
-                      <button style={S.iconBtnBlue} onClick={() => setEditClient(c)} title="Editar responsáveis">
+                      <button style={S.iconBtnBlue} onClick={() => setEditarId(c.id)} title="Editar cadastro e equipe">
                         <Edit2 size={13} />
                       </button>
                       {acoesEntregas && (
@@ -512,19 +301,38 @@ export default function AdminClients({ clients, collaborators, tasks = [], onAdd
         </div>
       </div>
 
-      {/* Os dois modais vão para o body via portal. Sem isso eles ficam
-          presos dentro do `.fade-up` da tela: o `animation-fill-mode`
-          cria um containing block e o `position: fixed` do overlay passa
-          a se ancorar nele, não na viewport — o modal aparece no meio do
-          conteúdo, fora de vista. Mesmo caso já corrigido no Brand Hub. */}
-      {showAdd && ReactDOM.createPortal(
-        <AddClientModal collaborators={collaborators} onClose={() => setShowAdd(false)} onAdd={onAdd} />,
-        document.body)}
-      {editClient && ReactDOM.createPortal(
-        <EditResponsibleModal client={editClient} collaborators={collaborators} onClose={() => setEditClient(null)} onSave={onUpdate} onRename={onRename} />,
-        document.body)}
+      {/* Novo cliente pelo admin: o mesmo formulário da CS, mas entra
+          direto na base com a equipe definida (pula Kick Off e
+          onboarding). O formulário já vai para o body (Overlay). */}
+      {showAdd && (
+        <ClienteForm
+          modo="novo"
+          admin
+          collaborators={collaborators}
+          me={me}
+          toast={toast}
+          onClose={() => setShowAdd(false)}
+          onUpload={acoesEntregas?.upload}
+          onCriar={async (dados) => {
+            const r = await onAdd(dados);
+            if (r?.success) setShowAdd(false);
+            return r;
+          }}
+        />
+      )}
+      {editar && (
+        <ClienteFicha
+          client={editar}
+          acoes={acoesEntregas}
+          collaborators={collaborators}
+          toast={toast}
+          editar
+          etapaInicial="equipe"
+          onClose={() => setEditarId(null)}
+        />
+      )}
       {ficha && (
-        <ClienteFicha client={ficha} acoes={acoesEntregas} toast={toast} onClose={() => setFichaId(null)} />
+        <ClienteFicha client={ficha} acoes={acoesEntregas} collaborators={collaborators} toast={toast} onClose={() => setFichaId(null)} />
       )}
       {clienteInativar && (
         <InativarModal
@@ -624,18 +432,3 @@ const MS2 = {
   check: { display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'var(--text)', marginTop: 14, cursor: 'pointer' },
 };
 
-const MS = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,.75)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 },
-  modal: { background: 'var(--bg2)', border: '1px solid var(--neon-border)', borderRadius: 16, width: '100%', maxWidth: 560, boxShadow: '0 24px 80px rgba(0,0,0,.7)', maxHeight: '90vh', overflow: 'auto' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid var(--border)' },
-  icon: { width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: 700, color: 'var(--text)' },
-  closeBtn: { background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '6px 8px', display: 'flex', alignItems: 'center', cursor: 'pointer' },
-  body: { padding: 22, display: 'flex', flexDirection: 'column', gap: 16 },
-  field: { display: 'flex', flexDirection: 'column', gap: 8 },
-  label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
-  input: { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
-  select: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
-  cancelBtn: { background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '9px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' },
-  submitBtn: { background: 'var(--grad)', border: 'none', borderRadius: 8, padding: '9px 22px', color: 'var(--on)', fontSize: 13, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(238,51,99,.3)', display: 'flex', alignItems: 'center', gap: 8 },
-};
