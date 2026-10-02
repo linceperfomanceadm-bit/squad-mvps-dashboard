@@ -14,12 +14,13 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-10-2';
+export const PATCH_VERSION = '2026-10-3';
  
 const PATCH_NOTES = {
   date: 'Outubro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '🗃️', text: 'Agora dá para criar task para cliente inativo. Na lista de clientes da Nova Task, eles aparecem num grupo separado, "Inativos", para as demandas que ficaram depois do fim do contrato.' },
     { emoji: '📝', text: 'O cadastro do cliente agora é um formulário só, em abas: Cliente, Serviços, Contrato, Entregas e Equipe. É o mesmo para cadastrar cliente novo e para completar ou corrigir um cliente que já está na base.' },
     { emoji: '1️⃣', text: 'No cadastro do cliente, cada entrega agora pode ser Mensal ou Única. A Única (ex.: Google Meu Negócio) aparece como 0 de 1 até alguém marcar, conta no mês em que foi feita e não volta nos meses seguintes.' },
     { emoji: '🔧', text: 'Trocar o setor ou corrigir o nome de uma entrega no cadastro agora vale na hora, inclusive no mês em andamento. Mudança de quantidade continua valendo a partir do próximo mês.' },

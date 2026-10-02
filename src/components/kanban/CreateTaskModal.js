@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Plus, Trash2 } from 'lucide-react';
-import { TASK_PRIORITIES, SECTORS } from '../../lib/firebase';
+import { X, Plus, Trash2, Archive } from 'lucide-react';
+import { TASK_PRIORITIES, SECTORS, isInativo } from '../../lib/firebase';
+
+const porNome = (a, b) => (a.name || '').localeCompare(b.name || '');
 
 export default function CreateTaskModal({ clients, collaborators, currentUser, currentUserSector, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -18,7 +20,22 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
   const [error, setError] = useState('');
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active);
+  // `active !== false`: colaborador antigo sem o campo é ativo — com
+  // `c.active` ele sumia da lista de responsáveis.
+  const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active !== false);
+
+  // Os dashboards passam a base inteira e a regra de quem entra fica
+  // aqui. Ativos aparecem normalmente; inativos (contrato encerrado,
+  // bloco `inativo`) vêm num grupo à parte porque ainda podem ter
+  // demanda residual — último relatório, entrega de arquivos, ajuste
+  // final. Quem só está correndo o fluxo de entrada (também
+  // `active: false`, mas sem `inativo`) continua fora: ainda não tem
+  // operação para receber task.
+  const { ativos, inativos } = useMemo(() => ({
+    ativos:   clients.filter(c => c.active !== false && !isInativo(c)).sort(porNome),
+    inativos: clients.filter(isInativo).sort(porNome),
+  }), [clients]);
+  const clienteInativo = form.clientId && inativos.some(c => c.id === form.clientId);
 
   const addLink = () => setLinks(l => [...l, { name: '', url: '' }]);
   const updateLink = (i, field, val) => setLinks(l => l.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
@@ -106,10 +123,18 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <label style={S.label}>CLIENTE *</label>
               <select style={S.select} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
                 <option value="">Selecionar cliente</option>
-                {clients
-                  .filter(c => c.active !== false)
-                  .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-                  .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {inativos.length === 0
+                  ? ativos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                  : (
+                    <>
+                      <optgroup label="Clientes ativos">
+                        {ativos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </optgroup>
+                      <optgroup label="Inativos (demandas finais)">
+                        {inativos.map(c => <option key={c.id} value={c.id}>{c.name} (inativo)</option>)}
+                      </optgroup>
+                    </>
+                  )}
               </select>
             </div>
             <div style={S.field}>
@@ -117,6 +142,13 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <input style={S.input} type="date" value={form.deadline} onChange={e => set('deadline', e.target.value)} />
             </div>
           </div>
+
+          {clienteInativo && (
+            <div style={S.aviso}>
+              <Archive size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>Cliente inativo. Use só para demandas que ficaram do contrato encerrado — a task segue o fluxo normal do Kanban.</span>
+            </div>
+          )}
 
           {/* Priority */}
           <div style={S.field}>
@@ -255,5 +287,6 @@ const S = {
   field: { display: 'flex', flexDirection: 'column', gap: 7 },
   label: { fontSize: 10, letterSpacing: '.14em', color: 'var(--muted)', fontWeight: 600, fontFamily: 'var(--fm)' },
   input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
+  aviso: { display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--amber-dim)', border: '1px solid var(--amber-b)', borderRadius: 9, padding: '9px 12px', color: 'var(--amber)', fontSize: 12, lineHeight: 1.45 },
   select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 9, padding: '10px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
 };

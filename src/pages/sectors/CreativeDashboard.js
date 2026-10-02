@@ -131,7 +131,7 @@ export default function CreativeDashboard({ sectorId }) {
           <TaskKanban
             tasks={tasks}
             clients={myClients}
-            allClients={clients.filter(c => c.active !== false)}
+            allClients={clients}
             collaborators={collaborators}
             currentUser={user?.name}
             currentUserSector={sectorId}
