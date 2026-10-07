@@ -64,7 +64,7 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 
 `src/hooks/use*.js` são a camada de dados de tudo que uma tela renderiza. Cada hook abre um `onSnapshot`, mapeia `{ id, ...data }` para o estado e expõe funções de CRUD. Sem cache, sem normalização, sem store global — o componente assina chamando o hook e toda aba aberta atualiza em tempo real.
 
-Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `portal_clients`, `portal_products`, `userIndex` e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
+Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `planejamentos`, `vm_marcacoes`, `portal_clients`, `portal_products`, `userIndex` e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
 
 Quatro arquivos acessam o Firestore direto, cada um por um motivo:
 
@@ -82,6 +82,7 @@ Três áreas independentes no mesmo bucket:
 - `brand-hub/{clientId}/{id}_{arquivo}` — materiais do Brand Hub/Cofre, indexados no cliente em `brandbook.materials`
 - `contratos/` e `briefings/` — anexos do cadastro. Pastas separadas de propósito: o contrato tem CPF, CNPJ e valores e **nunca aparece em nenhuma tela** do app
 - `portal-products/{portalClientId}/{productId}/{arquivo}` — fotos de produto do portal
+- `planejamentos/{planoId}/{postId}/{arquivo}` — artes dos posts do planejamento (imagem ou vídeo, até `MIDIA_MAX_MB`). A página pública usa a URL com token do `getDownloadURL`, então o anônimo não precisa de leitura no Storage
 
 Downloads do Storage dependem de uma política de CORS no bucket (GET com `Content-Type` e `Content-Disposition`).
 
@@ -108,13 +109,14 @@ Criar colaborador usa uma **instância secundária e descartável do Firebase** 
 | `/admin` | `requireAdmin` |
 | `/tv` | nenhuma — painel público, login anônimo, só leitura, carregado sob demanda |
 | `/tv/comercial` | nenhuma — TV da sala comercial, mesma lógica da `/tv` |
+| `/aprovar/:token` | nenhuma — aprovação do planejamento pelo cliente, login anônimo; o token é o id do documento em `planejamentos` |
 | `/portal/login` · `/portal` | `PortalProtectedRoute` (login do portal, não da equipe) |
 
 **A CS é um time só.** Não existe mais CS Comercial: toda a CS faz o fluxo inteiro, do cadastro à entrada do cliente na base. `CS_ROLES` tem só `operacional`; colaboradores antigos com `csRole: 'comercial'` caem no mesmo painel, e `/cs-comercial` ficou como redirecionamento. O setor Comercial (SDR/Closer) foi removido — o cadastro manual pela CS é a única porta de entrada de cliente.
 
 **Líder da CS = líder do comercial.** Não é setor nem rota própria: é quem tem `'cs'` em `leaderOf`. Entra pelo acesso da CS, mas o `CSOperacionalDashboard` vira um painel **só de gestão** (`modoGestao`): Gestão do Time, Carteira de todas as CSs, Comercial e Agenda — sem cadastro, Kick Off, onboarding ou solicitações. A etiqueta do usuário mostra "LÍDER DA CS".
 
-As guardas do front são só UX — a barreira real são as regras do Firestore. Toda coleção nova precisa de regra separando equipe (`isStaff()`) de acesso anônimo (`isAnon()`); o anônimo (Painel de TV) só lê `tasks`, `clients` e `app_config`.
+As guardas do front são só UX — a barreira real são as regras do Firestore. Toda coleção nova precisa de regra separando equipe (`isStaff()`) de acesso anônimo (`isAnon()`); o anônimo (Painel de TV) só lê `tasks`, `clients` e `app_config`. Exceção: em `planejamentos` qualquer usuário logado (inclusive o anônimo do link) pode dar `get` — nunca `list` — e o anônimo só pode atualizar `respostas` e `respondidoEm` (`diff().affectedKeys().hasOnly(...)`). `vm_marcacoes` é só equipe.
 
 > A CONFIRMAR: as regras publicadas não estão versionadas (não há `firestore.rules` no repo nem chave `firestore` no `firebase.json`). O README ainda sugere regra aberta e pode estar desatualizado.
 
@@ -193,6 +195,16 @@ Persistência em `useDocuments.js`: o documento inteiro (dados, slides extras, s
 - Escrita no `useClients`: `saveCadastro`, `saveEscopo`, `ajustarMesEntregas`, `marcarEntrega` (transação), `transferirCS`. As telas recebem essas funções já embrulhadas por `acoesDeEntregas` (`components/entregas/acoes.js`); ação ausente esconde o botão.
 - Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin; na CS o acompanhamento fica no card da Carteira de Clientes, por decisão de produto), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
 
+### Planejamento de conteúdo e calendário
+
+Social Media monta o mês de cada cliente, manda um link sem login e o cliente aprova post a post. Constantes em `firebase.js` (bloco "Planejamento de conteúdo"), regras puras em `src/lib/planejamento.js`, dados em `usePlanejamentos` (equipe), `useAprovacaoPublica` (página pública) e `useMarcacoes` (agenda do Videomaker). Telas em `src/components/planejamento/` (`PlanejamentosPage`, `PlanejamentoEditor`, `PostDrawer`, `CalendarioConteudo`, `PostDetalheModal`, `ConteudoModais`, `kit.js`) e `src/pages/AprovacaoPage.js`.
+
+- **Um documento por cliente e mês**, posts num array dentro dele (o cliente lê tudo com um `get`). Toda escrita no array é transação. O id do documento é o token do link (`gerarToken`, 24 caracteres do crypto).
+- **Status do post é derivado** (`statusDoPost`), nunca gravado: `rodada` 0 = rascunho; enviado sem resposta da mesma rodada = com o cliente; resposta da rodada = aprovado/ajuste; depois de aprovado, `etapa` manual da social = em produção/publicado. Reenviar um post corrigido dá a ele a rodada nova e a resposta antiga deixa de valer sozinha. Atraso = dia de publicação passou sem publicar.
+- **A aprovação do cliente só muda o status do calendário.** Entregas do Mês e o checklist do Mural continuam manuais (decisão out/2026) — não ligue um no outro.
+- **Videomaker** vê só reels já enviados dos clientes em que está escalado; prazo do vídeo = `VIDEO_PRAZO_DIAS_UTEIS` antes da publicação (`voltaDiasUteis`, dias de `BUSINESS_DAY`). `videoEntregue` é marcado por ele. Marcações manuais em `vm_marcacoes`; captação com cliente aparece para a social no detalhe do reel.
+- Quem da equipe abre o link logado vê uma **prévia**: a página não grava resposta.
+
 ### Cadastro do cliente — formulário único
 
 `src/components/cadastro/ClienteForm.js` (+ peças em `cadastro/kit.js`, regras puras em `src/lib/cadastro.js`). Um formulário em abas — Cliente · Serviços · Contrato · Entregas · Equipe — para as três portas:
@@ -244,6 +256,7 @@ Antes de criar card, KPI, modal, campo, tag ou estado vazio à mão, use os kits
 
 - **`src/components/shared/AppShell.js`** — casca única de todos os painéis: sidebar de 224px (`SIDEBAR_WIDTH`) com o item ativo no gradiente do setor e barra superior com Agenda, tema, notificações e perfil. Exporta `AppShell` e `Aside`.
 - **`src/components/shared/ui.js`** — kit do Layout 01, usado pelas visões gerais (admin, Social Media, WebDesign, Criativos, CS): `PageHeader`, `Card`, `Grid`, `Kpi`, `Breakdown`, `MiniBars`, `Goal`, `HBars`, `Pills`, `Trio`, `Tag`, `Row`, `Empty`. Tudo neutro; cor do painel por `var(--c)`/`var(--grad)`, semântica por `--green`/`--red`. **É o padrão para tela nova.**
+- **`src/components/planejamento/kit.js`** — peças do conteúdo: `Pill`/`Dot` de status (ponto oco = ainda não andou), `KpiFiltro` (KPI clicável, com ícone ou anel), `Linha`, `Sigla`, `MiniCalendario`, `MesNav`, `ChipsClientes`, `Midia`, `Janela` e `Gaveta` (portais com Esc) e os estilos `JANELA`/`BTN`.
 - **`src/components/commercial/ui.js`** — kit mais antigo, usado pelas telas da CS e por modais: constantes de estilo (`CARD`, `GRID`, `MODAL`, `LBL`, `INP`, `BTN_PRIMARY`, `BTN_GREEN`, `BTN_CANCEL`, `ICON_BTN`), componentes (`Overlay`, `ModalHeader`, `ConfirmModal`, `ScheduleModal`, `Field`, `Stat`, `Tag`, `Empty`, `Spinner`, `Section`, `RO`) e formatadores (`money`, `fmtDate`, `fmtDateTime`, `toLocalInput`). Para modal e formulário ainda é a peça certa. O comentário do topo cita SDR/Closer, que já não existem.
 
 Se faltar uma peça que vai se repetir, crie no kit, não na tela. Tela nova deve parecer irmã das já migradas — mesma hierarquia de título, espaçamento e componentes.
@@ -252,6 +265,5 @@ Se faltar uma peça que vai se repetir, crie no kit, não na tela. Tela nova dev
 
 - Depois de mudança visível ao usuário, incremente `PATCH_VERSION` e edite `PATCH_NOTES` em `src/components/shared/PatchNotesPopup.js` — cada colaborador vê o popup uma vez no próximo login (controle em `collaborators.lastPatchSeen`). Notas em linguagem de usuário, sem jargão.
 
-  > A CONFIRMAR: se a convenção segue viva. `PATCH_VERSION` está em `'2026-06-1'`.
 - Notificações de desktop são só Notification API (sem service worker/FCM): funcionam apenas com uma aba aberta. `NotificationCenter` é montado uma vez em `App.js` e é o único que dispara; `useDesktopNotifications` em outros lugares serve só como chave liga/desliga.
 - Credenciais e dados sensíveis (contratos, CPF/CNPJ, valores) nunca aparecem em tela, em código do cliente ou em documentação.

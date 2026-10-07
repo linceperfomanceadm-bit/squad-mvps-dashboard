@@ -510,6 +510,59 @@ export const HEALTH_STALE_DAYS = 30;
 // como "fluxo parado" no painel do líder da CS.
 export const FLUXO_PARADO_DIAS = 10;
 
+// ─── Planejamento de conteúdo e calendário ────────────────────
+// Coleção `planejamentos`: um documento por cliente e mês, montado
+// pela social media e aprovado pelo cliente num link sem login
+// (`/aprovar/:token`). O id do documento É o token do link — é o que
+// deixa o acesso anônimo ler só aquele planejamento (regra `get`, sem
+// `list`). Regras puras em `src/lib/planejamento.js`.
+//
+// O status do post é DERIVADO (`statusDoPost`), nunca gravado:
+//   rodada 0 → rascunho; enviado e sem resposta daquela rodada → cliente;
+//   resposta da rodada → aprovado/ajuste; aprovado + `etapa` manual →
+//   producao/publicado. Atraso é data passada sem publicação.
+// A aprovação do cliente muda só esse status do calendário. Entregas do
+// Mês e o checklist do Mural continuam marcados à mão (decisão out/2026).
+export const POST_FORMATOS = {
+  feed:  { id: 'feed',  label: 'Post',      tag: 'FEED',  maxMidias: 1,  aceita: 'image/*',         dica: 'Uma imagem, de preferência 1080 × 1350' },
+  car:   { id: 'car',   label: 'Carrossel', tag: 'CARR',  maxMidias: 10, aceita: 'image/*',         dica: 'Até 10 imagens, na ordem das lâminas' },
+  reel:  { id: 'reel',  label: 'Reel',      tag: 'REEL',  maxMidias: 1,  aceita: 'image/*,video/*', dica: 'O vídeo ou a capa do reel' },
+  story: { id: 'story', label: 'Story',     tag: 'STORY', maxMidias: 1,  aceita: 'image/*,video/*', dica: 'Imagem ou vídeo vertical, 1080 × 1920' },
+};
+export const POST_STATUS = {
+  rascunho:  { id: 'rascunho',  label: 'Rascunho',      cor: 'var(--dim)',    oco: true },
+  cliente:   { id: 'cliente',   label: 'Com o cliente', cor: 'var(--amber)' },
+  ajuste:    { id: 'ajuste',    label: 'Ajuste pedido', cor: 'var(--purple)' },
+  aprovado:  { id: 'aprovado',  label: 'Aprovado',      cor: 'var(--green)',  oco: true },
+  producao:  { id: 'producao',  label: 'Em produção',   cor: 'var(--blue)' },
+  publicado: { id: 'publicado', label: 'Publicado',     cor: 'var(--green)' },
+  atrasado:  { id: 'atrasado',  label: 'Atrasado',      cor: 'var(--red)' },
+};
+// Ordem da linha do tempo no detalhe do post (ajuste ocupa o lugar de "cliente").
+export const POST_ETAPAS_ORDEM = ['rascunho', 'cliente', 'aprovado', 'producao', 'publicado'];
+// Como o reel aparece para o Videomaker. Prazo de entrega do vídeo:
+// VIDEO_PRAZO_DIAS_UTEIS antes da publicação.
+export const VIDEO_STATUS = {
+  aguarda:  { id: 'aguarda',  label: 'Aguardando o cliente aprovar', cor: 'var(--dim)', oco: true },
+  produzir: { id: 'produzir', label: 'Aprovado · a produzir',        cor: 'var(--blue)' },
+  perto:    { id: 'perto',    label: 'Entregar até amanhã',          cor: 'var(--amber)' },
+  atrasado: { id: 'atrasado', label: 'Vídeo atrasado',               cor: 'var(--red)' },
+  entregue: { id: 'entregue', label: 'Vídeo entregue',               cor: 'var(--green)' },
+};
+export const VIDEO_PRAZO_DIAS_UTEIS = 2;
+// Agenda manual do Videomaker (coleção `vm_marcacoes`). Captação com
+// cliente aparece para a social media no reel daquele cliente.
+export const MARCACAO_TIPOS = {
+  cap: { id: 'cap', label: 'Captação',    tag: 'CAPT' },
+  tre: { id: 'tre', label: 'Treinamento', tag: 'TREI' },
+  reu: { id: 'reu', label: 'Reunião',     tag: 'REUN' },
+  out: { id: 'out', label: 'Outro',       tag: 'OUTRO' },
+};
+// Endereço público do link de aprovação (o domínio é o do app).
+export const APROVACAO_PATH = '/aprovar/';
+// Limite de upload de arte por arquivo.
+export const MIDIA_MAX_MB = 200;
+
 // ─── Comercial (Hunters) ──────────────────────────────────────
 // Dados da TV da sala comercial. Tudo é lançado à mão pelo líder do
 // comercial (o CRM é externo). Ficam em `app_config` porque é a única

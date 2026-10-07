@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Users, Kanban, FileText, Calendar, ClipboardList, BookOpen, MessageSquare, ListChecks } from 'lucide-react';
+import { LayoutDashboard, Users, Kanban, FileText, Calendar, CalendarDays, LayoutGrid, ClipboardList, BookOpen, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import AgendaView from '../../components/shared/AgendaView';
 import RequestsInbox from '../../components/shared/RequestsInbox';
@@ -10,6 +10,9 @@ import { useCollaborators } from '../../hooks/useCollaborators';
 import { useTasks } from '../../hooks/useTasks';
 import { useRequests } from '../../hooks/useRequests';
 import { useDocuments } from '../../hooks/useDocuments';
+import { usePlanejamentos } from '../../hooks/usePlanejamentos';
+import { useMarcacoes } from '../../hooks/useMarcacoes';
+import { statusDoPost } from '../../lib/planejamento';
 import { useToast } from '../../components/shared/Toast';
 import AppShell from '../../components/shared/AppShell';
 import SMOverview from '../../components/sectors/socialMedia/SMOverview';
@@ -20,6 +23,9 @@ import VaultPage from '../../components/sectors/creative/VaultPage';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import EntregasSetor from '../../components/entregas/EntregasSetor';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
+import PlanejamentosPage from '../../components/planejamento/PlanejamentosPage';
+import CalendarioConteudo from '../../components/planejamento/CalendarioConteudo';
+import ConteudoModais from '../../components/planejamento/ConteudoModais';
 
 // Responsável pode estar salvo como string (legado) ou array (multi).
 const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
@@ -27,6 +33,8 @@ const asArray = (v) => (Array.isArray(v) ? v : (v ? [v] : []));
 const NAV = [
   { key: 'overview',   label: 'Visão Geral',   icon: LayoutDashboard },
   { key: 'mural',      label: 'Mural',          icon: Users },
+  { key: 'planejamentos', label: 'Planejamentos', icon: LayoutGrid },
+  { key: 'calendario', label: 'Calendário',     icon: CalendarDays },
   { key: 'entregas',   label: 'Entregas do Mês', icon: ListChecks },
   { key: 'kanban',     label: 'Tasks',          icon: Kanban },
   { key: 'documentos', label: 'Documentos',     icon: FileText },
@@ -48,7 +56,14 @@ export default function SocialMediaDashboard() {
   } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
   const { documents, createDocument, deleteDocument, saveVersion } = useDocuments();
+  const planejamento = usePlanejamentos();
+  const { marcacoes } = useMarcacoes();
   const [page, setPage] = useState('overview');
+  // Planejamento aberto no editor ({ id, postId? }), modal de conteúdo
+  // e o dia em que o calendário abre (vindo do mini calendário).
+  const [planoAberto, setPlanoAberto] = useState(null);
+  const [modal, setModal] = useState(null);
+  const [calInicial, setCalInicial] = useState(null);
 
   // Quem produz só marca entregas — escopo e cadastro são da CS.
   const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
@@ -66,6 +81,14 @@ export default function SocialMediaDashboard() {
   // responsável. O admin tem a visão completa no painel próprio.
   const myClientIds = myClients.map(c => c.id);
   const myDocs = documents.filter(d => myClientIds.includes(d.clientId));
+  const myPlanos = planejamento.planejamentos.filter(p => myClientIds.includes(p.clientId));
+
+  // Post em que o cliente pediu ajuste e ainda não foi reenviado.
+  const ajustesPedidos = myPlanos.reduce((n, pl) => n + (pl.posts || []).filter(p => statusDoPost(p, pl) === 'ajuste').length, 0);
+
+  const abrirPlano = (id, postId) => { setPlanoAberto({ id, postId }); setPage('planejamentos'); };
+  const abrirCalendario = (iso) => { setCalInicial(iso); setPage('calendario'); };
+  const abrirPost = (planoId, postId) => setModal({ t: 'post', planoId, postId });
 
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;
@@ -135,6 +158,7 @@ export default function SocialMediaDashboard() {
   const navItems = NAV.map(n => ({
     ...n,
     badge: n.key === 'kanban' ? pendingApproval
+      : n.key === 'planejamentos' ? ajustesPedidos
       : n.key === 'requests' ? openRequests
       : n.key === 'documentos' ? openDocs
       : 0,
@@ -143,17 +167,42 @@ export default function SocialMediaDashboard() {
   }));
 
   return (
-    <AppShell sectorId="socialmedia" navItems={navItems} activeKey={page} onNav={setPage}>
-        {loading || loadingTasks ? (
+    <AppShell sectorId="socialmedia" navItems={navItems} activeKey={page} onNav={(k) => { if (k === 'planejamentos') setPlanoAberto(null); if (k === 'calendario') setCalInicial(null); setPage(k); }}>
+        {loading || loadingTasks || planejamento.loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
           </div>
         ) : page === 'overview' ? (
           <SMOverview
+            me={user?.name}
             myClients={myClients}
             myDocs={myDocs}
             myTasks={myTasks}
+            planos={myPlanos}
             onNavigate={setPage}
+            onAbrirPost={abrirPost}
+            onAbrirPlano={(id) => abrirPlano(id)}
+            onAbrirCalendario={abrirCalendario}
+          />
+        ) : page === 'planejamentos' ? (
+          <PlanejamentosPage
+            clientes={myClients}
+            planos={myPlanos}
+            me={user?.name}
+            acoes={planejamento}
+            toast={toast}
+            aberto={planoAberto}
+            onAbrir={setPlanoAberto}
+          />
+        ) : page === 'calendario' ? (
+          <CalendarioConteudo
+            key={calInicial || 'cal'}
+            modo="sm"
+            clientes={myClients}
+            planos={myPlanos}
+            inicial={calInicial}
+            onAbrirPost={abrirPost}
+            onIrPlanejamentos={() => { setPlanoAberto(null); setPage('planejamentos'); }}
           />
         ) : page === 'mural' ? (
           <SMMural
@@ -219,6 +268,18 @@ export default function SocialMediaDashboard() {
             onDelete={deleteTask}
           />
         )}
+        <ConteudoModais
+          modal={modal}
+          onClose={() => setModal(null)}
+          modo="sm"
+          planos={myPlanos}
+          clientes={myClients}
+          marcacoes={marcacoes}
+          me={user?.name}
+          acoes={planejamento}
+          toast={toast}
+          onAbrirPlanejamento={abrirPlano}
+        />
     </AppShell>
   );
 }

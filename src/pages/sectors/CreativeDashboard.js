@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, ClipboardList, Palette, MessageSquare, ListChecks } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, CalendarDays, ClipboardList, Palette, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { naCarteira } from '../../lib/firebase';
 import { useClients } from '../../hooks/useClients';
 import { useTasks } from '../../hooks/useTasks';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useRequests } from '../../hooks/useRequests';
+import { usePlanejamentos } from '../../hooks/usePlanejamentos';
+import { useMarcacoes } from '../../hooks/useMarcacoes';
 import { useToast } from '../../components/shared/Toast';
 import AppShell from '../../components/shared/AppShell';
 import CreativeOverview from '../../components/sectors/creative/CreativeOverview';
+import VMOverview from '../../components/sectors/creative/VMOverview';
+import CalendarioConteudo from '../../components/planejamento/CalendarioConteudo';
+import ConteudoModais from '../../components/planejamento/ConteudoModais';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import HallOfFame from '../../components/sectors/creative/HallOfFame';
 import IdVisualBoard from '../../components/sectors/creative/IdVisualBoard';
@@ -37,8 +42,15 @@ export default function CreativeDashboard({ sectorId }) {
     approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
   } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
+  // Calendário de conteúdo: só o Videomaker usa (os reels saem dos
+  // planejamentos das Socials). O Design não abre os listeners.
+  const isVM = sectorId === 'videomaker';
+  const planejamento = usePlanejamentos({ ativo: isVM });
+  const { marcacoes, loading: loadingMarcacoes, criarMarcacao, excluirMarcacao } = useMarcacoes({ ativo: isVM });
 
   const [page, setPage] = useState('overview');
+  const [modal, setModal] = useState(null);
+  const [calInicial, setCalInicial] = useState(null);
   // Quem produz só marca entregas — escopo e cadastro são da CS.
   const acoesEntregas = acoesDeEntregas({ marcarEntrega }, user?.name, toast, { soMarcar: true });
 
@@ -51,6 +63,12 @@ export default function CreativeDashboard({ sectorId }) {
   const myClients = clients.filter(
     c => naCarteira(c) && asArray(c.responsibles?.[responsibleField]).includes(user?.name)
   );
+
+  const myClientIds = myClients.map(c => c.id);
+  const myPlanos = planejamento.planejamentos.filter(p => myClientIds.includes(p.clientId));
+  const minhasMarcacoes = marcacoes.filter(m => m.autorName === user?.name);
+  const abrirPost = (planoId, postId) => setModal({ t: 'post', planoId, postId });
+  const abrirCalendario = (iso) => { setCalInicial(iso); setPage('calendario'); };
 
   // ID Visual é exclusivo do Design e só do designer responsável.
   const isDesign = sectorId === 'design';
@@ -87,10 +105,11 @@ export default function CreativeDashboard({ sectorId }) {
     return res;
   };
 
-  const loading = loadingClients || loadingCollabs || loadingTasks;
+  const loading = loadingClients || loadingCollabs || loadingTasks || planejamento.loading || loadingMarcacoes;
 
   const NAV = [
     { key: 'overview',  label: 'Visão Geral',   icon: LayoutDashboard },
+    ...(isVM ? [{ key: 'calendario', label: 'Calendário', icon: CalendarDays }] : []),
     { key: 'kanban',    label: 'Tasks',          icon: Kanban },
     { key: 'entregas',  label: 'Entregas do Mês', icon: ListChecks },
     { key: 'requests',  label: 'Reporte da CS',  icon: MessageSquare },
@@ -116,11 +135,36 @@ export default function CreativeDashboard({ sectorId }) {
   });
 
   return (
-    <AppShell sectorId={sectorId} navItems={navItems} activeKey={page} onNav={setPage}>
+    <AppShell sectorId={sectorId} navItems={navItems} activeKey={page} onNav={(k) => { if (k === 'calendario') setCalInicial(null); setPage(k); }}>
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
             <div className="spinner" style={{ width: 36, height: 36 }} />
           </div>
+        ) : page === 'overview' && isVM ? (
+          <VMOverview
+            me={user?.name}
+            clientes={myClients}
+            planos={myPlanos}
+            marcacoes={minhasMarcacoes}
+            myTasks={tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name)}
+            onNavigate={setPage}
+            onAbrirPost={abrirPost}
+            onAbrirMarcacao={(m) => setModal({ t: 'marca', id: m.id })}
+            onNovaMarcacao={(data) => setModal({ t: 'novaMarca', data })}
+            onAbrirCalendario={abrirCalendario}
+          />
+        ) : page === 'calendario' && isVM ? (
+          <CalendarioConteudo
+            key={calInicial || 'cal'}
+            modo="vm"
+            clientes={myClients}
+            planos={myPlanos}
+            marcacoes={minhasMarcacoes}
+            inicial={calInicial}
+            onAbrirPost={abrirPost}
+            onAbrirMarcacao={(m) => setModal({ t: 'marca', id: m.id })}
+            onNovaMarcacao={(data) => setModal({ t: 'novaMarca', data })}
+          />
         ) : page === 'overview' ? (
           <CreativeOverview
             tasks={tasks.filter(t => t.responsibleSector === responsibleField)}
@@ -180,6 +224,20 @@ export default function CreativeDashboard({ sectorId }) {
           <AgendaView />
         ) : (
           <HallOfFame tasks={hallTasks} />
+        )}
+        {isVM && (
+          <ConteudoModais
+            modal={modal}
+            onClose={() => setModal(null)}
+            modo="vm"
+            planos={myPlanos}
+            clientes={myClients}
+            marcacoes={minhasMarcacoes}
+            me={user?.name}
+            acoes={planejamento}
+            acoesMarcacao={{ criarMarcacao, excluirMarcacao }}
+            toast={toast}
+          />
         )}
     </AppShell>
   );

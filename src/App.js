@@ -25,6 +25,8 @@ import PortalDashboard from './pages/PortalDashboard';
 const TVPanel = lazy(() => import('./pages/TVPanel'));
 // TV da sala comercial (Hunters) — mesma lógica: pública, anônima, sob demanda.
 const TVComercial = lazy(() => import('./pages/TVComercial'));
+// Link de aprovação do planejamento — o cliente abre sem login.
+const AprovacaoPage = lazy(() => import('./pages/AprovacaoPage'));
 
 // Destino do usuário de CS. A CS virou um time só — quem ainda está
 // cadastrado como 'comercial' cai no mesmo painel.
@@ -151,6 +153,14 @@ function AppRoutes() {
       <Route path="/tv/comercial" element={
         <Suspense fallback={<div style={{ minHeight: '100vh', background: '#08090b' }} />}>
           <TVComercial />
+        </Suspense>
+      } />
+
+      {/* Aprovação do planejamento pelo cliente — pública e anônima como
+          a /tv. O token na URL é o id do planejamento. */}
+      <Route path="/aprovar/:token" element={
+        <Suspense fallback={<div style={{ minHeight: '100vh', background: 'var(--bg)' }} />}>
+          <AprovacaoPage />
         </Suspense>
       } />
 

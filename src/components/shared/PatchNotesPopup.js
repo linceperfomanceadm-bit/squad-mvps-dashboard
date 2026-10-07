@@ -14,12 +14,16 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-10-3';
+export const PATCH_VERSION = '2026-10-4';
  
 const PATCH_NOTES = {
   date: 'Outubro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '🗓️', text: 'Social Media: nova aba Planejamentos. Monte o mês de cada cliente em cards numerados, com legenda, ideia e a arte (imagem, carrossel ou vídeo), e veja a prévia do feed antes de enviar.' },
+    { emoji: '🔗', text: 'O planejamento vai para o cliente por um link que abre sem login. Ele aprova cada post ou pede ajuste com um comentário, e o status muda na hora no seu calendário. Entregas do Mês e o checklist do Mural continuam sendo marcados por você.' },
+    { emoji: '📅', text: 'Nova aba Calendário para Social Media e Videomaker. A Social vê todos os posts da carteira, do rascunho ao publicado; o Videomaker vê os reels dos clientes dele, com prazo de entrega do vídeo, e pode marcar captação, treinamento e reunião na própria agenda.' },
+    { emoji: '🏠', text: 'Visão Geral nova para Social Media e Videomaker, com o que está atrasado, com o cliente ou pedindo ajuste, a fila de vídeos para produzir e um calendário do mês resumido.' },
     { emoji: '🗃️', text: 'Agora dá para criar task para cliente inativo. Na lista de clientes da Nova Task, eles aparecem num grupo separado, "Inativos", para as demandas que ficaram depois do fim do contrato.' },
     { emoji: '📝', text: 'O cadastro do cliente agora é um formulário só, em abas: Cliente, Serviços, Contrato, Entregas e Equipe. É o mesmo para cadastrar cliente novo e para completar ou corrigir um cliente que já está na base.' },
     { emoji: '1️⃣', text: 'No cadastro do cliente, cada entrega agora pode ser Mensal ou Única. A Única (ex.: Google Meu Negócio) aparece como 0 de 1 até alguém marcar, conta no mês em que foi feita e não volta nos meses seguintes.' },
