@@ -1,5 +1,8 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import {
+  getFirestore, initializeFirestore, persistentLocalCache,
+  persistentMultipleTabManager, memoryLocalCache,
+} from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
@@ -14,10 +17,53 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// ─── Firestore com cache local ────────────────────────────────
+// O projeto está no plano gratuito do Firebase, que tem limite diário
+// de leituras. Cada hook assina a coleção inteira, então sem cache
+// TODA recarga de página, troca de painel ou aba nova relia todos os
+// clientes, tasks e solicitações do zero — foi isso que estourou a
+// cota ("Quota exceeded") em out/2026.
+// Com o cache em disco, o listener que volta em até 30 min retoma de
+// onde parou e o Firebase cobra só o que mudou nesse meio tempo.
+// O gerenciador multi-aba deixa várias abas dividirem o mesmo cache.
+//
+// Telas públicas e de aparelho compartilhado (TV, link de aprovação
+// do cliente, portal) ficam só na memória: não faz sentido gravar
+// dado da agência no disco de uma Smart TV ou do celular do cliente.
+// Se o navegador não tiver IndexedDB, o SDK cai sozinho para memória.
+const ROTA_PUBLICA = /^\/(tv|aprovar|portal)(\/|$)/;
+function criarFirestore() {
+  const publica = typeof window !== 'undefined' && ROTA_PUBLICA.test(window.location.pathname);
+  try {
+    return initializeFirestore(app, {
+      localCache: publica
+        ? memoryLocalCache()
+        : persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch (e) {
+    // initializeFirestore só pode rodar uma vez por app; em qualquer
+    // falha, segue com a instância padrão para o app nunca abrir em branco.
+    return getFirestore(app);
+  }
+}
+export const db = criarFirestore();
 export const auth = getAuth(app);
 export const storage = getStorage(app); // fotos dos produtos do portal
 export const functions = getFunctions(app); // Cloud Functions (reset de senha)
+
+// ─── Mensagem de erro do Firebase para a tela ─────────────────
+// O SDK devolve mensagens em inglês e técnicas ("Quota exceeded.").
+// Os casos que a equipe realmente vê ganham texto em português; o
+// resto passa como veio, para não esconder erro desconhecido.
+const ERROS_FIREBASE = {
+  'resource-exhausted': 'O limite diário do banco de dados foi atingido. Avise o admin; o acesso volta sozinho de madrugada.',
+  'permission-denied': 'Você não tem permissão para fazer isso.',
+  unavailable: 'Sem conexão com o servidor. Confira a internet e tente de novo.',
+  'deadline-exceeded': 'O servidor demorou para responder. Tente de novo.',
+};
+export const mensagemDeErro = (err) =>
+  ERROS_FIREBASE[err?.code] || err?.message || 'Algo deu errado. Tente de novo.';
 
 // ─── Auth: synthetic email domain ─────────────────────────────
 // Firebase Auth autentica por email. O usuário continua digitando

@@ -4,7 +4,7 @@ import {
   deleteDoc, doc, serverTimestamp, query, orderBy,
   writeBatch, FieldPath,
 } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { db, mensagemDeErro } from '../lib/firebase';
 import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
 
 // ─── Ordem pessoal do Kanban ──────────────────────────────────
@@ -35,7 +35,7 @@ export async function saveTaskOrder(userName, orderedIds, allTasks) {
     });
     if (mudou) await batch.commit();
     return { success: true };
-  } catch (err) { return { success: false, error: err.message }; }
+  } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
 }
 
 // ─── Auto-reparo de tasks presas em aprovação ──────────────────
@@ -190,7 +190,7 @@ export async function updateTaskResponsibles(task, people, byName, bySector) {
 
     await updateDoc(doc(db, 'tasks', task.id), patch);
     return { success: true, removed };
-  } catch (err) { return { success: false, error: err.message }; }
+  } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
 }
 
 export function useTasks() {
@@ -242,6 +242,11 @@ export function useTasks() {
           }).catch(() => {});
         });
       }
+    }, err => {
+      // Sem este callback, uma falha do listener (cota estourada, sem
+      // permissão) deixava o quadro carregando para sempre, sem aviso.
+      console.error('[useTasks] listener de tasks falhou:', err);
+      setLoading(false);
     });
   }, []);
 
@@ -303,7 +308,7 @@ export function useTasks() {
         createdAt: serverTimestamp(),
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Move to Em Produção ──────────────────────────────────────
@@ -325,7 +330,7 @@ export function useTasks() {
         timeline,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Move to Em Aprovação ─────────────────────────────────────
@@ -404,7 +409,7 @@ export function useTasks() {
 
       await updateDoc(doc(db, 'tasks', taskId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Approve (complete) task ──────────────────────────────────
@@ -453,7 +458,7 @@ export function useTasks() {
         },
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Reject (send back for rework) ───────────────────────────
@@ -510,7 +515,7 @@ export function useTasks() {
         timeline,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Add comment ──────────────────────────────────────────────
@@ -528,7 +533,7 @@ export function useTasks() {
         comments: [...(task.comments || []), newComment],
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Update links ─────────────────────────────────────────────
@@ -536,7 +541,7 @@ export function useTasks() {
     try {
       await updateDoc(doc(db, 'tasks', taskId), { links });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Alterar data de entrega (com justificativa) ─────────────
@@ -567,7 +572,7 @@ export function useTasks() {
       }];
       await updateDoc(doc(db, 'tasks', taskId), { deadline: newDeadline, timeline, comments });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Delete task ──────────────────────────────────────────────
@@ -575,7 +580,7 @@ export function useTasks() {
     try {
       await deleteDoc(doc(db, 'tasks', taskId));
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Helper: tasks visible to a user ─────────────────────────

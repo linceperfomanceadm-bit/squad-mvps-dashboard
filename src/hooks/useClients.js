@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction, deleteField } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
+import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
 import { linhaEndereco } from '../lib/cadastro';
@@ -18,6 +18,11 @@ export function useClients() {
     const q = query(collection(db, 'clients'), orderBy('createdAt', 'desc'));
     return onSnapshot(q, snap => {
       setClients(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, err => {
+      // Falha do listener (cota estourada, sem permissão) não pode
+      // deixar a tela presa no carregamento.
+      console.error('[useClients] listener de clientes falhou:', err);
       setLoading(false);
     });
   }, []);
@@ -80,17 +85,17 @@ export function useClients() {
       };
       const ref = await addDoc(collection(db, 'clients'), newClient);
       return { success: true, id: ref.id };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const updateClient = async (id, data) => {
     try { await updateDoc(doc(db, 'clients', id), data); return { success: true }; }
-    catch (err) { return { success: false, error: err.message }; }
+    catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const deleteClient = async (id) => {
     try { await deleteDoc(doc(db, 'clients', id)); return { success: true }; }
-    catch (err) { return { success: false, error: err.message }; }
+    catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ─── Brand Hub: materiais (upload de arquivo OU link de vídeo) ───
@@ -157,7 +162,7 @@ export function useClients() {
         await logBrand(clientId, { action: 'add', name: material.name, by, sector });
       }
       return { success: true, count: lista.length };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Remove material. Permissão (criador/admin) é checada na UI; aqui
@@ -175,7 +180,7 @@ export function useClients() {
         sector: bySector || '',
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── WebDesign actions ──────────────────────────────────────
@@ -219,7 +224,7 @@ export function useClients() {
         checklist,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const wdMoveBackToOnboarding = async (clientId, jobId = 'main') => {
@@ -231,19 +236,19 @@ export function useClients() {
         checklist: [],
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const wdUpdateChecklist = async (clientId, updatedChecklist, jobId = 'main') => {
     try {
       await wdPatch(clientId, jobId, { checklist: updatedChecklist });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const wdUpdateNotes = async (clientId, notes, jobId = 'main') => {
     try { await wdPatch(clientId, jobId, { notes }); return { success: true }; }
-    catch (err) { return { success: false, error: err.message }; }
+    catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Ao concluir, grava `finishedAt` (igual ao ID Visual): é a data que
@@ -262,7 +267,7 @@ export function useClients() {
       }
       await wdPatch(clientId, jobId, fields);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Novo serviço de Web para um cliente que JÁ está na base.
@@ -311,7 +316,7 @@ export function useClients() {
         tx.update(ref, upd);
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Remove UM serviço de Web — o cliente continua na base.
@@ -330,7 +335,7 @@ export function useClients() {
         });
       }
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── ID Visual actions ──────────────────────────────────────
@@ -348,7 +353,7 @@ export function useClients() {
         'idv.checklist': checklist,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const idvMoveBackToOnboarding = async (clientId) => {
@@ -360,19 +365,19 @@ export function useClients() {
         'idv.checklist': [],
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const idvUpdateChecklist = async (clientId, updatedChecklist) => {
     try {
       await updateDoc(doc(db, 'clients', clientId), { 'idv.checklist': updatedChecklist });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const idvUpdateNotes = async (clientId, notes) => {
     try { await updateDoc(doc(db, 'clients', clientId), { 'idv.notes': notes }); return { success: true }; }
-    catch (err) { return { success: false, error: err.message }; }
+    catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Novo ID Visual para um cliente que JÁ está na base — o espelho do
@@ -424,7 +429,7 @@ export function useClients() {
         tx.update(ref, upd);
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const idvMoveStatus = async (clientId, newStatus) => {
@@ -433,7 +438,7 @@ export function useClients() {
       if (newStatus === 'finished') patch['idv.finishedAt'] = new Date().toISOString();
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const addDelivery = async (clientId, sector, delivery) => {
@@ -445,7 +450,7 @@ export function useClients() {
       const newDelivery = { ...delivery, id: `del_${Date.now()}`, createdAt: new Date().toISOString() };
       await updateDoc(doc(db, 'clients', clientId), { [key]: [...existing, newDelivery] });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Brandbook ────────────────────────────────────────────
@@ -465,7 +470,7 @@ export function useClients() {
         sector: bySector || '',
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ════════════════════════════════════════════════════════════
@@ -591,7 +596,7 @@ export function useClients() {
 
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true, activated: fechou, trocado: troca };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Cobrança do líder que ainda não indicou ninguém. Fica registrado
@@ -603,7 +608,7 @@ export function useClients() {
         [`staffing.nudges.${sector}`]: { by: byName || null, at: new Date().toISOString() },
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Call 1: Kick Off ─────────────────────────────────────────
@@ -622,7 +627,7 @@ export function useClients() {
         'kickoffCall.scheduledAt': new Date().toISOString(),
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Desmarca o agendamento do Kick Off. O cliente volta para
@@ -636,7 +641,7 @@ export function useClients() {
         'kickoffCall.scheduledAt': null,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Kick Off realizado: abre o staffing e, junto, libera a CS para
@@ -659,7 +664,7 @@ export function useClients() {
         'staffing.startedAt': now,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Call 2: Onboarding ───────────────────────────────────────
@@ -690,7 +695,7 @@ export function useClients() {
         'kickoff.scheduledAt': new Date().toISOString(),
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // A CS confirma que a call aconteceu. O cliente sai da aba de
@@ -714,7 +719,7 @@ export function useClients() {
         'kickoff.confirmedBy': byName || null,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Cancela um cadastro feito por engano. Vale no Kick Off e no
@@ -743,7 +748,7 @@ export function useClients() {
       }
       await deleteDoc(doc(db, 'clients', clientId));
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Anexos do cadastro (briefing e contrato) ────────────────
@@ -763,7 +768,7 @@ export function useClients() {
         success: true,
         file: { name: file.name, url: await getDownloadURL(storageRef), path, type: file.type },
       };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Renomear cliente ────────────────────────────────────────
@@ -848,7 +853,7 @@ export function useClients() {
       };
       await updateDoc(doc(db, 'clients', clientId), { anexos: arrayUnion(anexo) });
       return { success: true, file: anexo };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Remove o anexo do doc e, se der, o arquivo do Storage. A ordem
@@ -863,7 +868,7 @@ export function useClients() {
         catch { /* arquivo já não existe no Storage */ }
       }
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Contrato: renovação e encerramento ──────────────────────
@@ -906,7 +911,7 @@ export function useClients() {
         }),
       });
       return { success: true, endAt: simulado.endAt };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Encerramento. NÃO mexe em `active`: desativar o cliente aqui o
@@ -926,7 +931,7 @@ export function useClients() {
         'contract.closeReason': String(reason || '').trim(),
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Reabre um contrato encerrado por engano.
@@ -939,7 +944,7 @@ export function useClients() {
         'contract.closeReason': '',
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Inativar / reativar ─────────────────────────────────────
@@ -974,7 +979,7 @@ export function useClients() {
     try {
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   const reativarCliente = async (clientId, { reabrirContrato = false } = {}, byName = null) => {
@@ -997,7 +1002,7 @@ export function useClients() {
     try {
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Completar cadastro ──────────────────────────────────────
@@ -1103,7 +1108,7 @@ export function useClients() {
     try {
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Escopo de entregas (recorrentes do mês) ─────────────────
@@ -1160,7 +1165,7 @@ export function useClients() {
         escopo: { versoes, semRecorrencia: limpos.length === 0 },
       });
       return { success: true, desde: soCorrecao ? atual : desde, corrigiuAtual };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Ajuste de quantidade SÓ de um mês (cliente que entrou no meio do
@@ -1185,7 +1190,7 @@ export function useClients() {
     try {
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // Marca (+1) ou desmarca (-1) uma entrega do mês. Em transação: duas
@@ -1210,7 +1215,7 @@ export function useClients() {
         return novo;
       });
       return { success: true, feito: resultado };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Checklist mensal do Social Media ────────────────────────
@@ -1226,7 +1231,7 @@ export function useClients() {
           : deleteField(),
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Transferir carteira entre CSs ───────────────────────────
@@ -1250,7 +1255,7 @@ export function useClients() {
       });
       await batch.commit();
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── Ex-colaboradores ────────────────────────────────────────
@@ -1277,7 +1282,7 @@ export function useClients() {
         await batch.commit();
       }
       return { success: true, clientes: planos.length };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // O líder (ou o admin) diz que a vaga não precisa de ninguém — o
@@ -1286,7 +1291,7 @@ export function useClients() {
     try {
       await updateDoc(doc(db, 'clients', clientId), { [`vagas.${sector}`]: deleteField() });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   // ── CS Operacional: Saúde do Cliente (farol manual) ─────────
@@ -1299,7 +1304,7 @@ export function useClients() {
           : null,
       });
       return { success: true };
-    } catch (err) { return { success: false, error: err.message }; }
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
   return {
