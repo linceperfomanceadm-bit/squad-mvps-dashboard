@@ -96,6 +96,19 @@ export default function DocEditorPage() {
   const doc = documento ? docPorId(documento.tipo) : null;
   const cliente = documento ? clients.find((c) => c.id === documento.clientId) : null;
 
+  // `updateDocument` nasce de novo a cada render (o hook não memoriza
+  // as funções). Se ele entrar nas dependências do efeito de saída lá
+  // embaixo, a "limpeza" roda a cada render em vez de só ao sair —
+  // e como ela gravava o pendente sem zerá-lo, cada gravação gerava um
+  // snapshot, que gerava um render, que gravava de novo. Esse loop
+  // queimou as 20 mil gravações diárias do Firebase em 15/out/2026.
+  // Por isso a função e o usuário vivem em ref: o efeito depende só
+  // do documento aberto.
+  const salvarRef = useRef(updateDocument);
+  salvarRef.current = updateDocument;
+  const nomeRef = useRef(user?.name);
+  nomeRef.current = user?.name;
+
   const gravar = useCallback((patch) => {
     if (!docId) return;
     pendenteRef.current = { ...(pendenteRef.current || {}), ...patch };
@@ -104,11 +117,12 @@ export default function DocEditorPage() {
     timer.current = setTimeout(async () => {
       const carga = pendenteRef.current;
       pendenteRef.current = null;
-      const res = await updateDocument(docId, carga, user?.name);
+      if (!carga) { setSalvando(false); return; }
+      const res = await salvarRef.current(docId, carga, nomeRef.current);
       setSalvando(false);
       if (!res.success) toast(`Não foi possível salvar: ${res.error}`, 'e');
     }, ATRASO_SALVAR);
-  }, [docId, updateDocument, user, toast]);
+  }, [docId, toast]);
 
   // O rascunho local absorve a digitação; o Firestore recebe depois
   // do intervalo. Sem isso, cada tecla vira uma escrita.
@@ -129,13 +143,18 @@ export default function DocEditorPage() {
     if (dados !== original) gravar({ dados });
   }, [documento, doc, gravar]);
 
-  // Grava o que estiver pendente ao sair da página.
-  useEffect(() => () => {
-    if (pendenteRef.current && docId) {
-      updateDocument(docId, pendenteRef.current, user?.name);
-    }
-    clearTimeout(timer.current);
-  }, [docId, updateDocument, user]);
+  // Grava o que estiver pendente ao sair da página (ou trocar de
+  // documento). O pendente é zerado ANTES de gravar: assim, mesmo que
+  // a limpeza rode de novo, nunca grava a mesma carga duas vezes.
+  useEffect(() => {
+    const timerAtual = timer;
+    return () => {
+      const carga = pendenteRef.current;
+      pendenteRef.current = null;
+      clearTimeout(timerAtual.current);
+      if (carga && docId) salvarRef.current(docId, carga, nomeRef.current);
+    };
+  }, [docId]);
 
   // Trocar de seção recomeça do topo nas duas colunas. Sem isso, a
   // seção nova abre no meio, na altura em que a anterior estava.
