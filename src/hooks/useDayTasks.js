@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, serverTimestamp } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { addDoc, updateDoc, deleteDoc } from '../lib/gravacoes';
 import { db } from '../lib/firebase';
 import { notifyLocal } from './useDesktopNotifications';
 

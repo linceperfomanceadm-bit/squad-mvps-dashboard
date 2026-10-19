@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, query, orderBy, where, getDocs, writeBatch, arrayUnion, arrayRemove, runTransaction, deleteField } from 'firebase/firestore';
+import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, where, getDocs, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { addDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from '../lib/gravacoes';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';

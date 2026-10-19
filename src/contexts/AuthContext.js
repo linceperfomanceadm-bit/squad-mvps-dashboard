@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import {
-  collection, query, where, getDocs, updateDoc, doc, setDoc,
-} from 'firebase/firestore';
+import { collection, query, where, getDocs, doc } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { updateDoc, setDoc } from '../lib/gravacoes';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,

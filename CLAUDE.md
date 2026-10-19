@@ -75,6 +75,8 @@ Quatro arquivos acessam o Firestore direto, cada um por um motivo:
 
 Tela nova deve consumir hook. Acesso direto só com motivo forte e comentado.
 
+**Toda gravação passa pela trava (`src/lib/gravacoes.js`).** `addDoc`, `setDoc`, `updateDoc`, `deleteDoc`, `runTransaction` e `writeBatch` são importados de lá, nunca direto de `firebase/firestore` — mesma assinatura e mesmo retorno. A trava conta as gravações de cada aba (60 em 10s, 900 em 10 min, 1500 em 1h) e, se uma aba passar disso, pausa só aquela aba até recarregar e mostra o `TravaGravacoesAviso` (montado no `App.js`). Existe porque, em 15/out/2026, um loop no editor do Lince Docs queimou a cota diária de gravações do Firebase e parou o app inteiro. O stack de quem disparou a trava vai para o console.
+
 ### Storage
 
 Três áreas independentes no mesmo bucket:

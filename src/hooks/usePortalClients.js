@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, orderBy, serverTimestamp,
-} from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, orderBy, serverTimestamp } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { addDoc, updateDoc, deleteDoc } from '../lib/gravacoes';
 import { db } from '../lib/firebase';
 import { hashPassword } from '../contexts/PortalAuthContext';
 

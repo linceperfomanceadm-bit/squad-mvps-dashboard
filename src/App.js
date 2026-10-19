@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer } from './components/shared/Toast';
 import PatchNotesPopup from './components/shared/PatchNotesPopup';
 import NotificationCenter from './components/shared/NotificationCenter';
+import TravaGravacoesAviso from './components/shared/TravaGravacoesAviso';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import FirstAccessPage from './pages/FirstAccessPage';
@@ -96,6 +97,9 @@ function AppRoutes() {
       {/* Notificações de desktop — válidas em qualquer tela, por isso
           montadas aqui e não dentro de cada painel. */}
       {user && !user.firstAccess && <NotificationCenter />}
+      {/* Aviso da trava de gravações — vale para toda tela, inclusive
+          TV e páginas públicas, que também gravam no Firestore. */}
+      <TravaGravacoesAviso />
       <Routes>
         <Route path="/" element={<HomePage />} />
       <Route path="/login/:sectorId" element={<LoginPage />} />

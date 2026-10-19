@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import {
-  collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, query, where, serverTimestamp,
-} from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, where, serverTimestamp } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { addDoc, updateDoc, deleteDoc } from '../lib/gravacoes';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../lib/firebase';
 

@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  collection, onSnapshot, addDoc, updateDoc,
-  deleteDoc, doc, serverTimestamp, query, orderBy,
-  writeBatch, FieldPath,
-} from 'firebase/firestore';
+import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, FieldPath } from 'firebase/firestore';
+// Gravações passam pela trava contra loop (lib/gravacoes.js).
+import { addDoc, updateDoc, deleteDoc, writeBatch } from '../lib/gravacoes';
 import { db, mensagemDeErro } from '../lib/firebase';
 import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
 
