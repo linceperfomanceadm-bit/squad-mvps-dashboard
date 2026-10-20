@@ -615,10 +615,14 @@ export const MIDIA_MAX_MB = 200;
 // coleção que a TV anônima já tem permissão de ler:
 //   app_config/comercial            → controles da TV + time (Closers/SDRs)
 //   app_config/comercial_AAAA-MM    → meta e lançamentos de cada mês
+//   app_config/comercial_fotos      → foto de cada pessoa do time (pódio)
+// `patas`: a pata da Lince que marca 1º, 2º e 3º no pódio da TV
+// (ouro, prata e bronze), no lugar do troféu.
 export const COMERCIAL_TEAM = {
   id: 'comercial',
   label: 'Hunters',
   logo: '/logos/hunters.png',
+  patas: { 1: '/comercial/pata-1.png', 2: '/comercial/pata-2.png', 3: '/comercial/pata-3.png' },
 };
 
 // ─── Portal de Coleta de Produtos (clientes externos) ─────────

@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc } from 'firebase/firestore';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { db, auth } from '../lib/firebase';
 import { mesChave } from '../lib/entregas';
 import { resumoComercial } from '../lib/comercial';
-import { COMERCIAL_DEFAULTS, MES_VAZIO, docDoMes } from './useComercial';
+import { COMERCIAL_DEFAULTS, MES_VAZIO, docDoMes, DOC_FOTOS } from './useComercial';
+import { isTaskOverdue, overdueDays } from './useClientHealth';
 
 /*
  * useComercialTVData — alimenta a TV da sala comercial (/tv/comercial).
@@ -18,7 +19,30 @@ import { COMERCIAL_DEFAULTS, MES_VAZIO, docDoMes } from './useComercial';
  * Diferença de propósito: esta TV fica na sala do comercial e MOSTRA
  * valores (meta em R$, vendas). O modo visita esconde todo R$ e toda
  * cena de alerta.
+ *
+ * Tasks em atraso: mesmo listener estreito da TV operacional (só status
+ * em aberto, sem orderBy) e a mesma régua de atraso (isTaskOverdue), para
+ * o número bater com o que a operação vê.
  */
+
+const OPEN_STATUSES = ['todo', 'doing', 'approval'];
+
+// Clientes com task atrasada: quantas tasks e o maior atraso, do pior
+// para o melhor. Task sem cliente fica de fora — o card é por cliente.
+function atrasosPorCliente(tasks, clients, now) {
+  const nomes = {};
+  clients.forEach(c => { nomes[c.id] = c.name; });
+  const mapa = {};
+  tasks.forEach(t => {
+    if (!isTaskOverdue(t, now)) return;
+    const chave = t.clientId || t.clientName;
+    if (!chave) return;
+    if (!mapa[chave]) mapa[chave] = { id: chave, nome: nomes[t.clientId] || t.clientName || 'Cliente', tasks: 0, dias: 0 };
+    mapa[chave].tasks += 1;
+    mapa[chave].dias = Math.max(mapa[chave].dias, overdueDays(t, now));
+  });
+  return Object.values(mapa).sort((a, b) => b.tasks - a.tasks || b.dias - a.dias || a.nome.localeCompare(b.nome));
+}
 export function useComercialTVData() {
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState('');
@@ -26,6 +50,8 @@ export function useComercialTVData() {
   const [config, setConfig] = useState(COMERCIAL_DEFAULTS);
   const [dadosMes, setDadosMes] = useState(MES_VAZIO);
   const [clients, setClients] = useState([]);
+  const [openTasks, setOpenTasks] = useState([]);
+  const [fotos, setFotos] = useState({});
   const [loadingMes, setLoadingMes] = useState(true);
   const [loadingClients, setLoadingClients] = useState(true);
   const [celebration, setCelebration] = useState(null);
@@ -97,13 +123,34 @@ export function useComercialTVData() {
     }, () => { setLoadingClients(false); setOnline(false); });
   }, [authReady]);
 
+  // ── Tasks em aberto (card "Tasks em atraso" do Sinal vermelho) ─
+  useEffect(() => {
+    if (!authReady) return undefined;
+    const q = query(collection(db, 'tasks'), where('status', 'in', OPEN_STATUSES));
+    return onSnapshot(q, snap => {
+      setOpenTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, () => { /* sem tasks, o card só fica vazio */ });
+  }, [authReady]);
+
+  // ── Fotos do time (pódio e comemoração) ──────────────────────
+  useEffect(() => {
+    if (!authReady) return undefined;
+    return onSnapshot(doc(db, 'app_config', DOC_FOTOS), snap => {
+      setFotos(snap.exists() ? snap.data() : {});
+    }, () => { /* sem foto, o pódio usa as iniciais */ });
+  }, [authReady]);
+
   const resumo = useMemo(
     () => resumoComercial({ config, dadosMes, clients, mes, agora: new Date(nowTs) }),
     [config, dadosMes, clients, mes, nowTs]
   );
 
+  const atrasos = useMemo(() => atrasosPorCliente(openTasks, clients, new Date(nowTs)), [openTasks, clients, nowTs]);
+
   return {
     ...resumo,
+    atrasos,
+    fotos,
     config,
     authError,
     online,

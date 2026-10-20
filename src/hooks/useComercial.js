@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot, arrayUnion, arrayRemove, deleteField } from 'firebase/firestore';
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { setDoc, updateDoc, runTransaction } from '../lib/gravacoes';
 import { db } from '../lib/firebase';
@@ -19,9 +19,18 @@ import { chaveSdr } from '../lib/comercial';
  *
  *   app_config/comercial_AAAA-MM — um por mês:
  *     meta (R$), leads (qtd),
- *     vendas: [{ id, closer, cliente, valor, servico, data, by, at }],
+ *     metasCloser: { [chaveSdr(nome)]: R$ },  meta individual do mês
+ *     vendas: [{ id, closer, sdr?, cliente, valor, servico, data, by, at,
+ *                editedBy?, editedAt? }],
  *     sdr: { [chaveSdr(nome)]: { agendados, realizados, noShow } },
  *     churn: [{ id, cliente, valorMensal, motivo, data, by, at }]
+ *
+ *   app_config/comercial_fotos — { [chaveSdr(nome)]: dataURL JPEG }
+ *     Foto de cada pessoa do time para o pódio da TV. Fica num documento
+ *     à parte (e não em app_config/comercial) para a TV não baixar as
+ *     fotos de novo a cada pausa ou troca de rádio. Vai como imagem
+ *     reduzida dentro do Firestore, e não no Storage, porque a TV entra
+ *     anônima e já tem leitura em app_config — sem regra nova.
  *
  * O mês é o do calendário, como no resto do app.
  */
@@ -43,18 +52,24 @@ export const COMERCIAL_DEFAULTS = {
 export const MES_VAZIO = { meta: 0, leads: 0, vendas: [], sdr: {}, churn: [] };
 
 export const docDoMes = (mes) => `comercial_${mes}`;
+export const DOC_FOTOS = 'comercial_fotos';
 
 const novoId = (p) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
 export function useComercial(mes) {
   const [config, setConfig] = useState(COMERCIAL_DEFAULTS);
   const [dadosMes, setDadosMes] = useState(MES_VAZIO);
+  const [fotos, setFotos] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => onSnapshot(doc(db, 'app_config', 'comercial'), snap => {
     setConfig({ ...COMERCIAL_DEFAULTS, ...(snap.exists() ? snap.data() : {}) });
     setLoading(false);
   }, () => setLoading(false)), []);
+
+  useEffect(() => onSnapshot(doc(db, 'app_config', DOC_FOTOS), snap => {
+    setFotos(snap.exists() ? snap.data() : {});
+  }, () => setFotos({})), []);
 
   useEffect(() => {
     if (!mes) return undefined;
@@ -85,6 +100,7 @@ export function useComercial(mes) {
     const item = {
       id: novoId('v'),
       closer: venda.closer,
+      sdr: venda.sdr || '',
       cliente: String(venda.cliente).trim(),
       valor,
       servico: venda.servico || '',
@@ -94,6 +110,36 @@ export function useComercial(mes) {
     };
     try {
       await setDoc(refMes(), { vendas: arrayUnion(item) }, { merge: true });
+      return ok();
+    } catch (err) { return falha(err); }
+  };
+
+  // Editar reescreve o array inteiro numa transação (o Firestore não
+  // atualiza um item de array no lugar). O id não muda, então a TV não
+  // comemora de novo uma venda corrigida.
+  const updateVenda = async (id, venda, byName) => {
+    const valor = Number(venda?.valor);
+    if (!venda?.closer) return { success: false, error: 'Escolha o Closer.' };
+    if (!String(venda?.cliente || '').trim()) return { success: false, error: 'Informe o cliente.' };
+    if (!valor || valor <= 0) return { success: false, error: 'Informe o valor da venda.' };
+    try {
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(refMes());
+        const lista = Array.isArray(snap.data()?.vendas) ? snap.data().vendas : [];
+        if (!lista.some(v => v.id === id)) throw new Error('Essa venda não existe mais. Atualize a página.');
+        const nova = lista.map(v => (v.id !== id ? v : {
+          ...v,
+          closer: venda.closer,
+          sdr: venda.sdr || '',
+          cliente: String(venda.cliente).trim(),
+          valor,
+          servico: venda.servico || '',
+          data: venda.data || '',
+          editedBy: byName || null,
+          editedAt: new Date().toISOString(),
+        }));
+        tx.update(refMes(), { vendas: nova });
+      });
       return ok();
     } catch (err) { return falha(err); }
   };
@@ -141,8 +187,19 @@ export function useComercial(mes) {
     } catch (err) { return falha(err); }
   };
 
+  const saveFoto = async (nome, dataUrl) => {
+    try { await setDoc(doc(db, 'app_config', DOC_FOTOS), { [chaveSdr(nome)]: dataUrl }, { merge: true }); return ok(); }
+    catch (err) { return falha(err); }
+  };
+
+  const removeFoto = async (nome) => {
+    try { await setDoc(doc(db, 'app_config', DOC_FOTOS), { [chaveSdr(nome)]: deleteField() }, { merge: true }); return ok(); }
+    catch (err) { return falha(err); }
+  };
+
   return {
-    config, dadosMes, loading,
-    saveConfig, saveMes, addVenda, removeVenda, addChurn, removeChurn, ajustarSdr,
+    config, dadosMes, fotos, loading,
+    saveConfig, saveMes, addVenda, updateVenda, removeVenda, addChurn, removeChurn, ajustarSdr,
+    saveFoto, removeFoto,
   };
 }

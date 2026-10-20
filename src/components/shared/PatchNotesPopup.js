@@ -16,12 +16,14 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-10-4';
+export const PATCH_VERSION = '2026-10-5';
  
 const PATCH_NOTES = {
   date: 'Outubro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '🏆', text: 'TV do Comercial de cara nova: pódio com a foto de cada Closer e SDR, ranking com a meta individual do mês, o funil no topo da tela dos SDRs e um card com os clientes que têm tasks em atraso.' },
+    { emoji: '✏️', text: 'Comercial (painel do líder): agora dá para corrigir uma venda já lançada, marcar qual SDR agendou a call que virou venda, definir a meta individual de cada Closer e colocar a foto de cada pessoa do time.' },
     { emoji: '🗓️', text: 'Social Media: nova aba Planejamentos. Monte o mês de cada cliente em cards numerados, com legenda, ideia e a arte (imagem, carrossel ou vídeo), e veja a prévia do feed antes de enviar.' },
     { emoji: '🔗', text: 'O planejamento vai para o cliente por um link que abre sem login. Ele aprova cada post ou pede ajuste com um comentário, e o status muda na hora no seu calendário. Entregas do Mês e o checklist do Mural continuam sendo marcados por você.' },
     { emoji: '📅', text: 'Nova aba Calendário para Social Media e Videomaker. A Social vê todos os posts da carteira, do rascunho ao publicado; o Videomaker vê os reels dos clientes dele, com prazo de entrega do vídeo, e pode marcar captação, treinamento e reunião na própria agenda.' },

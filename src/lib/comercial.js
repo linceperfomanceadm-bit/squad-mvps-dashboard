@@ -9,11 +9,17 @@ import { mesChave, inicioDoMes, fimDoMes, fracaoDoMes } from './entregas';
  * Entradas: `config` (app_config/comercial), `dadosMes`
  * (app_config/comercial_AAAA-MM) e `clients` (para carteira, contratos
  * e churn registrado pela CS).
+ *
+ * A meta individual de cada Closer fica no mês (`metasCloser`), porque
+ * muda de um mês para o outro. A venda guarda também o SDR que agendou
+ * a call (`sdr`, opcional — vendas antigas não têm), e é daí que sai o
+ * "vendas geradas" de cada SDR.
  */
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
-// Nome do SDR vira chave de mapa no Firestore. Ponto e alguns símbolos
-// quebram o caminho do campo, então são trocados por "_".
+// Nome da pessoa vira chave de mapa no Firestore (contadores do SDR,
+// meta individual do Closer, foto). Ponto e alguns símbolos quebram o
+// caminho do campo, então são trocados por "_".
 export const chaveSdr = (nome) => String(nome || '').replace(/[.~*/[\]`]/g, '_');
 const norm = (s) => String(s || '').trim().toLowerCase();
 
@@ -49,11 +55,17 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
   const esperadoHoje = meta * fracaoDoMes(mes, agora);
 
   // ── Ranking de Closers (time cadastrado + quem aparece em venda) ──
+  const metasCloser = dadosMes.metasCloser || {};
   const nomesCloser = new Set([...(config.closers || []), ...vendas.map(v => v.closer)].filter(Boolean));
   const closers = [...nomesCloser].map(nome => {
     const minhas = vendas.filter(v => v.closer === nome);
     const valor = minhas.reduce((s, v) => s + num(v.valor), 0);
-    return { nome, valor, qtd: minhas.length, ticket: minhas.length ? valor / minhas.length : 0 };
+    const metaInd = num(metasCloser[chaveSdr(nome)]);
+    return {
+      nome, valor, qtd: minhas.length, ticket: minhas.length ? valor / minhas.length : 0,
+      meta: metaInd,
+      ating: metaInd ? Math.round((valor / metaInd) * 100) : null,
+    };
   }).sort((a, b) => b.valor - a.valor || b.qtd - a.qtd || a.nome.localeCompare(b.nome));
 
   // ── Ranking de SDRs ──────────────────────────────────────────
@@ -64,7 +76,13 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
     const realizados = num(d.realizados);
     const noShow = num(d.noShow);
     const base = realizados + noShow;
-    return { nome, agendados, realizados, noShow, comparecimento: base ? Math.round((realizados / base) * 100) : null };
+    const geradas = vendas.filter(v => v.sdr === nome);
+    return {
+      nome, agendados, realizados, noShow,
+      comparecimento: base ? Math.round((realizados / base) * 100) : null,
+      vendas: geradas.length,
+      valorVendas: geradas.reduce((s, v) => s + num(v.valor), 0),
+    };
   }).sort((a, b) => b.agendados - a.agendados || b.realizados - a.realizados || a.nome.localeCompare(b.nome));
 
   const agendados = sdrs.reduce((s, x) => s + x.agendados, 0);
@@ -111,6 +129,11 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
   });
   let acc = 0;
   const acumulado = porDia.map((v, i) => { acc += v; return i < hojeDia ? acc : null; });
+  // Ritmo para bater a meta, no mesmo relógio de dias úteis do "ritmo de
+  // hoje": a linha anda só de segunda a sexta e fica reta no fim de semana.
+  const ritmo = meta
+    ? porDia.map((_, i) => meta * fracaoDoMes(mes, new Date(ini.getFullYear(), ini.getMonth(), i + 1, 23, 59, 59)))
+    : [];
 
   return {
     mes,
@@ -132,6 +155,7 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
       taxaAgendamento: taxa(agendados, leads),
       taxaComparecimento: taxa(realizados, realizados + noShows),
       taxaFechamento: taxa(nVendas, realizados),
+      taxaTotal: taxa(nVendas, leads),
     },
     noShows,
     vendasRecentes: vendas.slice(0, 7),
@@ -140,6 +164,6 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
     mrrPerdido,
     vencendo,
     emRisco,
-    curva: { acumulado, diasNoMes },
+    curva: { acumulado, ritmo, diasNoMes, hojeDia },
   };
 }
