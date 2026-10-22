@@ -16,12 +16,13 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-10-5';
+export const PATCH_VERSION = '2026-10-6';
  
 const PATCH_NOTES = {
   date: 'Outubro de 2026',
   title: 'Novidades no painel',
   items: [
+    { emoji: '🎯', text: 'SDRs agora têm meta de agendamentos e pontuação: 1 ponto por reunião realizada e 5 por assistência (call agendada que virou venda). O ranking dos SDRs na TV do Comercial passa a ser por pontos.' },
     { emoji: '🏆', text: 'TV do Comercial de cara nova: pódio com a foto de cada Closer e SDR, ranking com a meta individual do mês, o funil no topo da tela dos SDRs e um card com os clientes que têm tasks em atraso.' },
     { emoji: '✏️', text: 'Comercial (painel do líder): agora dá para corrigir uma venda já lançada, marcar qual SDR agendou a call que virou venda, definir a meta individual de cada Closer e colocar a foto de cada pessoa do time.' },
     { emoji: '🗓️', text: 'Social Media: nova aba Planejamentos. Monte o mês de cada cliente em cards numerados, com legenda, ideia e a arte (imagem, carrossel ou vídeo), e veja a prévia do feed antes de enviar.' },

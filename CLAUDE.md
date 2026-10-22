@@ -222,8 +222,10 @@ CPF, CNPJ, valor e pagamento são só escrita na edição: a tela diz "já cadas
 Tudo lançado à mão pelo líder do comercial (o CRM é externo). Fica em `app_config` porque é a coleção que a TV anônima já lê:
 
 - `app_config/comercial` — controles da TV comercial (mesmos campos `tv*` da TV operacional) + `closers[]` e `sdrs[]`.
-- `app_config/comercial_AAAA-MM` — `meta`, `leads`, `metasCloser{ [chaveSdr(nome)]: R$ }` (meta individual do mês), `vendas[]` (cada uma com `sdr` opcional — quem agendou a call; vendas antigas não têm), `sdr{ [chaveSdr(nome)]: { agendados, realizados, noShow } }`, `churn[]`.
+- `app_config/comercial_AAAA-MM` — `meta`, `leads`, `metasCloser{ [chaveSdr(nome)]: R$ }` (meta individual do mês), `metasSdr{ [chaveSdr(nome)]: qtd }` (meta de agendamentos do SDR), `vendas[]` (cada uma com `sdr` opcional — quem agendou a call; vendas antigas não têm), `sdr{ [chaveSdr(nome)]: { agendados, realizados, noShow } }`, `churn[]`.
 - `app_config/comercial_fotos` — `{ [chaveSdr(nome)]: dataURL }`, a foto de cada pessoa do time para o pódio, reduzida no navegador para 480×720 JPEG. Fica no Firestore (e não no Storage) porque a TV anônima já lê `app_config`; e num documento à parte para não pesar o listener dos controles da TV.
+
+Pontuação dos SDRs (`SDR_PONTOS` em `firebase.js`): 1 ponto por reunião realizada, 5 por assistência — venda lançada com o SDR marcado. O ranking dos SDRs é por pontos.
 
 Venda lançada pode ser corrigida (`updateVenda`, transação que reescreve o array mantendo o `id`, então a TV não comemora de novo).
 

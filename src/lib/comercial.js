@@ -1,4 +1,4 @@
-import { stageOf, contractState } from './firebase';
+import { stageOf, contractState, SDR_PONTOS } from './firebase';
 import { businessMsBetween, BUSINESS_MS_PER_DAY } from './taskTime';
 import { mesChave, inicioDoMes, fimDoMes, fracaoDoMes } from './entregas';
 
@@ -14,6 +14,11 @@ import { mesChave, inicioDoMes, fimDoMes, fracaoDoMes } from './entregas';
  * muda de um mês para o outro. A venda guarda também o SDR que agendou
  * a call (`sdr`, opcional — vendas antigas não têm), e é daí que sai o
  * "vendas geradas" de cada SDR.
+ *
+ * SDRs: meta de agendamentos do mês (`metasSdr`) e pontuação —
+ * SDR_PONTOS.realizada por reunião realizada e SDR_PONTOS.assistencia
+ * por assistência (venda lançada com o SDR marcado). O ranking é por
+ * pontos.
  */
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -70,6 +75,7 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
 
   // ── Ranking de SDRs ──────────────────────────────────────────
   const sdrMap = dadosMes.sdr || {};
+  const metasSdr = dadosMes.metasSdr || {};
   const sdrs = (config.sdrs || []).filter(Boolean).map(nome => {
     const d = sdrMap[chaveSdr(nome)] || {};
     const agendados = num(d.agendados);
@@ -77,13 +83,17 @@ export function resumoComercial({ config = {}, dadosMes = {}, clients = [], mes 
     const noShow = num(d.noShow);
     const base = realizados + noShow;
     const geradas = vendas.filter(v => v.sdr === nome);
+    const metaAg = num(metasSdr[chaveSdr(nome)]);
     return {
       nome, agendados, realizados, noShow,
       comparecimento: base ? Math.round((realizados / base) * 100) : null,
       vendas: geradas.length,
       valorVendas: geradas.reduce((s, v) => s + num(v.valor), 0),
+      meta: metaAg,
+      ating: metaAg ? Math.round((agendados / metaAg) * 100) : null,
+      pontos: realizados * SDR_PONTOS.realizada + geradas.length * SDR_PONTOS.assistencia,
     };
-  }).sort((a, b) => b.agendados - a.agendados || b.realizados - a.realizados || a.nome.localeCompare(b.nome));
+  }).sort((a, b) => b.pontos - a.pontos || b.agendados - a.agendados || b.realizados - a.realizados || a.nome.localeCompare(b.nome));
 
   const agendados = sdrs.reduce((s, x) => s + x.agendados, 0);
   const realizados = sdrs.reduce((s, x) => s + x.realizados, 0);

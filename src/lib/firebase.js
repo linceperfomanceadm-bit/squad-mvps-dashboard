@@ -625,6 +625,11 @@ export const COMERCIAL_TEAM = {
   patas: { 1: '/comercial/pata-1.png', 2: '/comercial/pata-2.png', 3: '/comercial/pata-3.png' },
 };
 
+// Pontuação dos SDRs (regra do comercial): cada reunião que o SDR agendou
+// e que foi realizada vale 1 ponto; cada assistência — call agendada por
+// ele que virou venda — vale 5. O ranking dos SDRs é por pontos.
+export const SDR_PONTOS = { realizada: 1, assistencia: 5 };
+
 // ─── Portal de Coleta de Produtos (clientes externos) ─────────
 // Plataformas de e-commerce que o cliente pode ter. "Outro" abre
 // campo de texto livre na criação do acesso.

@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { Plus, Minus, Trash2, X, Save, Pencil, Camera } from 'lucide-react';
-import { SALE_SERVICES } from '../../lib/firebase';
+import { SALE_SERVICES, SDR_PONTOS } from '../../lib/firebase';
 import { rotuloMes } from '../../lib/entregas';
 import { resumoComercial, chaveSdr } from '../../lib/comercial';
 import { Grid, Kpi, Card, Empty, Goal } from '../shared/ui';
@@ -75,7 +75,7 @@ export default function ComercialLancamentos({ com, clients, mes, me, toast }) {
       </Grid>
 
       <div style={S.duas}>
-        <MetaBloco dadosMes={dadosMes} mes={mes} closers={config.closers || []} onSave={async (patch) => aviso(await com.saveMes(patch), 'Metas do mês salvas.')} />
+        <MetaBloco dadosMes={dadosMes} mes={mes} closers={config.closers || []} sdrs={config.sdrs || []} onSave={async (patch) => aviso(await com.saveMes(patch), 'Metas do mês salvas.')} />
         <TimeBloco
           config={config}
           fotos={com.fotos || {}}
@@ -115,7 +115,7 @@ export default function ComercialLancamentos({ com, clients, mes, me, toast }) {
 // atingimento.
 const metasParaTexto = (m) => Object.fromEntries(Object.entries(m || {}).map(([k, v]) => [k, v ? String(v) : '']));
 
-function MetaBloco({ dadosMes, mes, closers, onSave }) {
+function MetaBloco({ dadosMes, mes, closers, sdrs, onSave }) {
   const [meta, setMeta] = useState(dadosMes.meta ? String(dadosMes.meta) : '');
   const [leads, setLeads] = useState(dadosMes.leads ? String(dadosMes.leads) : '');
   const metasJson = JSON.stringify(dadosMes.metasCloser || {});
@@ -126,16 +126,23 @@ function MetaBloco({ dadosMes, mes, closers, onSave }) {
   // Compara pelo conteúdo: o objeto muda a cada lançamento do mês e
   // apagaria o que o líder está digitando.
   useEffect(() => { setInd(metasParaTexto(JSON.parse(metasJson))); }, [metasJson]);
+  const metasSdrJson = JSON.stringify(dadosMes.metasSdr || {});
+  const [indSdr, setIndSdr] = useState(() => metasParaTexto(dadosMes.metasSdr));
+  useEffect(() => { setIndSdr(metasParaTexto(JSON.parse(metasSdrJson))); }, [metasSdrJson]);
 
   const salvas = JSON.parse(metasJson);
-  const mudouInd = closers.some(n => String(ind[chaveSdr(n)] || '') !== String(salvas[chaveSdr(n)] || ''));
+  const salvasSdr = JSON.parse(metasSdrJson);
+  const mudouInd = closers.some(n => String(ind[chaveSdr(n)] || '') !== String(salvas[chaveSdr(n)] || ''))
+    || sdrs.some(n => String(indSdr[chaveSdr(n)] || '') !== String(salvasSdr[chaveSdr(n)] || ''));
   const mudou = String(meta) !== String(dadosMes.meta || '') || String(leads) !== String(dadosMes.leads || '') || mudouInd;
+  const somaSdr = sdrs.reduce((t, n) => t + (Number(indSdr[chaveSdr(n)]) || 0), 0);
   const soma = closers.reduce((t, n) => t + (Number(ind[chaveSdr(n)]) || 0), 0);
 
   const salvar = () => onSave({
     meta: Number(meta) || 0,
     leads: Number(leads) || 0,
     metasCloser: Object.fromEntries(closers.map(n => [chaveSdr(n), Number(ind[chaveSdr(n)]) || 0])),
+    metasSdr: Object.fromEntries(sdrs.map(n => [chaveSdr(n), Number(indSdr[chaveSdr(n)]) || 0])),
   });
 
   return (
@@ -173,6 +180,31 @@ function MetaBloco({ dadosMes, mes, closers, onSave }) {
           <p style={{ ...S.nota, marginTop: 8 }}>
             Soma das metas individuais: <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{money(soma)}</span>
             {Number(meta) > 0 && <> de {money(Number(meta))} da meta do mês</>}
+          </p>
+        </>
+      )}
+
+      <p style={{ ...LBL, marginTop: 16 }}>META DE AGENDAMENTOS DOS SDRS (CALLS)</p>
+      {sdrs.length === 0 ? (
+        <p style={{ ...S.nota, marginTop: 6 }}>Cadastre os SDRs em "Time comercial".</p>
+      ) : (
+        <>
+          <div style={S.metasInd}>
+            {sdrs.map(n => (
+              <label key={n} style={S.metaInd}>
+                <span style={S.titulo}>{n}</span>
+                <input
+                  type="number" min={0}
+                  value={indSdr[chaveSdr(n)] || ''}
+                  onChange={e => { const v = e.target.value; setIndSdr(x => ({ ...x, [chaveSdr(n)]: v })); }}
+                  placeholder="Sem meta"
+                  style={{ ...INP, fontFamily: 'var(--fm)' }}
+                />
+              </label>
+            ))}
+          </div>
+          <p style={{ ...S.nota, marginTop: 8 }}>
+            Soma das metas de agendamento: <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{somaSdr}</span> calls
           </p>
         </>
       )}
@@ -406,19 +438,28 @@ function SdrBloco({ sdrs, onAjustar }) {
     </div>
   );
   return (
-    <Card title="Agendamentos dos SDRs" sub="some a cada reunião marcada, realizada ou que o cliente faltou" style={{ marginBottom: 14 }}>
+    <Card title="Agendamentos e pontos dos SDRs" sub="some a cada reunião marcada, realizada ou que o cliente faltou" style={{ marginBottom: 14 }}>
+      <p style={{ ...S.nota, margin: '6px 0 4px' }}>
+        Pontos: {SDR_PONTOS.realizada} por reunião realizada e {SDR_PONTOS.assistencia} por assistência.
+        Assistência é a venda lançada com o SDR marcado, em "Vendas" (dá para corrigir uma venda antiga pelo lápis e incluir o SDR).
+      </p>
       {sdrs.length === 0 ? <Empty>Cadastre os SDRs em "Time comercial".</Empty> : (
         <div style={{ overflowX: 'auto' }}>
           <div style={{ ...S.sdrHead }}>
-            <span>SDR</span><span>Agendados</span><span>Realizados</span><span>No-show</span><span>Comparecimento</span>
+            <span>SDR</span><span>Agendados</span><span>Realizados</span><span>No-show</span><span>Comparec.</span><span>Assistências</span><span>Pontos</span>
           </div>
           {sdrs.map(s => (
             <div key={s.nome} style={S.sdrLinha}>
-              <span style={S.titulo}>{s.nome}</span>
+              <div style={{ minWidth: 0 }}>
+                <p style={S.titulo}>{s.nome}</p>
+                <p style={S.nota}>{s.meta ? `${s.agendados} de ${s.meta} agendamentos · ${s.ating}%` : 'sem meta de agendamentos'}</p>
+              </div>
               {cont(s.nome, 'agendados', s.agendados)}
               {cont(s.nome, 'realizados', s.realizados)}
               {cont(s.nome, 'noShow', s.noShow, s.noShow ? 'var(--red)' : undefined)}
               <span style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--muted)' }}>{s.comparecimento == null ? '—' : `${s.comparecimento}%`}</span>
+              <span style={{ fontFamily: 'var(--fm)', fontSize: 13, color: 'var(--text)' }}>{s.vendas}</span>
+              <span style={{ fontFamily: 'var(--fm)', fontSize: 15, fontWeight: 600, color: 'var(--c)' }}>{s.pontos} pts</span>
             </div>
           ))}
         </div>
@@ -485,6 +526,6 @@ const S = {
   formChurn: { display: 'grid', gridTemplateColumns: '1.4fr 160px 1.4fr 150px auto', gap: 8, alignItems: 'center' },
   linha: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' },
   iconBtn: { width: 30, height: 30, flexShrink: 0, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg3)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },
-  sdrHead: { display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) 130px 130px 130px 120px', gap: 12, fontSize: 11, color: 'var(--muted)', padding: '10px 0 8px', borderBottom: '1px solid var(--border)', minWidth: 660 },
-  sdrLinha: { display: 'grid', gridTemplateColumns: 'minmax(140px,1fr) 130px 130px 130px 120px', gap: 12, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)', minWidth: 660 },
+  sdrHead: { display: 'grid', gridTemplateColumns: 'minmax(170px,1fr) 120px 120px 120px 80px 90px 80px', gap: 12, fontSize: 11, color: 'var(--muted)', padding: '10px 0 8px', borderBottom: '1px solid var(--border)', minWidth: 860 },
+  sdrLinha: { display: 'grid', gridTemplateColumns: 'minmax(170px,1fr) 120px 120px 120px 80px 90px 80px', gap: 12, alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)', minWidth: 860 },
 };
