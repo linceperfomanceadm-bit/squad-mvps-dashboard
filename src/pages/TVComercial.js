@@ -503,13 +503,14 @@ function SceneClosers({ d }) {
 }
 
 // SDRs: o ranking é por pontos (SDR_PONTOS — reunião realizada e
-// assistência). Ao lado, a meta de agendamentos do mês com a marca do
-// ritmo de hoje, igual à meta individual dos Closers.
+// assistência). Ao lado, a meta de pontos do mês com a marca do ritmo
+// de hoje, igual à meta individual dos Closers. Agendamentos, no-show
+// e assistências ficam só como detalhe na linha de baixo.
 function SceneSdrs({ d }) {
   if (!d.sdrs.length) {
     return <section className="hc-card hc-pad" style={{ gridColumn: '1 / -1' }}><div className="hc-empty" style={{ color: '#a3aab5' }}>Cadastre os SDRs no painel da CS.</div></section>;
   }
-  const max = Math.max(1, ...d.sdrs.map(s => s.agendados));
+  const max = Math.max(1, ...d.sdrs.map(s => s.pontos));
   const ritmo = Math.min(100, d.fracao * 100);
   const assist = (n) => `${n} ${n === 1 ? 'assistência' : 'assistências'}`;
   const corpo = (s) => ({
@@ -517,14 +518,14 @@ function SceneSdrs({ d }) {
     info: <span>{s.realizados} {s.realizados === 1 ? 'realizada' : 'realizadas'} · {assist(s.vendas)}</span>,
     chip: s.ating == null
       ? <span className="hc-chip"><b>{s.agendados}</b>agendados</span>
-      : <span className={`hc-chip ${s.ating >= 100 ? 'gold' : ''}`}><b>{s.ating}%</b>da meta de agendamentos</span>,
+      : <span className={`hc-chip ${s.ating >= 100 ? 'gold' : ''}`}><b>{s.ating}%</b>da meta de pontos</span>,
   });
   return (
     <>
       <Podio itens={d.sdrs} fotos={d.fotos} corpo={corpo} />
       <section className="hc-card hc-pad">
         <h3 className="hc-t">
-          <CalendarClock size={18} /> Pontos e meta de agendamentos
+          <CalendarClock size={18} /> Pontos e meta do mês
           <span className="hc-legrow">{SDR_PONTOS.realizada} pt por realizada · {SDR_PONTOS.assistencia} pts por assistência</span>
         </h3>
         <div className="hc-rlist">
@@ -542,13 +543,14 @@ function SceneSdrs({ d }) {
                         {ritmo > 0 && ritmo < 100 && <span className="hc-tick" style={{ left: `${ritmo}%` }} />}
                       </>
                     ) : (
-                      <div className="hc-bar silver"><i style={{ width: `${(s.agendados / max) * 100}%` }} /></div>
+                      <div className="hc-bar silver"><i style={{ width: `${(s.pontos / max) * 100}%` }} /></div>
                     )}
                   </div>
                   <b style={{ color: s.ating >= 100 ? GOLD : '#eef1f5' }}>{s.ating == null ? '—' : `${s.ating}%`}</b>
                 </div>
                 <div className="sub">
-                  {s.meta ? <><b>{s.agendados}</b> de {s.meta} agendados</> : <><b>{s.agendados}</b> agendados · sem meta</>}
+                  {s.meta ? <><b>{s.pontos}</b> de {s.meta} pts</> : <>sem meta</>}
+                  {' · '}<b>{s.agendados}</b> agendados
                   {' · '}<b>{s.realizados}</b> realizados · <span className={s.noShow ? 'red' : ''}>{s.noShow} no-show</span>
                   {' · '}<b>{s.vendas}</b> {s.vendas === 1 ? 'assistência' : 'assistências'}
                 </div>

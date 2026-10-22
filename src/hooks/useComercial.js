@@ -20,7 +20,8 @@ import { chaveSdr } from '../lib/comercial';
  *   app_config/comercial_AAAA-MM — um por mês:
  *     meta (R$), leads (qtd),
  *     metasCloser: { [chaveSdr(nome)]: R$ },  meta individual do mês
- *     metasSdr: { [chaveSdr(nome)]: qtd },    meta de agendamentos do SDR
+ *     metasPontosSdr: { [chaveSdr(nome)]: pts }, meta de pontos do SDR
+ *     metasSdr: { ... }   antiga meta de agendamentos — sem uso desde 22/out/2026
  *     vendas: [{ id, closer, sdr?, cliente, valor, servico, data, by, at,
  *                editedBy?, editedAt? }],
  *     sdr: { [chaveSdr(nome)]: { agendados, realizados, noShow } },

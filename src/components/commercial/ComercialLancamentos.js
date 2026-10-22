@@ -126,8 +126,10 @@ function MetaBloco({ dadosMes, mes, closers, sdrs, onSave }) {
   // Compara pelo conteúdo: o objeto muda a cada lançamento do mês e
   // apagaria o que o líder está digitando.
   useEffect(() => { setInd(metasParaTexto(JSON.parse(metasJson))); }, [metasJson]);
-  const metasSdrJson = JSON.stringify(dadosMes.metasSdr || {});
-  const [indSdr, setIndSdr] = useState(() => metasParaTexto(dadosMes.metasSdr));
+  // Meta dos SDRs é em pontos (metasPontosSdr). A antiga, de
+  // agendamentos (metasSdr), não é mais lida nem gravada.
+  const metasSdrJson = JSON.stringify(dadosMes.metasPontosSdr || {});
+  const [indSdr, setIndSdr] = useState(() => metasParaTexto(dadosMes.metasPontosSdr));
   useEffect(() => { setIndSdr(metasParaTexto(JSON.parse(metasSdrJson))); }, [metasSdrJson]);
 
   const salvas = JSON.parse(metasJson);
@@ -142,7 +144,7 @@ function MetaBloco({ dadosMes, mes, closers, sdrs, onSave }) {
     meta: Number(meta) || 0,
     leads: Number(leads) || 0,
     metasCloser: Object.fromEntries(closers.map(n => [chaveSdr(n), Number(ind[chaveSdr(n)]) || 0])),
-    metasSdr: Object.fromEntries(sdrs.map(n => [chaveSdr(n), Number(indSdr[chaveSdr(n)]) || 0])),
+    metasPontosSdr: Object.fromEntries(sdrs.map(n => [chaveSdr(n), Number(indSdr[chaveSdr(n)]) || 0])),
   });
 
   return (
@@ -184,7 +186,7 @@ function MetaBloco({ dadosMes, mes, closers, sdrs, onSave }) {
         </>
       )}
 
-      <p style={{ ...LBL, marginTop: 16 }}>META DE AGENDAMENTOS DOS SDRS (CALLS)</p>
+      <p style={{ ...LBL, marginTop: 16 }}>META DE PONTOS DOS SDRS</p>
       {sdrs.length === 0 ? (
         <p style={{ ...S.nota, marginTop: 6 }}>Cadastre os SDRs em "Time comercial".</p>
       ) : (
@@ -204,7 +206,8 @@ function MetaBloco({ dadosMes, mes, closers, sdrs, onSave }) {
             ))}
           </div>
           <p style={{ ...S.nota, marginTop: 8 }}>
-            Soma das metas de agendamento: <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{somaSdr}</span> calls
+            Soma das metas: <span style={{ fontFamily: 'var(--fm)', color: 'var(--text)' }}>{somaSdr}</span> pts
+            {' · '}{SDR_PONTOS.realizada} pt por reunião realizada e {SDR_PONTOS.assistencia} por assistência
           </p>
         </>
       )}
@@ -452,7 +455,7 @@ function SdrBloco({ sdrs, onAjustar }) {
             <div key={s.nome} style={S.sdrLinha}>
               <div style={{ minWidth: 0 }}>
                 <p style={S.titulo}>{s.nome}</p>
-                <p style={S.nota}>{s.meta ? `${s.agendados} de ${s.meta} agendamentos · ${s.ating}%` : 'sem meta de agendamentos'}</p>
+                <p style={S.nota}>{s.meta ? `${s.pontos} de ${s.meta} pts · ${s.ating}% da meta` : 'sem meta de pontos'}</p>
               </div>
               {cont(s.nome, 'agendados', s.agendados)}
               {cont(s.nome, 'realizados', s.realizados)}
