@@ -1,7 +1,8 @@
 import React from 'react';
-import { Check, X, Trash2, Plus, Repeat, CircleDot, Lock } from 'lucide-react';
-import { SECTORS, ENTREGAVEIS, ENTREGA_SECTORS } from '../../lib/firebase';
+import { Check, X, Trash2, Plus, Repeat, CircleDot, Lock, ListPlus } from 'lucide-react';
+import { SECTORS, ENTREGAVEIS, ENTREGA_SECTORS, BRIEFING_MIN_PALAVRAS, BRIEFING_MIN_DISTINTAS } from '../../lib/firebase';
 import { novoIdItem } from '../../lib/entregas';
+import { avaliarBriefing, roteiroBriefing } from '../../lib/cadastro';
 import { asArray } from '../../lib/wdJobs';
 import { LBL, INP } from '../commercial/ui';
 
@@ -32,6 +33,45 @@ export function Campo({ label, value, onChange, placeholder, area, rows = 3, typ
       {area
         ? <textarea rows={rows} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ ...INP, marginTop: 6, resize: 'vertical' }} />
         : <input type={type || 'text'} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder} style={{ ...INP, marginTop: 6, ...(type === 'date' ? { colorScheme: 'dark light' } : null) }} />}
+    </div>
+  );
+}
+
+// Briefing com medidor. A trava em si é do `errosPorEtapa`; aqui a CS
+// vê o quanto falta enquanto escreve, em vez de só descobrir no fim.
+// `exigido` falso (edição sem mexer no briefing) mostra o medidor sem
+// cobrar — cliente antigo continua editável.
+export function CampoBriefing({ value, onChange, exigido }) {
+  const b = avaliarBriefing(value);
+  const vazio = !String(value || '').trim();
+  const pct = Math.min(1, Math.min(b.palavras / BRIEFING_MIN_PALAVRAS, b.distintas / BRIEFING_MIN_DISTINTAS));
+  const cor = b.ok ? 'var(--green)' : exigido ? 'var(--amber)' : 'var(--dim)';
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <p style={{ ...LBL, flex: 1 }}>BRIEFING{exigido ? ' *' : ''}</p>
+        {vazio && (
+          <button type="button" className="ui-btn small" onClick={() => onChange(roteiroBriefing())} title="Coloca um título por tópico para você responder embaixo">
+            <ListPlus size={13} /> Inserir roteiro
+          </button>
+        )}
+      </div>
+      <textarea
+        rows={8}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Contexto do cliente para o time: o que ele faz, público, diferenciais, concorrentes, referências, tom de voz, expectativas..."
+        style={{ ...INP, marginTop: 6, resize: 'vertical' }}
+      />
+      <div style={S.medidor}>
+        <div style={{ ...S.medidorBarra, width: `${Math.round(pct * 100)}%`, background: cor }} />
+      </div>
+      <p style={{ ...S.hint, marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, color: b.ok ? 'var(--green)' : 'var(--muted)' }}>
+        {b.ok && <Check size={12} />}
+        {b.ok
+          ? 'Briefing completo.'
+          : `${b.palavras} de ${BRIEFING_MIN_PALAVRAS} palavras. É o que o time operacional lê para entender o negócio do cliente — escreva o contexto real, não um resumo.`}
+      </p>
     </div>
   );
 }
@@ -206,6 +246,8 @@ export function EscopoEditor({ itens, semRecorrencia, onChange }) {
 const S = {
   bloco: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 12, padding: 14, display: 'flex', flexDirection: 'column', gap: 10 },
   hint: { fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5 },
+  medidor: { height: 4, borderRadius: 99, background: 'var(--bg2)', border: '1px solid var(--border)', marginTop: 8, overflow: 'hidden' },
+  medidorBarra: { height: '100%', borderRadius: 99, transition: 'width .25s ease, background .25s ease' },
   respLinha: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' },
   respSetor: { fontSize: 13, color: 'var(--text)', fontWeight: 500, width: 120, flexShrink: 0, paddingTop: 7 },
   fora: { background: 'var(--red-dim)', color: 'var(--red)', borderColor: 'var(--red-b)', gap: 5 },

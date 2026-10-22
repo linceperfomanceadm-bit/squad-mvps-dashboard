@@ -354,6 +354,25 @@ export const linkValido = (v) => {
 };
 export const driveDoCliente = (c) => normalizaLink(c?.contrato?.driveUrl || c?.driveUrl || '');
 
+// ─── Briefing do cliente (cadastro) ───────────────────────────
+// O briefing é o que o time operacional lê para entender o negócio do
+// cliente antes de produzir. Só "não pode ficar vazio" não bastava: a
+// CS digitava um ponto, "teste" ou "ver contrato" e passava. Por isso a
+// trava mede conteúdo de verdade — palavras, palavras diferentes (para
+// não valer repetir a mesma coisa) e nada de "aaaaaa" ou "......".
+// Os títulos do roteiro não contam como texto escrito.
+export const BRIEFING_MIN_PALAVRAS = 40;
+export const BRIEFING_MIN_DISTINTAS = 20;
+export const BRIEFING_ROTEIRO = [
+  'O que o cliente faz e o que vende',
+  'Público-alvo',
+  'Diferenciais',
+  'Concorrentes',
+  'Referências',
+  'Tom de voz',
+  'Objetivos e expectativas com a Lince',
+];
+
 // Formas de pagamento do cadastro de cliente (CS).
 export const PAYMENT_METHODS = [
   'PIX', 'Boleto', 'Cartão de Crédito', 'Cartão de Débito', 'Transferência', 'Outro',

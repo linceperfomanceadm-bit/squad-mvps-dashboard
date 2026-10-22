@@ -1,4 +1,7 @@
-import { SALE_SERVICES, normalizaLink, linkValido, contractState } from './firebase';
+import {
+  SALE_SERVICES, normalizaLink, linkValido, contractState,
+  BRIEFING_MIN_PALAVRAS, BRIEFING_MIN_DISTINTAS, BRIEFING_ROTEIRO,
+} from './firebase';
 import { escopoParaEditar, ehEntregaUnica, mesChave } from './entregas';
 import { asArray } from './wdJobs';
 
@@ -176,12 +179,47 @@ export const listaServicos = (servicos) => Object.entries(servicos).map(([id, de
   id, desc: txt(desc), label: SALE_SERVICES.find(s => s.id === id)?.label || id,
 }));
 
+// ─── Briefing ─────────────────────────────────────────────────
+// Texto que o botão "Inserir roteiro" coloca no campo: um título por
+// linha, com espaço para a CS responder embaixo.
+export const roteiroBriefing = () => BRIEFING_ROTEIRO.map(t => `${t}:\n`).join('\n');
+
+const semAcento = (s) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+const TITULOS = BRIEFING_ROTEIRO.map(t => semAcento(t.toLowerCase()));
+
+// Mede o briefing de verdade (ver BRIEFING_* no firebase.js). Os títulos
+// do roteiro saem da conta: inserir o roteiro e não escrever nada não
+// pode passar.
+export function avaliarBriefing(texto) {
+  let limpo = semAcento(String(texto ?? '').toLowerCase());
+  TITULOS.forEach(t => { limpo = limpo.split(t).join(' '); });
+  const palavras = limpo.match(/[a-z0-9]{2,}/g) || [];
+  const distintas = new Set(palavras).size;
+  const repetido = /(\S)\1{5,}/.test(limpo);
+  const ok = !repetido && palavras.length >= BRIEFING_MIN_PALAVRAS && distintas >= BRIEFING_MIN_DISTINTAS;
+  let motivo = '';
+  if (!ok) {
+    if (!palavras.length) motivo = 'O briefing é obrigatório.';
+    else if (repetido) motivo = 'O briefing tem caracteres repetidos em sequência. Escreva o contexto real do cliente.';
+    else if (palavras.length < BRIEFING_MIN_PALAVRAS) motivo = `O briefing precisa de pelo menos ${BRIEFING_MIN_PALAVRAS} palavras sobre o negócio do cliente (tem ${palavras.length}).`;
+    else motivo = 'O briefing está repetindo as mesmas palavras. Descreva o negócio do cliente com mais detalhe.';
+  }
+  return { palavras: palavras.length, distintas, ok, motivo };
+}
+
+// O briefing passa pela trava no cadastro novo e, na edição, sempre que
+// alguém mexe nele — assim não dá para apagar ou trocar um briefing bom
+// por um ponto. Cliente antigo sem briefing não trava a edição do resto.
+export const briefingExigido = (f, { novo, briefingInicial }) =>
+  novo || txt(f.briefing) !== txt(briefingInicial);
+
 // ─── Validação por etapa ──────────────────────────────────────
 // `novo`: cadastro de cliente novo (tudo obrigatório).
 // `admin`: cadastro feito pelo admin (nasce na base com a equipe).
 // Na edição só valem as regras de formato, para não travar o
-// cliente antigo que ainda está incompleto.
-export function errosPorEtapa(f, { novo, admin, financeiroAberto }) {
+// cliente antigo que ainda está incompleto — exceto o briefing, que
+// trava sempre que é alterado (`briefingExigido`).
+export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicial = '' }) {
   const e = { cliente: '', servicos: '', contrato: '', entregas: '', equipe: '' };
   const pj = f.personType === 'pj';
   const end = f.endereco;
@@ -207,13 +245,16 @@ export function errosPorEtapa(f, { novo, admin, financeiroAberto }) {
     else if (f.hasIdVisual && !f.sectors.includes('design')) e.servicos = 'O ID Visual exige o setor Design marcado.';
   }
 
+  const briefing = briefingExigido(f, { novo, briefingInicial }) ? avaliarBriefing(f.briefing) : null;
   if (!linkValido(f.driveUrl)) e.contrato = 'O link do Drive não parece um endereço válido.';
   else if (novo) {
     if (!(Number(f.contractMonths) > 0)) e.contrato = 'Informe a duração do contrato.';
     else if (!financeiroValido(f.financeiro)) e.contrato = 'Preencha valor e forma de pagamento (as parcelas precisam bater com o total).';
-    else if (!txt(f.briefing)) e.contrato = 'O briefing é obrigatório.';
+    else if (!briefing.ok) e.contrato = briefing.motivo;
   } else if (financeiroAberto && !financeiroValido(f.financeiro)) {
     e.contrato = 'Para substituir o financeiro, preencha valor e forma de pagamento.';
+  } else if (briefing && !briefing.ok) {
+    e.contrato = briefing.motivo;
   }
 
   const itens = itensDoEscopo(f.itens);

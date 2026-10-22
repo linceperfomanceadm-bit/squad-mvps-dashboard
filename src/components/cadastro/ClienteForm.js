@@ -9,11 +9,11 @@ import {
 } from '../../lib/entregas';
 import {
   UFS, formVazio, formDoCliente, sensiveisDoCliente, contaFinanceiro, itensDoEscopo, errosPorEtapa,
-  montarClienteNovo, dadosAlterados,
+  montarClienteNovo, dadosAlterados, briefingExigido,
 } from '../../lib/cadastro';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, money } from '../commercial/ui';
 import { Tag } from '../shared/ui';
-import { Bloco, Campo, CampoSensivel, Selecao, Chip, ResponsaveisSetor, EscopoEditor } from './kit';
+import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, ResponsaveisSetor, EscopoEditor } from './kit';
 
 /*
  * CADASTRO DO CLIENTE — formulário único.
@@ -93,7 +93,7 @@ export default function ClienteForm({
   const setEnd = (k, v) => setF(x => ({ ...x, endereco: { ...x.endereco, [k]: v } }));
   const setFin = (k, v) => setF(x => ({ ...x, financeiro: { ...x.financeiro, [k]: v } }));
 
-  const erros = errosPorEtapa(f, { novo, admin: comEquipe, financeiroAberto });
+  const erros = errosPorEtapa(f, { novo, admin: comEquipe, financeiroAberto, briefingInicial: inicial.briefing });
   const idx = etapas.findIndex(e => e.id === etapa);
   const pendencias = novo ? [] : cadastroPendencias(client);
   const podeRenomear = novo || !!onRenomear;
@@ -406,7 +406,7 @@ export default function ClienteForm({
                 )}
               </Bloco>
 
-              <Campo label="Briefing" obrigatorio={novo} area rows={5} value={f.briefing} onChange={v => set('briefing', v)} placeholder="Contexto do cliente para o time: o que ele faz, público, concorrentes, referências, tom de voz, expectativas..." />
+              <CampoBriefing value={f.briefing} onChange={v => set('briefing', v)} exigido={briefingExigido(f, { novo, briefingInicial: inicial.briefing })} />
 
               <div>
                 <p style={LBL}>PASTA DO CLIENTE NO DRIVE</p>
