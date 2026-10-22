@@ -64,11 +64,11 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 
 `src/hooks/use*.js` são a camada de dados de tudo que uma tela renderiza. Cada hook abre um `onSnapshot`, mapeia `{ id, ...data }` para o estado e expõe funções de CRUD. Sem cache, sem normalização, sem store global — o componente assina chamando o hook e toda aba aberta atualiza em tempo real.
 
-Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `planejamentos`, `vm_marcacoes`, `portal_clients`, `portal_products`, `userIndex` e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
+Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `planejamentos`, `vm_marcacoes`, `portal_clients`, `portal_products`, `userIndex` (escrito só pelas functions) e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
 
 Quatro arquivos acessam o Firestore direto, cada um por um motivo:
 
-- `contexts/AuthContext.js` — lê `collaborators` durante o login, antes de qualquer hook montar; também grava `userIndex` e `collaborators`
+- `contexts/AuthContext.js` — lê o doc do colaborador durante o login, antes de qualquer hook montar; grava só `firstAccess` na troca de senha
 - `contexts/PortalAuthContext.js` — login do portal e `lastLoginAt`
 - `components/shared/PatchNotesPopup.js` — lê e grava `collaborators.lastPatchSeen`
 - `pages/sectors/DocPrintPage.js` — um `getDoc` sem listener, para o documento não mudar no meio da geração do PDF
@@ -90,12 +90,25 @@ Downloads do Storage dependem de uma política de CORS no bucket (GET com `Conte
 
 ### Dois sistemas de login independentes
 
-- **Equipe** — `src/contexts/AuthContext.js`. O usuário digita um `loginId`, convertido em e-mail sintético (`loginIdToEmail`) para o Firebase Auth. O perfil (setor, isAdmin, csRole, leaderOf) fica no documento de `collaborators`, ligado por `authUid`. Existe **migração preguiçosa**: contas anteriores ao Auth ainda guardam `password` em texto no Firestore; no primeiro login valida contra ele, cria a conta no Auth e apaga o campo. Toda chamada ao Firestore no login passa por `withTimeout` e é best-effort — nada na gravação de perfil/índice pode travar o login.
+- **Equipe** — `src/contexts/AuthContext.js`. O usuário digita um `loginId`, convertido em e-mail sintético (`loginIdToEmail`) para o Firebase Auth. O perfil (setor, csRole, leaderOf) fica no documento de `collaborators`, ligado por `authUid`. **Quem é da equipe e quem é admin é decidido no servidor**, não no navegador (ver "Acesso decidido no servidor" abaixo). Existe **migração preguiçosa**: contas anteriores ao Auth ainda guardam `password` em texto no Firestore; no primeiro login a função `migrarConta` confere essa senha, cria a conta no Auth e apaga o campo. Toda chamada no login passa por `withTimeout` — nada pode pendurar a tela.
 - **Clientes do portal** — `src/contexts/PortalAuthContext.js`. Totalmente separado: usuário + hash SHA-256 conferido em `portal_clients`, sessão em `sessionStorage`. Nunca toca o Firebase Auth.
 
-Criar colaborador usa uma **instância secundária e descartável do Firebase** (`useCollaborators.js`), porque `createUserWithEmailAndPassword` na instância padrão deslogaria o admin. Redefinir a senha de outra pessoa exige o Admin SDK, por isso a única Cloud Function, `resetCollaboratorPassword`, que confere se quem chamou é admin via `userIndex` e depois `collaborators.authUid`.
+Criar colaborador usa uma **instância secundária e descartável do Firebase** (`useCollaborators.js`), porque `createUserWithEmailAndPassword` na instância padrão deslogaria o admin. Redefinir a senha de outra pessoa exige o Admin SDK, por isso a Cloud Function `resetCollaboratorPassword`.
 
-**Falha de segurança conhecida:** `AuthContext.js` ainda tem um par de credenciais de admin de fallback quando `REACT_APP_ADMIN_ID`/`REACT_APP_ADMIN_PASSWORD` não estão definidas. Esse fallback dá admin de verdade: passa pela migração preguiçosa, cria conta real no Auth e grava `userIndex/{uid}.isAdmin = true` — o mesmo registro em que a Cloud Function confia. Além disso, todo `REACT_APP_*` vai compilado para o navegador, então qualquer senha de admin configurada fica exposta. Trocar o valor não resolve; a correção é validar o admin **fora do cliente** (custom claims ou função callable) e ajustar as regras do Firestore. Nunca escreva essas credenciais em documento ou código.
+### Acesso decidido no servidor
+
+`functions/index.js`, desde 22/out/2026. Antes o admin era decidido no front, com uma senha reserva no código e um `userIndex` gravado pelo próprio usuário — e o repositório é público. **Nunca volte a decidir acesso no navegador nem a escrever credencial em código, `.env` ou documento**: todo `REACT_APP_*` é compilado para o bundle.
+
+- `sincronizarAcesso` (callable, chamada a cada login e abertura do app) calcula o acesso pela conta do Auth e grava **custom claims** no token: `{ acessoV, staff, admin, collabId, trocarSenha }`. O front só lê o token (`getIdTokenResult`).
+- Vínculo com o colaborador é só por `collaborators.authUid`. Ligar pelo loginId do e-mail deixaria qualquer um que criasse a conta antes do colaborador assumir o perfil dele — o cadastro pelo navegador segue ligado (criação de colaborador e TV anônima dependem dele).
+- `active: false` no colaborador corta o acesso de verdade (antes só bloqueava a migração). Doc sem o campo é ativo.
+- **Admin master** é a conta do Auth sem doc com o e-mail de um ID em `ADMINS_MASTER` (`admin`). Nunca apague essa conta no console: poderia ser recriada por outra pessoa. A senha dele anterior a 22/out/2026 é tratada como vazada: `trocarSenha` obriga a troca na tela de primeiro acesso, conferida pelo `tokensValidAfterTime` do Auth.
+- `migrarConta` (callable sem login) faz a migração preguiçosa no servidor; `resetCollaboratorPassword` confere admin nos dados do servidor a cada chamada, nunca no `userIndex`.
+- `userIndex` virou espelho escrito só pelas functions. Nada deve confiar nele enquanto as regras não travarem a escrita.
+- `ACESSO_V` existe nos dois lados (`functions/index.js` e `AuthContext.js`) e muda junto.
+- Ordem de publicação quando mexer nisso: functions primeiro, depois a `main`. Front novo sem a função deixa o admin master de fora (colaborador entra pelo plano B do doc).
+
+> PENDENTE: as regras do Firestore ainda precisam passar a usar o token (`request.auth.token.staff` / `.admin`), travar `isAdmin`, `active`, `sector`, `leaderOf`, `csRole`, `loginId` e `authUid` em `collaborators` para não admins e bloquear escrita do cliente em `userIndex`. Sem isso, um colaborador com acesso ao Firestore ainda consegue se promover editando o próprio doc.
 
 ### Rotas e controle de acesso
 

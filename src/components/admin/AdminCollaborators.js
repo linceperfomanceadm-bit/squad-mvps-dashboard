@@ -3,6 +3,12 @@ import { UserPlus, Edit2, Trash2, X, Check, Eye, EyeOff, Crown } from 'lucide-re
 import { SECTORS } from '../../lib/firebase';
 import { nomesDoCliente } from '../../lib/responsaveis';
 
+// Doc antigo, sem o campo `active`, é ativo — e desde out/2026 o
+// servidor só corta o acesso de quem tem active:false explícito. Ler
+// `c.active` direto mostraria essas pessoas como inativas sem que
+// estejam.
+const estaAtivo = (c) => c.active !== false;
+
 export default function AdminCollaborators({ collaborators, clients = [], onAdd, onUpdate, onResetPassword, onDelete }) {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ name: '', sector: '', phone: '', loginId: '', password: '', isAdmin: false, csRole: '', leaderOf: [] });
@@ -71,7 +77,7 @@ export default function AdminCollaborators({ collaborators, clients = [], onAdd,
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Colaboradores</h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{collaborators.filter(c => c.active).length} ativo{collaborators.filter(c => c.active).length !== 1 ? 's' : ''} · {collaborators.length} total</p>
+          <p style={{ fontSize: 13, color: 'var(--muted)' }}>{collaborators.filter(estaAtivo).length} ativo{collaborators.filter(estaAtivo).length !== 1 ? 's' : ''} · {collaborators.length} total</p>
         </div>
         <button onClick={() => setShowForm(!showForm)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
           {showForm ? <><X size={15} /> Cancelar</> : <><UserPlus size={15} /> Novo Colaborador</>}
@@ -158,7 +164,7 @@ export default function AdminCollaborators({ collaborators, clients = [], onAdd,
                   onSaveEdit={() => handleEdit(collab.id)}
                   onCancelEdit={() => setEditId(null)}
                   onEditFormChange={(k, v) => setEditForm(f => ({ ...f, [k]: v }))}
-                  onToggleActive={() => onUpdate(collab.id, { active: !collab.active })}
+                  onToggleActive={() => onUpdate(collab.id, { active: !estaAtivo(collab) })}
                   onDelete={() => setDelConfirm(collab.id)}
                   onConfirmDelete={() => { onDelete(collab.id); setDelConfirm(null); }}
                   onCancelDelete={() => setDelConfirm(null)}
@@ -202,7 +208,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
   const [showReset, setShowReset] = useState(false);
 
   return (
-    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, opacity: collab.active ? 1 : 0.5, transition: 'opacity .3s' }}>
+    <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, opacity: estaAtivo(collab) ? 1 : 0.5, transition: 'opacity .3s' }}>
       {isEditing ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <input style={S.input} value={editForm.name} onChange={e => onEditFormChange('name', e.target.value)} placeholder="Nome" />
@@ -242,7 +248,7 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
             </div>
             <div style={{ display: 'flex', gap: 5 }}>
               <button style={S.iconBtn} onClick={onEdit}><Edit2 size={13} /></button>
-              <button style={S.iconBtn} onClick={onToggleActive} title={collab.active ? 'Desativar' : 'Ativar'}>{collab.active ? '⏸' : '▶'}</button>
+              <button style={S.iconBtn} onClick={onToggleActive} title={estaAtivo(collab) ? 'Desativar' : 'Ativar'}>{estaAtivo(collab) ? '⏸' : '▶'}</button>
               {confirmDelete
                 ? <><button style={{ ...S.iconBtn, background: 'var(--neon-dim)', borderColor: 'var(--neon-border)', color: 'var(--neon)' }} onClick={onConfirmDelete}><Check size={13} /></button>
                     <button style={S.iconBtn} onClick={onCancelDelete}><X size={13} /></button></>
@@ -259,8 +265,8 @@ function CollabCard({ collab, sector, isEditing, editForm, onEdit, onSaveEdit, o
           )}
           {collab.phone && <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 6 }}>📱 {collab.phone}</p>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: collab.active ? 'var(--green-dim)' : 'var(--surface)', color: collab.active ? 'var(--green)' : 'var(--muted)', border: `1px solid ${collab.active ? 'var(--green-b)' : 'var(--border)'}`, fontFamily: 'var(--fm)' }}>
-              {collab.active ? '● Ativo' : '○ Inativo'}
+            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: estaAtivo(collab) ? 'var(--green-dim)' : 'var(--surface)', color: estaAtivo(collab) ? 'var(--green)' : 'var(--muted)', border: `1px solid ${estaAtivo(collab) ? 'var(--green-b)' : 'var(--border)'}`, fontFamily: 'var(--fm)' }}>
+              {estaAtivo(collab) ? '● Ativo' : '○ Inativo'}
             </span>
             {collab.isAdmin && <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: 'var(--neon-dim)', color: 'var(--neon)', border: '1px solid var(--neon-border)', fontFamily: 'var(--fm)' }}>👑 Admin</span>}
             {(collab.leaderOf || []).map(sid => (

@@ -1,13 +1,19 @@
 /**
  * Cloud Functions — Squad MVPs Dashboard
  *
- * resetCollaboratorPassword: redefine a senha de um colaborador no
- * Firebase Auth. Só pode ser chamada por um admin autenticado. A senha
- * real vive no Auth; aqui apenas a sobrescrevemos com uma provisória e
- * marcamos firstAccess:true no doc para forçar a troca no próximo login.
+ * Acesso da equipe — sincronizarAcesso, migrarConta e
+ * resetCollaboratorPassword. Quem é da equipe e quem é admin é decidido
+ * AQUI, no servidor, e gravado como custom claims no token do Firebase
+ * Auth: { acessoV, staff, admin, collabId, trocarSenha }. O navegador
+ * só lê o token.
  *
- * Por que precisa de backend: alterar a senha de OUTRO usuário exige o
- * Admin SDK (privilégio de servidor). O front-end não pode fazer isso.
+ * Por que: até 22/out/2026 isso era decidido no front, com uma senha de
+ * admin reserva no código e um índice (userIndex) gravado pelo próprio
+ * usuário no login. O repositório é público e todo REACT_APP_* vai
+ * compilado para o navegador, então qualquer pessoa conseguia entrar
+ * como admin — e esta função confiava no userIndex para liberar a troca
+ * de senha de qualquer colaborador. Não volte a confiar em nada que o
+ * cliente grava para decidir permissão.
  *
  * api: leitura de clientes e tarefas para outros apps internos,
  * protegida por chave. Detalhes no bloco dela, no fim do arquivo.
@@ -24,6 +30,233 @@ const AUTH_EMAIL_DOMAIN = 'squadmvps.interno';
 const loginIdToEmail = (loginId) =>
   `${String(loginId).trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;
 
+// loginId de volta a partir do e-mail sintético. null para e-mail de fora.
+const loginDoEmail = (email) => {
+  const sufixo = `@${AUTH_EMAIL_DOMAIN}`;
+  const e = String(email || '').toLowerCase();
+  return e.endsWith(sufixo) ? e.slice(0, -sufixo.length) : null;
+};
+
+// Comparação em tempo constante para não vazar segredo por tempo de
+// resposta. Usada na chave da api e na senha legada da migração.
+const chaveValida = (recebida, esperada) => {
+  if (!recebida || !esperada) return false;
+  const a = Buffer.from(String(recebida));
+  const b = Buffer.from(String(esperada));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+};
+
+/* ═══════════════════════════════════════════════════════════════
+ * Acesso da equipe
+ * ═══════════════════════════════════════════════════════════════ */
+
+// Versão do formato das claims. O front confere este número para saber
+// se o token já passou por aqui; mude nos dois lados juntos
+// (src/contexts/AuthContext.js).
+const ACESSO_V = 1;
+
+// Admin master: conta do Auth SEM doc em collaborators, que entra com
+// este ID na tela de login. A conta já existe (nasceu no primeiro login
+// dela) e nunca deve ser apagada no console do Firebase: o cadastro
+// pelo navegador segue ligado (criação de colaborador e TV anônima
+// dependem dele), então uma conta apagada poderia ser recriada por
+// outra pessoa com o mesmo e-mail.
+const ADMINS_MASTER = ['admin'];
+
+// A senha do admin master ficou exposta no código até 22/out/2026.
+// Senha definida antes disso é tratada como vazada e a troca vira
+// obrigatória no próximo login (claim trocarSenha, que o front mostra
+// na mesma tela do primeiro acesso). O Auth atualiza
+// tokensValidAfterTime toda vez que a senha muda, então o servidor
+// confere a troca sem depender do que o navegador diz.
+const SENHA_MASTER_VALIDA_DESDE = Date.parse('2026-10-22T00:00:00-03:00');
+
+const SEM_ACESSO = Object.freeze({
+  staff: false, admin: false, collabId: null, sector: null, trocarSenha: false,
+});
+
+// Decide o acesso de uma conta do Auth a partir de dados do servidor.
+// O vínculo com o colaborador é só pelo authUid: ligar pelo loginId do
+// e-mail deixaria qualquer um que criasse a conta antes do colaborador
+// assumir o perfil dele. Conta sem vínculo se resolve pela migrarConta
+// (senha legada conferida aqui) ou pelo reset de senha do admin.
+async function calcularAcesso(db, userRecord) {
+  const q = await db
+    .collection('collaborators')
+    .where('authUid', '==', userRecord.uid)
+    .limit(1)
+    .get();
+
+  if (!q.empty) {
+    const d = q.docs[0];
+    const c = d.data();
+    // Desativado no admin perde o acesso de verdade. Doc antigo, sem o
+    // campo, conta como ativo.
+    if (c.active === false) return SEM_ACESSO;
+    return {
+      staff: true,
+      admin: c.isAdmin === true,
+      collabId: d.id,
+      sector: c.sector || null,
+      trocarSenha: false,
+    };
+  }
+
+  const login = loginDoEmail(userRecord.email);
+  if (login && ADMINS_MASTER.includes(login)) {
+    // NaN (campo ausente) também cai em troca obrigatória.
+    const trocadaEm = Date.parse(userRecord.tokensValidAfterTime || '');
+    return {
+      staff: true,
+      admin: true,
+      collabId: null,
+      sector: null,
+      trocarSenha: !(trocadaEm >= SENHA_MASTER_VALIDA_DESDE),
+    };
+  }
+
+  return SEM_ACESSO;
+}
+
+// Grava o acesso como claims no token e devolve se algo mudou (o front
+// força a renovação do token só nesse caso).
+async function gravarAcesso(db, userRecord, acesso) {
+  const claims = {
+    acessoV: ACESSO_V,
+    staff: acesso.staff,
+    admin: acesso.admin,
+    collabId: acesso.collabId,
+    trocarSenha: acesso.trocarSenha,
+  };
+  const atuais = userRecord.customClaims || {};
+  const mudou =
+    Object.keys(claims).some(k => atuais[k] !== claims[k]) ||
+    Object.keys(atuais).some(k => !(k in claims));
+  if (mudou) await admin.auth().setCustomUserClaims(userRecord.uid, claims);
+
+  // userIndex virou espelho escrito só pelo servidor, para quem ainda lê
+  // por ele. O front não grava mais; enquanto as regras do Firestore não
+  // travarem a escrita, nada aqui confia no que está lá.
+  const idx = db.collection('userIndex').doc(userRecord.uid);
+  if (acesso.staff) {
+    await idx.set(
+      { collabId: acesso.collabId, isAdmin: acesso.admin, sector: acesso.sector },
+      { merge: true }
+    );
+  } else {
+    await idx.delete();
+  }
+  return mudou;
+}
+
+// Chamada pelo front a cada login e a cada abertura do app.
+exports.sincronizarAcesso = onCall({ maxInstances: 5 }, async (request) => {
+  const { auth } = request;
+  if (!auth) {
+    throw new HttpsError('unauthenticated', 'Faça login para continuar.');
+  }
+  // Sessão anônima é do Painel de TV e do link de aprovação.
+  if (auth.token.firebase && auth.token.firebase.sign_in_provider === 'anonymous') {
+    return { ...SEM_ACESSO, mudou: false };
+  }
+
+  const db = admin.firestore();
+  try {
+    const userRecord = await admin.auth().getUser(auth.uid);
+    const acesso = await calcularAcesso(db, userRecord);
+    const mudou = await gravarAcesso(db, userRecord, acesso);
+    return { ...acesso, mudou };
+  } catch (e) {
+    console.error('sincronizarAcesso:', e);
+    throw new HttpsError('internal', 'Falha ao conferir o acesso.');
+  }
+});
+
+/*
+ * migrarConta — colaborador criado antes do Auth, com a senha ainda em
+ * texto no doc. Antes o navegador lia essa senha do Firestore e criava
+ * a conta; agora a conferência e a criação acontecem aqui. Chamada sem
+ * login, pela tela de entrada.
+ *
+ * Se a conta do Auth já existir com o doc ainda guardando a senha
+ * legada, ela foi criada por uma migração que parou no meio — ou por
+ * outra pessoa que se adiantou. Como a senha legada acabou de ser
+ * conferida aqui, ela vira a senha da conta e as sessões antigas caem.
+ */
+exports.migrarConta = onCall({ maxInstances: 2 }, async (request) => {
+  const data = request.data || {};
+  const loginId = typeof data.loginId === 'string' ? data.loginId.trim() : '';
+  const password = typeof data.password === 'string' ? data.password : '';
+  if (!loginId || !password) {
+    throw new HttpsError('invalid-argument', 'Informe ID e senha.');
+  }
+
+  // Mesma mensagem para ID inexistente, senha errada e conta já
+  // migrada: a tela de login não serve para descobrir IDs.
+  const incorreto = { ok: false, erro: 'ID ou senha incorretos.' };
+  const db = admin.firestore();
+
+  let ref;
+  let c;
+  try {
+    const q = await db
+      .collection('collaborators')
+      .where('loginId', '==', loginId)
+      .limit(1)
+      .get();
+    if (q.empty) return incorreto;
+    ref = q.docs[0].ref;
+    c = q.docs[0].data();
+  } catch (e) {
+    console.error('migrarConta:', e);
+    throw new HttpsError('internal', 'Falha no login. Tente novamente.');
+  }
+
+  if (c.active === false) return { ok: false, erro: 'Conta desativada.' };
+  if (typeof c.password !== 'string' || !c.password) return incorreto;
+  if (!chaveValida(password, c.password)) return incorreto;
+  if (password.length < 6) {
+    return {
+      ok: false,
+      erro: 'Sua senha antiga é curta demais para o novo sistema (mín. 6). Peça um reset ao admin.',
+    };
+  }
+
+  try {
+    const email = loginIdToEmail(c.loginId);
+    let userRecord;
+    try {
+      const existente = await admin.auth().getUserByEmail(email);
+      await admin.auth().updateUser(existente.uid, { password });
+      await admin.auth().revokeRefreshTokens(existente.uid);
+      userRecord = await admin.auth().getUser(existente.uid);
+    } catch (e) {
+      if (e.code !== 'auth/user-not-found') throw e;
+      userRecord = await admin.auth().createUser({ email, password });
+    }
+
+    await ref.update({
+      authUid: userRecord.uid,
+      authMigrated: true,
+      password: admin.firestore.FieldValue.delete(),
+    });
+    await gravarAcesso(db, userRecord, await calcularAcesso(db, userRecord));
+    return { ok: true };
+  } catch (e) {
+    console.error('migrarConta:', e);
+    throw new HttpsError('internal', 'Falha na migração da conta.');
+  }
+});
+
+/*
+ * resetCollaboratorPassword — redefine a senha de um colaborador no
+ * Firebase Auth. A senha real vive no Auth; aqui apenas a sobrescrevemos
+ * com uma provisória e marcamos firstAccess:true no doc para forçar a
+ * troca no próximo login.
+ *
+ * Por que precisa de backend: alterar a senha de OUTRO usuário exige o
+ * Admin SDK (privilégio de servidor). O front-end não pode fazer isso.
+ */
 exports.resetCollaboratorPassword = onCall(async (request) => {
   const { auth, data } = request;
 
@@ -32,34 +265,18 @@ exports.resetCollaboratorPassword = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'Faça login para continuar.');
   }
 
-  // 2. Quem chama precisa ser admin. Confere no doc do próprio chamador.
-  //    O uid do chamador é vinculado ao doc via authUid (ou é o admin
-  //    master, marcado em userIndex).
+  // 2. Quem chama precisa ser admin — conferido agora, nos dados do
+  //    servidor, e não no token nem no userIndex: um admin que acabou de
+  //    perder o papel já não consegue usar esta função.
   const db = admin.firestore();
-  let isAdmin = false;
-
+  let quemChama;
   try {
-    // Caminho 1: índice rápido por uid.
-    const idxSnap = await db.collection('userIndex').doc(auth.uid).get();
-    if (idxSnap.exists && idxSnap.data().isAdmin === true) {
-      isAdmin = true;
-    }
-    // Caminho 2 (fallback): busca o doc do colaborador por authUid.
-    if (!isAdmin) {
-      const q = await db
-        .collection('collaborators')
-        .where('authUid', '==', auth.uid)
-        .limit(1)
-        .get();
-      if (!q.empty && q.docs[0].data().isAdmin === true) {
-        isAdmin = true;
-      }
-    }
+    quemChama = await calcularAcesso(db, await admin.auth().getUser(auth.uid));
   } catch (e) {
     throw new HttpsError('internal', 'Falha ao verificar permissões.');
   }
 
-  if (!isAdmin) {
+  if (!quemChama.admin) {
     throw new HttpsError(
       'permission-denied',
       'Apenas administradores podem redefinir senhas.'
@@ -117,11 +334,10 @@ exports.resetCollaboratorPassword = onCall(async (request) => {
     } else {
       // 6b. Conta não existe no Auth (nunca migrou) → cria com a senha
       //     provisória, já vinculada ao email do colaborador.
-      const created = await admin.auth().createUser({
+      authUser = await admin.auth().createUser({
         email,
         password: newPassword,
       });
-      authUser = created;
     }
 
     // 7. Sincroniza o doc: vincula o uid correto, marca troca no 1º acesso
@@ -133,15 +349,9 @@ exports.resetCollaboratorPassword = onCall(async (request) => {
       password: admin.firestore.FieldValue.delete(),
     });
 
-    // 8. Mantém o índice coerente.
-    await db.collection('userIndex').doc(authUser.uid).set(
-      {
-        collabId: collaboratorId,
-        isAdmin: target.isAdmin === true,
-        sector: target.sector || null,
-      },
-      { merge: true }
-    );
+    // 8. Atualiza o token e o índice do colaborador com o vínculo novo.
+    const atualizado = await admin.auth().getUser(authUser.uid);
+    await gravarAcesso(db, atualizado, await calcularAcesso(db, atualizado));
 
     return { success: true };
   } catch (e) {
@@ -365,14 +575,6 @@ const tarefaPublica = (t) => ({
   entregueEm: toIso(t.deliveredAt),
   concluidaEm: toIso(t.completedAt),
 });
-
-// Comparação em tempo constante para não vazar a chave por tempo de resposta.
-const chaveValida = (recebida, esperada) => {
-  if (!recebida || !esperada) return false;
-  const a = Buffer.from(String(recebida));
-  const b = Buffer.from(String(esperada));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-};
 
 const erro = (res, code, message) => res.status(code).json({ erro: message });
 

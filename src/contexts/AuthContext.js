@@ -1,15 +1,15 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { collection, query, where, getDocs, doc } from 'firebase/firestore';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
-import { updateDoc, setDoc } from '../lib/gravacoes';
+import { updateDoc } from '../lib/gravacoes';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   updatePassword,
   signOut,
   onAuthStateChanged,
 } from 'firebase/auth';
-import { db, auth, loginIdToEmail } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, auth, functions, loginIdToEmail } from '../lib/firebase';
 
 const AuthContext = createContext(null);
 
@@ -18,21 +18,34 @@ const AuthContext = createContext(null);
  * Login por loginId + senha, convertido para email sintético
  * (loginId@squadmvps.interno) no Firebase Auth.
  *
- * MIGRAÇÃO LAZY: colaboradores criados antes desta versão não
- * existem no Auth. No primeiro login pós-migração:
- *   1. Tenta signInWithEmailAndPassword.
- *   2. Se falhar com user-not-found, valida a senha contra o
- *      Firestore (senha antiga em texto puro) e, se bater, cria
- *      a conta no Auth com essa mesma senha (createUser...).
- *   3. Marca authMigrated:true no doc e limpa o campo password
- *      antigo (a senha agora vive só no Auth, com hash do Google).
+ * QUEM É QUEM É DECIDIDO NO SERVIDOR. A Cloud Function
+ * sincronizarAcesso confere o colaborador vinculado ao uid (ou o admin
+ * master) e grava o resultado como custom claims no token:
+ * { acessoV, staff, admin, collabId, trocarSenha }. Este arquivo só lê
+ * o token. Até 22/out/2026 o admin era decidido aqui, com uma senha
+ * reserva no código — e o repositório é público. Não volte a decidir
+ * acesso no front nem a escrever credencial aqui: guarda de tela é UX,
+ * a barreira são o token e as regras do Firestore.
  *
- * O perfil (sector, isAdmin, name...) continua no doc Firestore,
+ * Token que já passou pela função com acesso abre o app na hora, e a
+ * conferência roda em segundo plano (o admin trocou o papel, desativou
+ * a conta). Token que nunca passou, ou que estava sem acesso, espera a
+ * função. Se ela não responder, colaborador entra pelo doc como antes
+ * (só UX); o admin master, que não tem doc, depende dela.
+ *
+ * MIGRAÇÃO LAZY: colaboradores criados antes do Auth ainda guardam a
+ * senha em texto no Firestore. A conferência dessa senha e a criação da
+ * conta no Auth acontecem na função migrarConta, nunca no navegador.
+ *
+ * O perfil (sector, name, leaderOf...) continua no doc Firestore,
  * vinculado pelo authUid. O doc do Auth NÃO guarda senha.
  */
 
-const ADMIN_ID = (process.env.REACT_APP_ADMIN_ID || 'admin').toLowerCase();
-const ADMIN_PASS = process.env.REACT_APP_ADMIN_PASSWORD || 'Dash@2026';
+// Espelho de ACESSO_V em functions/index.js — mudam juntos.
+const ACESSO_V = 1;
+
+const chamarSincronizar = httpsCallable(functions, 'sincronizarAcesso');
+const chamarMigrar = httpsCallable(functions, 'migrarConta');
 
 // Garante que uma operação do Firestore nunca pendure a cadeia de login.
 // Se passar do tempo, rejeita para o chamador tratar (em vez de travar).
@@ -43,23 +56,214 @@ function withTimeout(promise, ms = 6000, label = 'firestore') {
   ]);
 }
 
+// ── Perfil ───────────────────────────────────────────────────
+
+// isAdmin vem de quem chamou: o token (servidor) ou, no plano B, o doc.
+function perfilDoColaborador(id, c, uid, isAdmin) {
+  return {
+    id,
+    authUid: uid,
+    name: c.name,
+    loginId: c.loginId,
+    sector: c.sector,
+    // Função dentro do CS: 'comercial' | 'operacional'.
+    // Colaboradores antigos, sem o campo, caem em 'operacional'.
+    csRole: c.sector === 'cs' ? (c.csRole || 'operacional') : null,
+    // Setores que esta pessoa lidera. Independente de `sector`: dá
+    // para liderar um setor diferente do próprio, e mais de um.
+    // É o que libera a indicação de responsáveis no onboarding.
+    leaderOf: Array.isArray(c.leaderOf) ? c.leaderOf : [],
+    role: isAdmin ? 'admin' : 'collaborator',
+    isAdmin,
+    firstAccess: c.firstAccess || false,
+  };
+}
+
+async function lerClaims(fbUser, forcar = false) {
+  const r = await fbUser.getIdTokenResult(forcar);
+  return (r && r.claims) || {};
+}
+
+async function perfilPelasClaims(fbUser, claims) {
+  if (claims.staff !== true) throw new Error('sem-acesso');
+
+  if (claims.collabId) {
+    const snap = await withTimeout(getDoc(doc(db, 'collaborators', claims.collabId)), 6000, 'perfil');
+    if (!snap.exists()) throw new Error('sem-acesso');
+    return perfilDoColaborador(snap.id, snap.data(), fbUser.uid, claims.admin === true);
+  }
+
+  if (claims.admin === true) {
+    // Admin master: conta do Auth sem doc em collaborators.
+    return {
+      id: fbUser.uid,
+      authUid: fbUser.uid,
+      name: 'Admin',
+      loginId: (fbUser.email || '').split('@')[0],
+      sector: null,
+      csRole: null,
+      role: 'superadmin',
+      isAdmin: true,
+      leaderOf: [],
+      // A senha antiga do admin ficou exposta no código. O servidor
+      // obriga a troca uma vez (claim trocarSenha), reaproveitando a
+      // tela de primeiro acesso.
+      firstAccess: claims.trocarSenha === true,
+    };
+  }
+
+  throw new Error('sem-acesso');
+}
+
+// Plano B quando a função não responde e o token nunca passou por ela:
+// colaborador entra pelo doc vinculado ao uid, como antes desta versão.
+async function perfilLegado(fbUser) {
+  const snap = await withTimeout(
+    getDocs(query(collection(db, 'collaborators'), where('authUid', '==', fbUser.uid))),
+    6000,
+    'legado',
+  );
+  if (snap.empty) throw new Error('sem-validacao');
+  const d = snap.docs[0];
+  const c = d.data();
+  if (c.active === false) throw new Error('sem-acesso');
+  return perfilDoColaborador(d.id, c, fbUser.uid, c.isAdmin === true);
+}
+
+// Confere no servidor sem segurar a tela. Se o acesso mudou, entrega o
+// perfil novo; se o servidor tirou o acesso, entrega null.
+function conferirNoFundo(fbUser, aoMudar) {
+  chamarSincronizar()
+    .then(async (res) => {
+      if (!res || !res.data || !res.data.mudou) return;
+      esquecerCarregamento();
+      try {
+        aoMudar(await perfilPelasClaims(fbUser, await lerClaims(fbUser, true)));
+      } catch (e) {
+        if (e && e.message === 'sem-acesso') aoMudar(null);
+      }
+    })
+    .catch(() => {});
+}
+
+async function montarPerfil(fbUser, aoMudar) {
+  const claims = await lerClaims(fbUser);
+
+  if (claims.acessoV === ACESSO_V && claims.staff === true) {
+    const perfil = await perfilPelasClaims(fbUser, claims);
+    conferirNoFundo(fbUser, aoMudar);
+    return perfil;
+  }
+
+  try {
+    await withTimeout(chamarSincronizar(), 12000, 'acesso');
+  } catch {
+    // Token já conferido antes e sem acesso: sem o servidor não há como
+    // saber se mudou. Nunca conferido: plano B pelo doc.
+    if (claims.acessoV === ACESSO_V) throw new Error('sem-validacao');
+    return perfilLegado(fbUser);
+  }
+  return perfilPelasClaims(fbUser, await lerClaims(fbUser, true));
+}
+
+// Login e onAuthStateChanged disparam juntos para a mesma conta: os dois
+// recebem a mesma promessa e a função roda uma vez só.
+const REUSO_MS = 10000;
+let carregamento = null;
+
+function esquecerCarregamento() { carregamento = null; }
+
+function carregarPerfil(fbUser, aoMudar) {
+  if (carregamento && carregamento.uid === fbUser.uid && Date.now() - carregamento.em < REUSO_MS) {
+    return carregamento.promise;
+  }
+  const promise = montarPerfil(fbUser, aoMudar);
+  const atual = { uid: fbUser.uid, em: Date.now(), promise };
+  carregamento = atual;
+  // Falha não fica guardada: a próxima tentativa recomeça do zero.
+  promise.catch(() => { if (carregamento === atual) carregamento = null; });
+  return promise;
+}
+
+async function perfilDaSessao(aoMudar) {
+  const fbUser = auth.currentUser;
+  if (!fbUser) return { erro: 'sem-validacao' };
+  try {
+    return { profile: await carregarPerfil(fbUser, aoMudar) };
+  } catch (e) {
+    return { erro: e && e.message === 'sem-acesso' ? 'sem-acesso' : 'sem-validacao' };
+  }
+}
+
+// ── Entrada ──────────────────────────────────────────────────
+
+const ERROS_LOGIN = {
+  'auth/wrong-password': 'Senha incorreta.',
+  'auth/too-many-requests': 'Muitas tentativas. Aguarde alguns minutos.',
+};
+
+async function entrar(email, password) {
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    return { success: true };
+  } catch (err) {
+    return { success: false, code: err.code, error: ERROS_LOGIN[err.code] || 'Falha no login. Tente novamente.' };
+  }
+}
+
+async function migrarContaAntiga(loginId, password) {
+  try {
+    const res = await withTimeout(chamarMigrar({ loginId: loginId.trim(), password }), 15000, 'migrar');
+    const d = (res && res.data) || {};
+    return d.ok ? { success: true } : { success: false, error: d.erro || 'ID ou senha incorretos.' };
+  } catch {
+    return { success: false, error: 'Falha no login. Tente novamente.' };
+  }
+}
+
+async function entrarComMigracao(loginId, email, password) {
+  const r = await entrar(email, password);
+  if (r.success) return r;
+  if (r.code !== 'auth/user-not-found' && r.code !== 'auth/invalid-credential') return r;
+  // Pode ser conta anterior ao Auth: o servidor confere a senha legada
+  // e cria a conta.
+  const migrada = await migrarContaAntiga(loginId, password);
+  if (!migrada.success) return migrada;
+  return entrar(email, password);
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Resultado da conferência em segundo plano: perfil novo, ou null
+  // quando o servidor tirou o acesso (desativado, removido).
+  const aoMudar = useCallback((perfil) => {
+    if (perfil) { setUser(perfil); return; }
+    esquecerCarregamento();
+    signOut(auth).catch(() => {});
+    setUser(null);
+  }, []);
+
   // Reidrata o perfil a partir do usuário autenticado no Auth.
   useEffect(() => {
     let settled = false;
-    // Rede de segurança: se algo no Firestore pendurar, não deixa o
-    // app preso no spinner para sempre.
-    const safety = setTimeout(() => { if (!settled) setLoading(false); }, 8000);
+    // Rede de segurança: se algo pendurar, não deixa o app preso no
+    // spinner para sempre. Folga para a primeira chamada da função.
+    const safety = setTimeout(() => { if (!settled) setLoading(false); }, 15000);
 
     const unsub = onAuthStateChanged(auth, async (fbUser) => {
-      if (!fbUser) { settled = true; clearTimeout(safety); setUser(null); setLoading(false); return; }
+      // Sessão anônima é do Painel de TV e do link de aprovação, nunca
+      // da equipe.
+      if (!fbUser || fbUser.isAnonymous) {
+        settled = true; clearTimeout(safety); setUser(null); setLoading(false);
+        return;
+      }
       try {
-        const profile = await loadProfileByUid(fbUser.uid, fbUser.email);
-        setUser(profile);
-      } catch {
+        setUser(await carregarPerfil(fbUser, aoMudar));
+      } catch (e) {
+        // Conta sem acesso não fica logada.
+        if (e && e.message === 'sem-acesso') signOut(auth).catch(() => {});
         setUser(null);
       } finally {
         settled = true;
@@ -68,165 +272,48 @@ export function AuthProvider({ children }) {
       }
     });
     return () => { clearTimeout(safety); unsub(); };
-  }, []);
-
-  // Busca o doc do colaborador vinculado a este authUid.
-  // Fallback: por loginId derivado do email (contas recém-migradas
-  // num tick em que authUid ainda não foi gravado).
-  const loadProfileByUid = async (uid, email) => {
-    const loginIdFromEmail = email ? email.split('@')[0] : null;
-
-    let snap;
-    try {
-      snap = await withTimeout(getDocs(query(collection(db, 'collaborators'), where('authUid', '==', uid))), 6000, 'q-authUid');
-    } catch {
-      snap = { empty: true, docs: [] };
-    }
-    if (snap.empty && loginIdFromEmail) {
-      try {
-        snap = await withTimeout(getDocs(query(collection(db, 'collaborators'), where('loginId', '==', loginIdFromEmail))), 6000, 'q-loginId');
-      } catch {
-        snap = { empty: true, docs: [] };
-      }
-    }
-
-    if (snap.empty) {
-      // Conta admin master sem doc no Firestore.
-      if (loginIdFromEmail === ADMIN_ID) {
-        try { await withTimeout(setDoc(doc(db, 'userIndex', uid), { collabId: null, isAdmin: true, sector: null }, { merge: true }), 5000, 'idx-admin'); } catch {}
-        return { id: uid, authUid: uid, name: 'Admin', loginId: ADMIN_ID, sector: null, role: 'superadmin', isAdmin: true, leaderOf: [], firstAccess: false };
-      }
-      throw new Error('Perfil não encontrado.');
-    }
-
-    const d = snap.docs[0];
-    const c = { id: d.id, ...d.data() };
-    // Vínculo authUid e índice são "best-effort": não podem travar o
-    // login. Rodam com timeout e qualquer falha é ignorada.
-    if (c.authUid !== uid) {
-      try { await withTimeout(updateDoc(doc(db, 'collaborators', d.id), { authUid: uid }), 5000, 'upd-uid'); } catch {}
-    }
-    try {
-      await withTimeout(setDoc(doc(db, 'userIndex', uid), {
-        collabId: d.id,
-        isAdmin: c.isAdmin || false,
-        sector: c.sector || null,
-      }, { merge: true }), 5000, 'idx');
-    } catch {}
-
-    return {
-      id: d.id,
-      authUid: uid,
-      name: c.name,
-      loginId: c.loginId,
-      sector: c.sector,
-      // Função dentro do CS: 'comercial' | 'operacional'.
-      // Colaboradores antigos, sem o campo, caem em 'operacional'.
-      csRole: c.sector === 'cs' ? (c.csRole || 'operacional') : null,
-      // Setores que esta pessoa lidera. Independente de `sector`: dá
-      // para liderar um setor diferente do próprio, e mais de um.
-      // É o que libera a indicação de responsáveis no onboarding.
-      leaderOf: Array.isArray(c.leaderOf) ? c.leaderOf : [],
-      role: c.isAdmin ? 'admin' : 'collaborator',
-      isAdmin: c.isAdmin || false,
-      firstAccess: c.firstAccess || false,
-    };
-  };
+  }, [aoMudar]);
 
   // ── Login unificado (setor é validado após autenticar) ───────
   const loginCollaborator = async (sectorId, loginId, password) => {
     const email = loginIdToEmail(loginId);
-    try {
-      // 1. Caminho normal: já existe no Auth.
-      await signInWithEmailAndPassword(auth, email, password);
-    } catch (err) {
-      // 2. Migração lazy: conta ainda não existe no Auth.
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-        const migrated = await tryLazyMigration(loginId, password);
-        if (!migrated.success) return migrated;
-        // após migrar, o onAuthStateChanged já autenticou.
-      } else if (err.code === 'auth/wrong-password') {
-        return { success: false, error: 'Senha incorreta.' };
-      } else if (err.code === 'auth/too-many-requests') {
-        return { success: false, error: 'Muitas tentativas. Aguarde alguns minutos.' };
-      } else {
-        return { success: false, error: 'Falha no login. Tente novamente.' };
+
+    const entrada = await entrarComMigracao(loginId, email, password);
+    if (!entrada.success) return { success: false, error: entrada.error };
+
+    let resultado = await perfilDaSessao(aoMudar);
+    if (resultado.erro === 'sem-acesso') {
+      // Conta no Auth sem vínculo com o doc: migração antiga que parou
+      // no meio. O servidor confere a senha legada e refaz o vínculo.
+      const migrada = await migrarContaAntiga(loginId, password);
+      if (migrada.success) {
+        esquecerCarregamento();
+        const deNovo = await entrar(email, password);
+        if (deNovo.success) resultado = await perfilDaSessao(aoMudar);
       }
     }
 
+    if (!resultado.profile) {
+      esquecerCarregamento();
+      await signOut(auth).catch(() => {});
+      return {
+        success: false,
+        error: resultado.erro === 'sem-acesso'
+          ? 'Este ID não tem acesso liberado. Fale com o admin.'
+          : 'Não foi possível validar seu acesso agora. Tente de novo em instantes.',
+      };
+    }
+
+    const profile = resultado.profile;
     // Validação de setor (apenas UX — a trava real são as regras do
-    // Firestore). Best-effort: se falhar/expirar, deixa o login seguir
-    // (o onAuthStateChanged carrega o perfil). Nunca trava aqui.
-    try {
-      const fbUser = auth.currentUser;
-      if (fbUser) {
-        const profile = await withTimeout(loadProfileByUid(fbUser.uid, fbUser.email), 6000, 'login-profile');
-        if (!profile.isAdmin && sectorId && profile.sector !== sectorId) {
-          await signOut(auth);
-          return { success: false, error: 'ID não pertence a este setor.' };
-        }
-        setUser(profile);
-        return { success: true, firstAccess: profile.firstAccess };
-      }
-    } catch {
-      // Não bloqueia: o listener global resolve o perfil e o loading.
+    // Firestore).
+    if (!profile.isAdmin && sectorId && profile.sector !== sectorId) {
+      esquecerCarregamento();
+      await signOut(auth).catch(() => {});
+      return { success: false, error: 'ID não pertence a este setor.' };
     }
-    return { success: true };
-  };
-
-  // Cria a conta no Auth a partir das credenciais antigas do Firestore.
-  const tryLazyMigration = async (loginId, password) => {
-    const email = loginIdToEmail(loginId);
-
-    // Admin master por env var — cria conta real no Auth no 1º uso.
-    if (loginId.trim().toLowerCase() === ADMIN_ID && password === ADMIN_PASS) {
-      try {
-        await createUserWithEmailAndPassword(auth, email, password);
-        return { success: true };
-      } catch (e) {
-        if (e.code === 'auth/email-already-in-use') {
-          try { await signInWithEmailAndPassword(auth, email, password); return { success: true }; }
-          catch { return { success: false, error: 'Senha do admin incorreta.' }; }
-        }
-        return { success: false, error: 'Falha ao inicializar admin.' };
-      }
-    }
-
-    // Colaborador comum: valida contra o doc do Firestore.
-    const snap = await getDocs(query(
-      collection(db, 'collaborators'),
-      where('loginId', '==', loginId.trim()),
-    ));
-    if (snap.empty) return { success: false, error: 'ID não encontrado.' };
-
-    const d = snap.docs[0];
-    const c = d.data();
-    if (c.active === false) return { success: false, error: 'Conta desativada.' };
-    if (c.password == null) {
-      // Já migrado mas senha não bateu no signIn acima.
-      return { success: false, error: 'Senha incorreta.' };
-    }
-    if (c.password !== password) return { success: false, error: 'Senha incorreta.' };
-
-    // Credenciais antigas conferem → cria no Auth.
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await updateDoc(doc(db, 'collaborators', d.id), {
-        authUid: cred.user.uid,
-        authMigrated: true,
-        password: null, // remove a senha em texto puro do Firestore
-      });
-      return { success: true };
-    } catch (e) {
-      if (e.code === 'auth/email-already-in-use') {
-        // Conta já existe no Auth mas a senha digitada não corresponde.
-        return { success: false, error: 'Senha incorreta.' };
-      }
-      if (e.code === 'auth/weak-password') {
-        return { success: false, error: 'Sua senha antiga é curta demais para o novo sistema (mín. 6). Peça um reset ao admin.' };
-      }
-      return { success: false, error: 'Falha na migração da conta.' };
-    }
+    setUser(profile);
+    return { success: true, firstAccess: profile.firstAccess };
   };
 
   // Admin login usa o mesmo fluxo; setor não é exigido.
@@ -243,8 +330,11 @@ export function AuthProvider({ children }) {
       if (user?.id && user.id !== fbUser.uid) {
         try { await updateDoc(doc(db, 'collaborators', user.id), { firstAccess: false }); } catch {}
       }
-      const updated = { ...user, firstAccess: false };
-      setUser(updated);
+      setUser({ ...user, firstAccess: false });
+      // Admin master: o servidor confere que a senha mudou e tira a
+      // troca obrigatória do token.
+      esquecerCarregamento();
+      conferirNoFundo(fbUser, aoMudar);
       return { success: true };
     } catch (e) {
       if (e.code === 'auth/requires-recent-login') {
@@ -255,6 +345,7 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
+    esquecerCarregamento();
     try { await signOut(auth); } catch {}
     setUser(null);
   };

@@ -41,18 +41,7 @@ Sistema de gestão do time de criação com dashboards individuais por setor.
 2. **Iniciar no modo de produção** → região `southamerica-east1` → **Ativar**
 
 ### 2.3 Regras do Firestore
-1. Aba **Regras** → substituir por:
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
-    }
-  }
-}
-```
-2. **Publicar**
+As regras separam a equipe (token com acesso conferido pela Cloud Function `sincronizarAcesso`), o Painel de TV (login anônimo, só leitura) e o link de aprovação do cliente. **Nunca publique regra aberta** (`allow read, write: if true`): o banco inteiro fica exposto para qualquer pessoa com a URL do app.
 
 ### 2.4 Registrar app Web
 1. Página inicial do projeto → ícone **`</>`**
@@ -77,8 +66,6 @@ service cloud.firestore {
 | `REACT_APP_FIREBASE_STORAGE_BUCKET` | valor do Firebase |
 | `REACT_APP_FIREBASE_MESSAGING_SENDER_ID` | valor do Firebase |
 | `REACT_APP_FIREBASE_APP_ID` | valor do Firebase |
-| `REACT_APP_ADMIN_ID` | `admin` |
-| `REACT_APP_ADMIN_PASSWORD` | `Dash@2026` |
 
 4. **Deploy** → aguarde 1-3 minutos
 
@@ -86,11 +73,13 @@ service cloud.firestore {
 
 ## PASSO 4 — Primeiro acesso
 
-1. Abra a URL do Vercel
-2. Na tela inicial, clique em **"acesso administrativo"** (rodapé)
-3. Login: `admin` · Senha: `Dash@2026`
+1. Publique as Cloud Functions: `npx firebase deploy --only functions` (sem elas ninguém entra — o acesso é decidido nelas)
+2. No console do Firebase → **Authentication** → **Adicionar usuário**: e-mail `admin@squadmvps.interno` e uma senha forte. Essa é a conta do admin master; nunca a apague
+3. Abra a URL do Vercel → **"acesso administrativo"** (rodapé) → entre com o ID `admin` e essa senha
 4. Vá em **Colaboradores** e cadastre os membros do time
 5. Vá em **Clientes** e comece a cadastrar os clientes
+
+> Nenhuma senha vai em variável de ambiente ou no código. Todo `REACT_APP_*` é compilado para o navegador e fica visível para qualquer visitante.
 
 ---
 
@@ -171,7 +160,7 @@ Esse cálculo é **invisível para o colaborador**, visível apenas no painel ad
 
 ## Problemas comuns
 
-**Tela em branco** → verifique as 8 variáveis de ambiente no Vercel
+**Tela em branco** → verifique as 6 variáveis de ambiente no Vercel
 
 **"permission-denied"** → publique as regras do Firestore (Passo 2.3)
 
