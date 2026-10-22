@@ -62,7 +62,14 @@ export default function SMClientModal({
   const materiais = marca.materials || [];
 
   const abertas = tasks.filter((t) => t.status !== 'done');
-  const concluidas = tasks.filter((t) => t.status === 'done').length;
+  // Só as do mês: os painéis acompanham as concluídas recentes ao vivo
+  // e o histórico completo fica nos Relatórios do admin.
+  const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const concluidas = tasks.filter((t) => {
+    if (t.status !== 'done') return false;
+    const c = t.completedAt?.toDate ? t.completedAt.toDate() : t.completedAt ? new Date(t.completedAt) : null;
+    return !!c && c >= inicioMes;
+  }).length;
 
   return ReactDOM.createPortal(
     <div style={S.overlay} onClick={onClose}>
@@ -159,7 +166,7 @@ export default function SMClientModal({
           </Bloco>
 
           {/* Tasks */}
-          <Bloco icone={Kanban} titulo={`Tasks${concluidas ? ` · ${concluidas} concluídas` : ''}`}>
+          <Bloco icone={Kanban} titulo={`Tasks${concluidas ? ` · ${concluidas} concluídas no mês` : ''}`}>
             {abertas.length === 0 ? (
               <p style={S.vazio}>Nenhuma task aberta para este cliente.</p>
             ) : (

@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, FieldPath } from 'firebase/firestore';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { collection, onSnapshot, doc, serverTimestamp, query, where, getDocs, Timestamp, FieldPath } from 'firebase/firestore';
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { addDoc, updateDoc, deleteDoc, writeBatch } from '../lib/gravacoes';
-import { db, mensagemDeErro } from '../lib/firebase';
+import { db, mensagemDeErro, TASK_COLUMNS, TASKS_RECENTES_SEMANAS } from '../lib/firebase';
 import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
 
 // ─── Ordem pessoal do Kanban ──────────────────────────────────
@@ -191,18 +191,89 @@ export async function updateTaskResponsibles(task, people, byName, bySector) {
   } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
 }
 
+// ─── O que cada painel acompanha ao vivo ──────────────────────
+// Até 22/out/2026 todo painel ouvia a coleção `tasks` inteira, com o
+// histórico desde o começo do app. Cada abertura do app (e cada volta
+// depois de 30 min parado) relia tudo, e o custo crescia todo dia — foi
+// o que estourou a cota diária de leituras do plano gratuito nesse dia.
+//
+// Agora são dois listeners estreitos, os mesmos recortes da TV:
+//   1. tasks abertas (todo, doing, approval);
+//   2. concluídas desde o início da janela recente — o mais antigo
+//      entre o começo do mês passado e a semana de TASKS_RECENTES_SEMANAS
+//      atrás, que cobre o Kanban (mês corrente), as comparações com o
+//      mês anterior e as 8 semanas da visão geral do admin.
+// O histórico mais antigo só existe no admin, sob demanda, pelos
+// Gráficos (carregarHistorico). Sem índice composto: cada consulta
+// filtra um campo só.
+//
+// completedAt é string ISO, que ordena igual à ordem cronológica. Task
+// muito antiga pode ter Timestamp ou nem ter o campo; ela fica fora da
+// janela recente (já é histórico) e entra no "Tudo" do admin, que
+// busca por status.
+export const OPEN_TASK_STATUSES = TASK_COLUMNS.map(c => c.id).filter(id => id !== 'done');
+
+export function inicioJanelaTasks(agora = new Date()) {
+  const mesPassado = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+  const semanas = new Date(agora);
+  semanas.setDate(semanas.getDate() - TASKS_RECENTES_SEMANAS * 7);
+  // Volta até a segunda-feira daquela semana.
+  semanas.setDate(semanas.getDate() - ((semanas.getDay() + 6) % 7));
+  semanas.setHours(0, 0, 0, 0);
+  return mesPassado < semanas ? mesPassado : semanas;
+}
+
+const mapear = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
 export function useTasks() {
   const [tasks, setTasks] = useState([]);
+  // Histórico além da janela, só quando o admin pede. Fica guardado na
+  // sessão: pedir um período já coberto não relê nada.
+  const [historico, setHistorico] = useState([]);
+  const [historicoEstado, setHistoricoEstado] = useState({ status: 'vazio', desde: undefined });
+  const historicoRef = useRef({ carregando: false, desde: undefined });
+  // A janela é fixada na montagem: aba aberta por dias só fica com
+  // um pouco mais de concluídas, nunca com menos.
+  const [inicioJanela] = useState(() => inicioJanelaTasks());
   const [loading, setLoading] = useState(true);
   // Garante que o auto-reparo rode só uma vez por sessão do hook.
   const repairedRef = useRef(false);
 
   useEffect(() => {
-    const q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, snap => {
-      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setTasks(list);
+    let abertas = null;
+    let concluidas = null;
+    // Junta os dois recortes por id. Task que acabou de mudar de coluna
+    // pode aparecer nos dois por um instante — o Map deixa uma só.
+    const publicar = () => {
+      if (abertas === null || concluidas === null) return;
+      const porId = new Map();
+      abertas.forEach(t => porId.set(t.id, t));
+      concluidas.forEach(t => porId.set(t.id, t));
+      const createdMs = (t) => { const d = t.createdAt?.toDate ? t.createdAt.toDate() : new Date(t.createdAt || 0); return d.getTime() || 0; };
+      setTasks([...porId.values()].sort((a, b) => createdMs(b) - createdMs(a)));
       setLoading(false);
+    };
+    const falhou = (qual) => (err) => {
+      // Sem este callback, uma falha do listener (cota estourada, sem
+      // permissão) deixava o quadro carregando para sempre, sem aviso.
+      console.error(`[useTasks] listener de tasks (${qual}) falhou:`, err);
+      if (qual === 'abertas') abertas = abertas || [];
+      else concluidas = concluidas || [];
+      publicar();
+      setLoading(false);
+    };
+
+    const qConcluidas = query(collection(db, 'tasks'), where('completedAt', '>=', inicioJanela.toISOString()));
+    const pararConcluidas = onSnapshot(qConcluidas, snap => {
+      concluidas = mapear(snap).filter(t => t.status === 'done');
+      publicar();
+    }, falhou('concluidas'));
+
+    const qAbertas = query(collection(db, 'tasks'), where('status', 'in', OPEN_TASK_STATUSES));
+    const pararAbertas = onSnapshot(qAbertas, snap => {
+      const list = mapear(snap);
+      abertas = list;
+      publicar();
 
       // Auto-reparo (uma vez). Corrige no Firestore; o snapshot propaga
       // o resultado para todos os usuários automaticamente.
@@ -240,13 +311,59 @@ export function useTasks() {
           }).catch(() => {});
         });
       }
-    }, err => {
-      // Sem este callback, uma falha do listener (cota estourada, sem
-      // permissão) deixava o quadro carregando para sempre, sem aviso.
-      console.error('[useTasks] listener de tasks falhou:', err);
-      setLoading(false);
-    });
-  }, []);
+    }, falhou('abertas'));
+
+    return () => { pararAbertas(); pararConcluidas(); };
+  }, [inicioJanela]);
+
+  // ── Histórico sob demanda (admin) ────────────────────────────
+  // desde = Date: concluídas de `desde` até o início da janela.
+  // desde = null: todas as concluídas (o "Tudo"), por status, para pegar
+  // também as antigas sem completedAt ou com Timestamp.
+  // Leitura única, sem listener: concluída antiga não muda.
+  const carregarHistorico = useCallback(async (desde) => {
+    const atual = historicoRef.current;
+    const jaCobre = atual.desde === null || (desde && atual.desde && atual.desde <= desde);
+    if (atual.carregando || jaCobre) return;
+    if (desde && desde >= inicioJanela) return;
+
+    historicoRef.current = { ...atual, carregando: true };
+    setHistoricoEstado(e => ({ ...e, status: 'carregando' }));
+    try {
+      const col = collection(db, 'tasks');
+      let lista;
+      if (desde === null) {
+        lista = mapear(await getDocs(query(col, where('status', '==', 'done'))));
+      } else {
+        const ate = inicioJanela;
+        const [texto, carimbo] = await Promise.all([
+          getDocs(query(col, where('completedAt', '>=', desde.toISOString()), where('completedAt', '<', ate.toISOString()))),
+          getDocs(query(col, where('completedAt', '>=', Timestamp.fromDate(desde)), where('completedAt', '<', Timestamp.fromDate(ate)))),
+        ]);
+        lista = [...mapear(texto), ...mapear(carimbo)].filter(t => t.status === 'done');
+      }
+      setHistorico(antes => {
+        const porId = new Map(antes.map(t => [t.id, t]));
+        lista.forEach(t => porId.set(t.id, t));
+        return [...porId.values()];
+      });
+      const novoDesde = desde === null ? null : (atual.desde && atual.desde < desde ? atual.desde : desde);
+      historicoRef.current = { carregando: false, desde: novoDesde };
+      setHistoricoEstado({ status: 'ok', desde: novoDesde });
+    } catch (err) {
+      console.error('[useTasks] histórico falhou:', err);
+      historicoRef.current = { ...atual, carregando: false };
+      setHistoricoEstado(e => ({ ...e, status: 'erro' }));
+    }
+  }, [inicioJanela]);
+
+  // O que vem ao vivo sempre ganha do histórico (a mesma task pode ter
+  // sido reaberta depois de carregada).
+  const todas = useMemo(() => {
+    if (!historico.length) return tasks;
+    const vivas = new Set(tasks.map(t => t.id));
+    return [...tasks, ...historico.filter(h => !vivas.has(h.id))];
+  }, [tasks, historico]);
 
   // ── Create task ──────────────────────────────────────────────
   const createTask = async ({ name, clientId, clientName, deadline, priority, responsibleSector, responsibleName, responsibleNames, requestedBy, requestedBySector, comment, links }) => {
@@ -312,7 +429,7 @@ export function useTasks() {
   // ── Move to Em Produção ──────────────────────────────────────
   const moveToProduction = async (taskId, updatedLinks) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       const now = new Date().toISOString();
       const timeline = [...(task.timeline || []), {
@@ -341,7 +458,7 @@ export function useTasks() {
   // atraso; se voltar para ajuste, o tempo parado volta para o prazo.
   const moveToApproval = async (taskId, approverName, approverSector, updatedLinks) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       // Guarda: sem aprovador explícito, não envia (evita gravar o
       // próprio executor como aprovador — origem do bug).
@@ -416,7 +533,7 @@ export function useTasks() {
   // timeline inteira a cada render.
   const approveTask = async (taskId) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       const at = new Date();
       const now = at.toISOString();
@@ -465,7 +582,7 @@ export function useTasks() {
   // quem demorou para revisar.
   const rejectTask = async (taskId, reworkNote, newResponsibleName, newResponsibleSector) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       const at = new Date();
       const now = at.toISOString();
@@ -519,7 +636,7 @@ export function useTasks() {
   // ── Add comment ──────────────────────────────────────────────
   const addComment = async (taskId, author, sector, text) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) throw new Error('Task não encontrada');
       const newComment = {
         id: `c_${Date.now()}`,
@@ -546,7 +663,7 @@ export function useTasks() {
   // Registra na timeline E como comentário no chat da task.
   const changeDeadline = async (taskId, newDeadline, reason, byName, bySector) => {
     try {
-      const task = tasks.find(t => t.id === taskId);
+      const task = todas.find(t => t.id === taskId);
       if (!task) return { success: false, error: 'Task não encontrada.' };
       if (!reason || !reason.trim()) return { success: false, error: 'Justifique a mudança de data.' };
       const now = new Date().toISOString();
@@ -583,7 +700,7 @@ export function useTasks() {
 
   // ── Helper: tasks visible to a user ─────────────────────────
   const getMyTasks = (userName) => {
-    return tasks.filter(t =>
+    return todas.filter(t =>
       t.responsibleName === userName ||
       (Array.isArray(t.responsibleNames) && t.responsibleNames.includes(userName)) ||
       t.requestedBy === userName ||
@@ -592,9 +709,11 @@ export function useTasks() {
   };
 
   return {
-    tasks, loading,
+    tasks: todas, loading,
     createTask, moveToProduction, moveToApproval,
     approveTask, rejectTask, addComment, updateLinks, deleteTask,
     changeDeadline, getMyTasks,
+    // Admin: histórico além da janela recente.
+    inicioJanela, carregarHistorico, historico: historicoEstado,
   };
 }

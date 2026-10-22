@@ -42,13 +42,13 @@ export default function HallOfFame({ tasks }) {
           🏆 Hall da Fama
         </h1>
         <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-          Ranking de entregas aprovadas de primeira — Design & VideoMaker
+          Ranking de entregas aprovadas de primeira nos últimos 2 meses — Design & VideoMaker
         </p>
       </div>
 
       {/* Ranking */}
       <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: '22px', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 18 }}>Ranking Geral</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 18 }}>Ranking</h2>
 
         {ranking.length === 0 ? (
           <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', padding: '24px 0' }}>

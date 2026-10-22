@@ -94,6 +94,7 @@ export default function AdminDashboard() {
     tasks, loading: loadingTasks,
     createTask, moveToProduction, moveToApproval,
     approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline,
+    inicioJanela, carregarHistorico, historico,
   } = useTasks();
 
   const [page, setPage] = useState('overview');
@@ -264,7 +265,13 @@ export default function AdminDashboard() {
         ) : page === 'onboarding' ? (
           <OnboardingBoard sectorId="admin" isAdminView />
         ) : page === 'charts' ? (
-          <AdminCharts clients={clients} tasks={tasks} />
+          <AdminCharts
+            clients={clients}
+            tasks={tasks}
+            inicioJanela={inicioJanela}
+            carregarHistorico={carregarHistorico}
+            historico={historico}
+          />
         ) : page === 'portal' ? (
           <AdminPortalClients clients={clients} currentUser={user} toast={toast} />
         ) : page === 'documentos' ? (

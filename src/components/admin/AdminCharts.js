@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { SECTORS } from '../../lib/firebase';
 import { entregadoresDe } from '../../hooks/useTasks';
@@ -139,8 +139,22 @@ function janelaDe(periodo, de, ate, now) {
 
 const SEL = { height: 34, borderRadius: 99, background: 'var(--bg3)', border: '1px solid var(--border-h)', padding: '0 32px 0 12px', fontSize: 12.5, color: 'var(--muted)', minWidth: 0 };
 const SEL_ON = { borderColor: 'var(--c)', background: 'var(--c-dim)', color: 'var(--text)', fontWeight: 600 };
+const AVISO_HIST = { display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)' };
 
-export default function AdminCharts({ clients, tasks = [] }) {
+// Quanto do histórico o período pede além do que os painéis já
+// acompanham ao vivo (useTasks). 'tudo' = o histórico inteiro; '' =
+// nada a buscar; ISO = de lá até o início da janela recente. Período
+// personalizado sem data inicial espera a data, para não puxar o
+// histórico inteiro só por abrir o seletor.
+function historicoPedido(periodo, de, ate, inicioJanela, now) {
+  if (!inicioJanela) return '';
+  if (periodo === 'tudo') return 'tudo';
+  if (periodo === 'custom' && !de) return '';
+  const [ini] = janelaDe(periodo, de, ate, now);
+  return ini && ini < inicioJanela ? ini.toISOString() : '';
+}
+
+export default function AdminCharts({ clients, tasks = [], inicioJanela = null, carregarHistorico = null, historico = null }) {
   const [periodo, setPeriodo] = useState('mes');
   const [de, setDe] = useState('');
   const [ate, setAte] = useState('');
@@ -148,6 +162,16 @@ export default function AdminCharts({ clients, tasks = [] }) {
   const [pessoa, setPessoa] = useState('');
   const now = new Date();
   const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // O histórico antigo não fica ao vivo em nenhum painel: carrega aqui,
+  // na hora em que alguém escolhe um período que passa da janela recente.
+  const pedido = historicoPedido(periodo, de, ate, inicioJanela, now);
+  useEffect(() => {
+    if (!pedido || !carregarHistorico) return;
+    carregarHistorico(pedido === 'tudo' ? null : new Date(pedido));
+  }, [pedido, carregarHistorico]);
+  const statusHistorico = pedido && historico ? historico.status : '';
+  const tentarDeNovo = () => carregarHistorico && carregarHistorico(pedido === 'tudo' ? null : new Date(pedido));
 
   // Quem já entregou alguma coisa — alimenta o filtro de colaborador.
   const pessoas = useMemo(() => {
@@ -284,6 +308,18 @@ export default function AdminCharts({ clients, tasks = [] }) {
             )}
             {(setor || pessoa || periodo !== 'mes') && (
               <button className="ui-btn small" style={{ height: 34 }} onClick={() => { setSetor(''); setPessoa(''); setPeriodo('mes'); setDe(''); setAte(''); }}>Limpar</button>
+            )}
+            {statusHistorico === 'carregando' && (
+              <span style={AVISO_HIST}><span className="spinner" style={{ width: 12, height: 12 }} /> Carregando histórico…</span>
+            )}
+            {statusHistorico === 'erro' && (
+              <span style={{ ...AVISO_HIST, color: 'var(--red)' }}>
+                Não deu para carregar o histórico.
+                <button className="ui-btn small" style={{ height: 28 }} onClick={tentarDeNovo}>Tentar de novo</button>
+              </span>
+            )}
+            {periodo === 'custom' && !de && (
+              <span style={AVISO_HIST}>Escolha a data inicial</span>
             )}
           </div>
         </div>

@@ -64,6 +64,8 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 
 `src/hooks/use*.js` são a camada de dados de tudo que uma tela renderiza. Cada hook abre um `onSnapshot`, mapeia `{ id, ...data }` para o estado e expõe funções de CRUD. Sem cache, sem normalização, sem store global — o componente assina chamando o hook e toda aba aberta atualiza em tempo real.
 
+**Leitura custa — cada listener relê tudo a cada abertura do app.** O Firestore cobra uma leitura por documento que o listener devolve, a cada abertura, F5, aba nova e volta depois de 30 min parado. Listener na coleção inteira de algo que só cresce estoura a cota (aconteceu com `tasks` em 22/out/2026: 74 mil leituras num dia, contra 50 mil do plano gratuito). Por isso o `useTasks` ouve só dois recortes — tasks abertas e concluídas desde `inicioJanelaTasks()` (o início do mês passado ou `TASKS_RECENTES_SEMANAS` atrás, o que for mais antigo) — e o histórico mais antigo só existe no admin, sob demanda: os Relatórios (`AdminCharts`) chamam `carregarHistorico` quando o período escolhido passa da janela (leitura única, guardada na sessão). Coleção nova que só cresce segue o mesmo padrão: recorte ao vivo, histórico sob demanda. Painel de setor não mostra contagem "de todos os tempos" de tasks.
+
 Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `planejamentos`, `vm_marcacoes`, `portal_clients`, `portal_products`, `userIndex` (escrito só pelas functions) e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
 
 Quatro arquivos acessam o Firestore direto, cada um por um motivo:

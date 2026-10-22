@@ -25,7 +25,14 @@ function GenericOverview({ myTasks, sectorId }) {
   const now = new Date();
   const active = myTasks.filter(t => t.status !== 'done');
   const pendingApproval = myTasks.filter(t => t.status === 'approval');
-  const done = myTasks.filter(t => t.status === 'done');
+  // Concluídas do mês: o painel só acompanha as recentes ao vivo
+  // (useTasks); o histórico completo fica nos Relatórios do admin.
+  const inicioMes = new Date(now.getFullYear(), now.getMonth(), 1);
+  const done = myTasks.filter(t => {
+    if (t.status !== 'done') return false;
+    const c = t.completedAt?.toDate ? t.completedAt.toDate() : t.completedAt ? new Date(t.completedAt) : null;
+    return !!c && c >= inicioMes;
+  });
   const rework = myTasks.filter(t => t.isRework && t.status !== 'done');
 
   return (
@@ -41,7 +48,7 @@ function GenericOverview({ myTasks, sectorId }) {
         {[
           { label: 'Tasks Ativas',       value: active.length,          color },
           { label: 'Aguard. Aprovação',   value: pendingApproval.length, color: pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)' },
-          { label: 'Concluídas',         value: done.length,            color: 'var(--green)' },
+          { label: 'Concluídas no mês',  value: done.length,            color: 'var(--green)' },
           { label: 'Em Ajuste',          value: rework.length,          color: rework.length > 0 ? 'var(--amber)' : 'var(--muted)' },
         ].map(s => (
           <div key={s.label} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, padding: '18px 20px', boxShadow: 'var(--shadow)', position: 'relative', overflow: 'hidden' }}>
