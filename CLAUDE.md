@@ -106,9 +106,12 @@ Criar colaborador usa uma **instância secundária e descartável do Firebase** 
 - `migrarConta` (callable sem login) faz a migração preguiçosa no servidor; `resetCollaboratorPassword` confere admin nos dados do servidor a cada chamada, nunca no `userIndex`.
 - `userIndex` virou espelho escrito só pelas functions. Nada deve confiar nele enquanto as regras não travarem a escrita.
 - `ACESSO_V` existe nos dois lados (`functions/index.js` e `AuthContext.js`) e muda junto.
-- Ordem de publicação quando mexer nisso: functions primeiro, depois a `main`. Front novo sem a função deixa o admin master de fora (colaborador entra pelo plano B do doc).
+- Ordem de publicação quando mexer nisso: functions primeiro, depois a `main`.
+- **Plano B no front** (`perfilLegado` em `AuthContext.js`): se a `sincronizarAcesso` não responde e o token nunca passou por ela, o front aplica as mesmas regras lendo direto — colaborador pelo doc ligado ao `authUid` (desativado ou sem doc fica de fora), admin master pelo e-mail, com a troca obrigatória conferida pelo `passwordUpdatedAt` da própria conta (`accounts:lookup` do Auth). `ADMINS_MASTER` e `SENHA_MASTER_VALIDA_DESDE` existem nos dois lados.
+- **Estado em 22/out/2026: as functions não estão no ar.** O projeto está sem cobrança ativa (plano Spark), e sem cobrança o Google não publica nem roda Cloud Functions — nem a `resetCollaboratorPassword` antiga. O app inteiro roda pelo plano B. No Spark valem as cotas diárias gratuitas do Firestore (50 mil leituras e 20 mil gravações por dia); estourou leitura nesse dia. Publicar as functions exige ligar o plano Blaze antes.
+- A `api` usa o segredo `SQUAD_API_KEY` do Secret Manager, que ainda não existe. O deploy de qualquer function do arquivo exige o segredo criado (`firebase functions:secrets:set SQUAD_API_KEY`), porque a CLI resolve os parâmetros do arquivo inteiro antes de filtrar por `--only`.
 
-> PENDENTE: as regras do Firestore ainda precisam passar a usar o token (`request.auth.token.staff` / `.admin`), travar `isAdmin`, `active`, `sector`, `leaderOf`, `csRole`, `loginId` e `authUid` em `collaborators` para não admins e bloquear escrita do cliente em `userIndex`. Sem isso, um colaborador com acesso ao Firestore ainda consegue se promover editando o próprio doc.
+> PENDENTE — regras do Firestore. As publicadas (lidas em 22/out/2026, ainda fora do repo) tratam como `isStaff()` **qualquer conta não anônima**, e o cadastro de conta pelo navegador está ligado: quem criar uma conta com a chave pública do app lê e grava quase tudo. `collaborators` tem leitura pública (`if true`) e `portal_clients`/`portal_products` são abertas. Correção: `isStaff()` precisa exigir vínculo real com a equipe (token das functions, ou, sem elas, um doc que só o admin grava), travar `isAdmin`, `active`, `sector`, `leaderOf`, `csRole`, `loginId` e `authUid` em `collaborators` para não admins e bloquear escrita do cliente em `userIndex`.
 
 ### Rotas e controle de acesso
 

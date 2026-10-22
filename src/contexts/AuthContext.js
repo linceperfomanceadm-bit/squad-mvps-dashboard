@@ -30,8 +30,16 @@ const AuthContext = createContext(null);
  * Token que já passou pela função com acesso abre o app na hora, e a
  * conferência roda em segundo plano (o admin trocou o papel, desativou
  * a conta). Token que nunca passou, ou que estava sem acesso, espera a
- * função. Se ela não responder, colaborador entra pelo doc como antes
- * (só UX); o admin master, que não tem doc, depende dela.
+ * função.
+ *
+ * PLANO B — functions fora do ar. Em 22/out/2026 o projeto estava sem
+ * cobrança ativa (plano Spark) e o Google não deixa publicar nem rodar
+ * Cloud Functions assim. Enquanto isso, o acesso sai das mesmas regras
+ * que o servidor usaria, lidas aqui (só UX — a barreira são as regras
+ * do Firestore e a senha): colaborador pelo doc vinculado ao authUid,
+ * admin master pelo e-mail da conta, com a troca obrigatória da senha
+ * exposta conferida pela data da última troca no próprio Auth. Quando
+ * as functions voltarem, o token assume sozinho.
  *
  * MIGRAÇÃO LAZY: colaboradores criados antes do Auth ainda guardam a
  * senha em texto no Firestore. A conferência dessa senha e a criação da
@@ -41,8 +49,11 @@ const AuthContext = createContext(null);
  * vinculado pelo authUid. O doc do Auth NÃO guarda senha.
  */
 
-// Espelho de ACESSO_V em functions/index.js — mudam juntos.
+// Espelhos de functions/index.js — mudam juntos.
 const ACESSO_V = 1;
+const ADMINS_MASTER = ['admin'];
+// Senha do admin master definida antes disto é tratada como vazada.
+const SENHA_MASTER_VALIDA_DESDE = Date.parse('2026-10-22T00:00:00-03:00');
 
 const chamarSincronizar = httpsCallable(functions, 'sincronizarAcesso');
 const chamarMigrar = httpsCallable(functions, 'migrarConta');
@@ -93,37 +104,73 @@ async function perfilPelasClaims(fbUser, claims) {
     return perfilDoColaborador(snap.id, snap.data(), fbUser.uid, claims.admin === true);
   }
 
-  if (claims.admin === true) {
-    // Admin master: conta do Auth sem doc em collaborators.
-    return {
-      id: fbUser.uid,
-      authUid: fbUser.uid,
-      name: 'Admin',
-      loginId: (fbUser.email || '').split('@')[0],
-      sector: null,
-      csRole: null,
-      role: 'superadmin',
-      isAdmin: true,
-      leaderOf: [],
-      // A senha antiga do admin ficou exposta no código. O servidor
-      // obriga a troca uma vez (claim trocarSenha), reaproveitando a
-      // tela de primeiro acesso.
-      firstAccess: claims.trocarSenha === true,
-    };
-  }
+  if (claims.admin === true) return perfilAdminMaster(fbUser, claims.trocarSenha === true);
 
   throw new Error('sem-acesso');
 }
 
-// Plano B quando a função não responde e o token nunca passou por ela:
-// colaborador entra pelo doc vinculado ao uid, como antes desta versão.
+// Admin master: conta do Auth sem doc em collaborators. A senha antiga
+// dele ficou exposta no código; trocarSenha reaproveita a tela de
+// primeiro acesso para obrigar a troca uma vez.
+function perfilAdminMaster(fbUser, trocarSenha) {
+  return {
+    id: fbUser.uid,
+    authUid: fbUser.uid,
+    name: 'Admin',
+    loginId: (fbUser.email || '').split('@')[0],
+    sector: null,
+    csRole: null,
+    role: 'superadmin',
+    isAdmin: true,
+    leaderOf: [],
+    firstAccess: trocarSenha,
+  };
+}
+
+const ehAdminMaster = (fbUser) => {
+  const email = String(fbUser.email || '').toLowerCase();
+  return ADMINS_MASTER.some(id => loginIdToEmail(id) === email);
+};
+
+// Data da última troca de senha da própria conta, pela API pública do
+// Auth (a mesma consulta que o SDK faz no reload). Na falha devolve 0,
+// e a troca é exigida — melhor pedir uma vez a mais do que deixar a
+// senha exposta valendo.
+async function senhaTrocadaEm(fbUser) {
+  try {
+    const idToken = await fbUser.getIdToken();
+    const chave = encodeURIComponent(auth.app.options.apiKey || '');
+    const res = await withTimeout(fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${chave}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) },
+    ), 6000, 'lookup');
+    const dados = await res.json();
+    const conta = dados && Array.isArray(dados.users) ? dados.users[0] : null;
+    return Number(conta && conta.passwordUpdatedAt) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Plano B quando a função não responde e o token nunca passou por ela
+// (ver o topo do arquivo).
 async function perfilLegado(fbUser) {
-  const snap = await withTimeout(
-    getDocs(query(collection(db, 'collaborators'), where('authUid', '==', fbUser.uid))),
-    6000,
-    'legado',
-  );
-  if (snap.empty) throw new Error('sem-validacao');
+  if (ehAdminMaster(fbUser)) {
+    return perfilAdminMaster(fbUser, (await senhaTrocadaEm(fbUser)) < SENHA_MASTER_VALIDA_DESDE);
+  }
+
+  let snap;
+  try {
+    snap = await withTimeout(
+      getDocs(query(collection(db, 'collaborators'), where('authUid', '==', fbUser.uid))),
+      6000,
+      'legado',
+    );
+  } catch {
+    throw new Error('sem-validacao');
+  }
+  // Consulta respondeu e não há colaborador ligado a esta conta.
+  if (snap.empty) throw new Error('sem-acesso');
   const d = snap.docs[0];
   const c = d.data();
   if (c.active === false) throw new Error('sem-acesso');
