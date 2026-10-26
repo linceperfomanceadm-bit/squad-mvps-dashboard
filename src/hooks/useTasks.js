@@ -3,6 +3,7 @@ import { collection, onSnapshot, doc, serverTimestamp, query, where, getDocs, Ti
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { addDoc, updateDoc, deleteDoc, writeBatch } from '../lib/gravacoes';
 import { db, mensagemDeErro, TASK_COLUMNS, TASKS_RECENTES_SEMANAS } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
 import { businessMsBetween, isDeliveryOnTime, taskTimeStats } from '../lib/taskTime';
 
 // ─── Ordem pessoal do Kanban ──────────────────────────────────
@@ -207,13 +208,24 @@ export async function updateTaskResponsibles(task, people, byName, bySector) {
 // Gráficos (carregarHistorico). Sem índice composto: cada consulta
 // filtra um campo só.
 //
+// JANELA POR PAPEL (26/out/2026). A janela de 8 semanas não resolveu:
+// o app só tem tasks desde set/2026, então ela cobria quase o histórico
+// inteiro e a cota estourou de novo (72 mil leituras). Só o admin usa
+// mês passado e 8 semanas (Visão Geral e Relatórios). Os painéis de
+// setor e o sino de notificações só olham o mês corrente (Kanban,
+// visão do setor, cliente da Social) e as tasks abertas. Então quem
+// não é admin ouve só as concluídas desde o dia 1 do mês. Todas as
+// instâncias do hook numa mesma sessão montam a MESMA consulta, e o
+// Firestore cobra uma vez só por consulta repetida.
+//
 // completedAt é string ISO, que ordena igual à ordem cronológica. Task
 // muito antiga pode ter Timestamp ou nem ter o campo; ela fica fora da
 // janela recente (já é histórico) e entra no "Tudo" do admin, que
 // busca por status.
 export const OPEN_TASK_STATUSES = TASK_COLUMNS.map(c => c.id).filter(id => id !== 'done');
 
-export function inicioJanelaTasks(agora = new Date()) {
+export function inicioJanelaTasks(agora = new Date(), completa = true) {
+  if (!completa) return new Date(agora.getFullYear(), agora.getMonth(), 1);
   const mesPassado = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
   const semanas = new Date(agora);
   semanas.setDate(semanas.getDate() - TASKS_RECENTES_SEMANAS * 7);
@@ -226,15 +238,17 @@ export function inicioJanelaTasks(agora = new Date()) {
 const mapear = (snap) => snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
 export function useTasks() {
+  const { user } = useAuth();
+  const isAdmin = !!user?.isAdmin;
   const [tasks, setTasks] = useState([]);
   // Histórico além da janela, só quando o admin pede. Fica guardado na
   // sessão: pedir um período já coberto não relê nada.
   const [historico, setHistorico] = useState([]);
   const [historicoEstado, setHistoricoEstado] = useState({ status: 'vazio', desde: undefined });
   const historicoRef = useRef({ carregando: false, desde: undefined });
-  // A janela é fixada na montagem: aba aberta por dias só fica com
-  // um pouco mais de concluídas, nunca com menos.
-  const [inicioJanela] = useState(() => inicioJanelaTasks());
+  // A janela é fixada por sessão (só muda se o papel mudar): aba aberta
+  // por dias só fica com um pouco mais de concluídas, nunca com menos.
+  const inicioJanela = useMemo(() => inicioJanelaTasks(new Date(), isAdmin), [isAdmin]);
   const [loading, setLoading] = useState(true);
   // Garante que o auto-reparo rode só uma vez por sessão do hook.
   const repairedRef = useRef(false);

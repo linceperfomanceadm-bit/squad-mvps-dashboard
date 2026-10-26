@@ -53,8 +53,8 @@ export default function CreativeOverview({ tasks, myTasks, sectorId }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(200px,1fr))', gap: 12, marginBottom: 28 }}>
         <StatCard icon={Package} label="Entregas no Mês"        value={monthDone.length}     color={color} />
-        <StatCard icon={Clock}   label="Tempo Médio"            value={`${avgDays}d`}        sub="por entrega" color={color} />
-        <StatCard icon={Star}    label="Aprovação de Primeira"  value={`${pctFirst}%`}       sub={`${firstApproval.length} tasks`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
+        <StatCard icon={Clock}   label="Tempo Médio"            value={`${avgDays}d`}        sub="por entrega no mês" color={color} />
+        <StatCard icon={Star}    label="Aprovação de Primeira"  value={`${pctFirst}%`}       sub={`${firstApproval.length} no mês`} color={pctFirst >= 70 ? 'var(--green)' : pctFirst >= 40 ? 'var(--amber)' : 'var(--neon)'} />
         <StatCard icon={Kanban}  label="Pendentes Aprovação"    value={pendingApproval.length} sub="aguardando ok" color={pendingApproval.length > 0 ? 'var(--amber)' : 'var(--muted)'} />
       </div>
 

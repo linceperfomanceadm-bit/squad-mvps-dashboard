@@ -464,9 +464,10 @@ export const TASK_COLUMNS = [
   { id: 'done',     label: 'Concluída',    color: '#22c55e' },
 ];
 
-// Concluídas que os painéis acompanham ao vivo: no mínimo estas semanas
-// para trás (e sempre desde o início do mês passado). O histórico mais
-// antigo só carrega no admin, sob demanda. Ver useTasks.js.
+// Concluídas que o ADMIN acompanha ao vivo: no mínimo estas semanas
+// para trás (e sempre desde o início do mês passado). Os painéis de
+// setor ouvem só o mês corrente. O histórico mais antigo só carrega no
+// admin, sob demanda. Ver useTasks.js.
 export const TASKS_RECENTES_SEMANAS = 8;
 
 // ─── Task priority — "low" changed to cyan for better visibility ──

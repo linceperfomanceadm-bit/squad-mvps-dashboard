@@ -48,6 +48,11 @@ export function useCollaborators(sectorFilter = null) {
       if (sectorFilter) data = data.filter(c => c.sector === sectorFilter);
       setCollaborators(data);
       setLoading(false);
+    }, err => {
+      // Sem este callback, uma falha do listener (cota estourada) deixava
+      // a tela de equipe carregando para sempre.
+      console.error('[useCollaborators] listener de colaboradores falhou:', err);
+      setLoading(false);
     });
   }, [sectorFilter]);
 

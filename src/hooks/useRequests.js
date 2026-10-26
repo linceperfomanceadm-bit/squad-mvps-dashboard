@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, query, orderBy, arrayUnion } from 'firebase/firestore';
+import { collection, onSnapshot, doc, query, orderBy, where, arrayUnion } from 'firebase/firestore';
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { updateDoc, deleteDoc, writeBatch } from '../lib/gravacoes';
 import { db } from '../lib/firebase';
+import { useAuth } from '../contexts/AuthContext';
 
 /*
  * useRequests — coleção `requests` (Reporte da CS).
@@ -37,17 +38,42 @@ import { db } from '../lib/firebase';
  * array obrigaria a reescrever inbox, badges, notificações e filtros,
  * e ainda assim misturaria o estado de pessoas diferentes num card só.
  */
+// Status que o colaborador ainda enxerga. Encerrada só interessa à CS.
+const STATUS_EM_ABERTO = ['open', 'answered'];
+
+// createdAt é string ISO; doc antigo pode ter Timestamp.
+const criadoMs = (r) => {
+  const c = r.createdAt;
+  const d = c?.toDate ? c.toDate() : new Date(c || 0);
+  return d.getTime() || 0;
+};
+
 export function useRequests() {
+  const { user } = useAuth();
+  // LEITURA POR PAPEL (26/out/2026, cota do Firestore). O hook roda para
+  // todo mundo logado (sino de notificações), e antes cada um lia a
+  // coleção inteira, com todo o arquivo de encerradas. Fora da CS,
+  // nenhuma tela mostra encerrada (caixa de entrada, contador e
+  // notificação olham só open/answered), então só a CS ouve tudo.
+  const veArquivo = user?.sector === 'cs';
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const q = query(collection(db, 'requests'), orderBy('createdAt', 'desc'));
+    // Sem orderBy junto do where para não exigir índice composto: a
+    // ordem (mais recente primeiro) é feita aqui.
+    const q = veArquivo
+      ? query(collection(db, 'requests'), orderBy('createdAt', 'desc'))
+      : query(collection(db, 'requests'), where('status', 'in', STATUS_EM_ABERTO));
     return onSnapshot(q, snap => {
-      setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setRequests(veArquivo ? lista : lista.sort((a, b) => criadoMs(b) - criadoMs(a)));
       setLoading(false);
-    }, () => setLoading(false));
-  }, []);
+    }, err => {
+      console.error('[useRequests] listener de solicitações falhou:', err);
+      setLoading(false);
+    });
+  }, [veArquivo]);
 
   const createRequest = async (data, byName, bySector) => {
     try {
