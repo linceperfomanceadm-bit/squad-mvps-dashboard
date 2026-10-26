@@ -79,9 +79,9 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(10px)',
-        zIndex: 99999, overflowY: 'auto',
-        display: 'flex', justifyContent: 'center',
-        padding: '40px 20px',
+        zIndex: 99999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
       }}
       onClick={onClose}
     >
@@ -90,15 +90,17 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
           background: 'var(--bg2)', border: '1px solid var(--neon-border)',
           borderRadius: 18, width: '100%', maxWidth: 580,
           boxShadow: '0 24px 80px rgba(0,0,0,.8)',
-          height: 'fit-content', flexShrink: 0,
+          // Cabe na tela do notebook: cabeçalho e botões ficam fixos e só
+          // o formulário rola. Antes o "Criar Task" ficava abaixo da dobra.
+          maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         }}
         onClick={e => e.stopPropagation()}
         className="fade-up"
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={18} color="var(--neon)" />
             </div>
             <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)' }}>Nova Task</h2>
@@ -109,7 +111,8 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
         </div>
 
         {/* Body */}
-        <form onSubmit={handleSubmit} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+          <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', flex: 1, minHeight: 0 }}>
 
           {/* Name */}
           <div style={S.field}>
@@ -179,7 +182,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <label style={S.label}>SETOR RESPONSÁVEL *</label>
               <select style={S.select} value={form.responsibleSector} onChange={e => { set('responsibleSector', e.target.value); set('responsibleNames', []); }}>
                 <option value="">Selecionar setor</option>
-                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div style={S.field}>
@@ -257,9 +260,11 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             />
           </div>
 
-          {error && <p style={{ fontSize: 12, color: 'var(--neon)' }}>⚠ {error}</p>}
+          </div>
 
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', paddingTop: 4 }}>
+          {/* Rodapé fixo: erro e botões sempre à vista. */}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'flex-end', padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+            {error && <p style={{ fontSize: 12, color: 'var(--neon)', flex: 1, lineHeight: 1.4 }}>{error}</p>}
             <button type="button"
               style={{ background: 'transparent', border: '1px solid rgba(255,255,255,.12)', borderRadius: 8, padding: '10px 18px', color: 'var(--muted)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
               onClick={onClose}

@@ -32,27 +32,20 @@ export default function TaskCard({ task, onClick }) {
         background: 'var(--bg2)',
         border: `1px solid ${task.isRework ? 'rgba(245,158,11,0.4)' : isLate ? 'rgba(238,51,99,0.35)' : 'rgba(255,255,255,0.07)'}`,
         borderRadius: 10,
-        padding: '12px 13px',
+        padding: '10px 11px',
         cursor: 'pointer',
         transition: 'all .15s',
-        marginBottom: 8,
+        marginBottom: 6,
         animation: 'fadeUp .2s ease',
         position: 'relative',
         overflow: 'hidden',
       }}
     >
-      {/* Rework flag */}
-      {task.isRework && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-          <RefreshCw size={10} color="var(--amber)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
-          <span style={{ fontSize: 9, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.08em', fontFamily: 'var(--fm)' }}>
-            AJUSTE #{task.reworkCount}
-          </span>
-        </div>
-      )}
-
-      {/* Priority + sector */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 7 }}>
+      {/* Linha 1: prioridade e ajuste à esquerda, prazo à direita.
+          Compacto de propósito: no notebook cada linha a menos é um card
+          a mais visível na coluna. O setor sai do card — no admin ele
+          continua na cor dos avatares. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
         {priority && (
           <span style={{
             fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 20,
@@ -63,19 +56,38 @@ export default function TaskCard({ task, onClick }) {
             {priority.label.toUpperCase()}
           </span>
         )}
-        {sector && (
-          <span style={{ fontSize: 10, color: sector.color }}>{sector.emoji}</span>
+        {task.isRework && (
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 700, color: 'var(--amber)', letterSpacing: '.08em', fontFamily: 'var(--fm)' }}>
+            <RefreshCw size={10} color="var(--amber)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
+            AJUSTE #{task.reworkCount}
+          </span>
+        )}
+        {deadline && state && (
+          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            {isFrozen
+              ? <PauseCircle size={11} color={state.color} />
+              : isLate
+                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
+                : <Clock size={11} color={state.kind === 'warn' ? 'var(--amber)' : 'var(--muted)'} />}
+            <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: state.color, whiteSpace: 'nowrap' }}>
+              {isFrozen
+                ? 'congelado'
+                : isLate
+                  ? state.label
+                  : format(deadline, 'dd MMM', { locale: ptBR })}
+            </span>
+          </span>
         )}
       </div>
 
       {/* Task name */}
-      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 4, lineHeight: 1.4 }}>
+      <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3, lineHeight: 1.35 }}>
         {task.name}
       </p>
 
-      {/* Client */}
-      <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>
-        👤 {task.clientName}
+      {/* Cliente e criação */}
+      <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 7, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {task.clientName || 'Sem cliente'}
         {createdAt && (
           <span title={`Criada em ${format(createdAt, "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}${task.requestedBy ? ` por ${task.requestedBy}` : ''}`}
             style={{ fontFamily: 'var(--fm)', fontSize: 10, color: 'var(--dim)' }}>
@@ -84,38 +96,16 @@ export default function TaskCard({ task, onClick }) {
         )}
       </p>
 
-      {/* Prazo — congelado enquanto a task está em aprovação */}
-      {deadline && state && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {isFrozen
-              ? <PauseCircle size={11} color={state.color} />
-              : isLate
-                ? <AlertTriangle size={11} color="var(--neon)" style={{ animation: 'breathe 3s ease-in-out infinite', transformOrigin: 'center' }} />
-                : <Clock size={11} color={state.kind === 'warn' ? 'var(--amber)' : 'var(--muted)'} />}
-            <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: state.color }}>
-              {isFrozen
-                ? 'prazo congelado'
-                : state.kind === 'done'
-                  ? format(deadline, 'dd MMM', { locale: ptBR })
-                  : isLate
-                    ? state.label
-                    : format(deadline, 'dd MMM', { locale: ptBR })}
-            </span>
-          </div>
-
-          {/* Envelhecimento na aprovação: o prazo parou, mas a espera
-              fica visível para ninguém se esconder atrás do congelamento. */}
-          {isFrozen && waitingMs > 0 && (
-            <p style={{ fontSize: 10, color: 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 4 }}>
-              aguardando {task.responsibleName || 'aprovação'} há {formatBusinessDuration(waitingMs)}
-            </p>
-          )}
-        </div>
+      {/* Envelhecimento na aprovação: o prazo parou, mas a espera
+          fica visível para ninguém se esconder atrás do congelamento. */}
+      {isFrozen && waitingMs > 0 && (
+        <p style={{ fontSize: 10, color: 'var(--dim)', fontFamily: 'var(--fm)', marginBottom: 7 }}>
+          aguardando {task.responsibleName || 'aprovação'} há {formatBusinessDuration(waitingMs)}
+        </p>
       )}
 
       {/* Footer: responsible + comments + links */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', alignItems: 'center' }}>
           {(() => {
             const names = (Array.isArray(task.responsibleNames) && task.responsibleNames.length) ? task.responsibleNames : (task.responsibleName ? [task.responsibleName] : []);
@@ -124,7 +114,7 @@ export default function TaskCard({ task, onClick }) {
               <>
                 {shown.map((n, i) => (
                   <div key={i} title={n} style={{
-                    width: 24, height: 24, borderRadius: 8,
+                    width: 22, height: 22, borderRadius: 7,
                     background: sector ? `color-mix(in srgb, ${sector.color} 13%, transparent)` : 'var(--surface)',
                     border: `1px solid ${sector ? `color-mix(in srgb, ${sector.color} 21%, transparent)` : 'var(--border)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',

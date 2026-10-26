@@ -138,6 +138,28 @@ select option:checked, select option:hover { background-color: var(--bg4); color
 }
 .sb-item .sb-badge.danger { background: var(--red-dim); color: var(--red); }
 .sb-item.on .sb-badge, .sb-item.on .sb-badge.danger { background: rgba(0,0,0,.22); color: var(--on); }
+/* Sidebar só com ícones (notebook). O aviso vira selo no canto do ícone. */
+.sb-item.compacta { justify-content: center; padding: 10px 0; position: relative; }
+.sb-item.compacta .sb-badge {
+  position: absolute; top: 2px; right: 4px; margin: 0; padding: 1px 5px;
+  font-size: 9px; line-height: 1.3; background: var(--c); color: var(--on);
+}
+.sb-item.compacta .sb-badge.danger { background: var(--red); color: #fff; }
+
+/* ── Área de conteúdo e barra superior ──────────────────────────
+   TELA DE REFERÊNCIA: notebook 1366×768 — no Chrome sobra ~1366×620.
+   Toda tela é montada e conferida primeiro nesse tamanho; em monitor
+   ela só ganha espaço. Abaixo de 1440px de largura as margens laterais
+   encolhem; abaixo de 800px de altura, as verticais. */
+.app-main { flex: 1; min-width: 0; min-height: 100vh; padding: 18px 32px 28px; transition: margin-left .2s ease; }
+.app-top { display: flex; align-items: center; gap: 6px; height: 44px; margin-bottom: 16px; }
+@media (max-width: 1440px) {
+  .app-main { padding-left: 20px; padding-right: 20px; }
+}
+@media (max-height: 800px) {
+  .app-main { padding-top: 10px; padding-bottom: 16px; }
+  .app-top { height: 40px; margin-bottom: 10px; }
+}
 
 .top-btn {
   display: inline-flex; align-items: center; gap: 7px; height: 36px; padding: 0 12px;

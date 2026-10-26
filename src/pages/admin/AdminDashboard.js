@@ -17,7 +17,7 @@ import AdminPortalClients from '../../components/admin/AdminPortalClients';
 import AdminTVControl from '../../components/admin/AdminTVControl';
 import AdminCarteiraSM from '../../components/admin/AdminCarteiraSM';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
-import TaskKanban from '../../components/kanban/TaskKanban';
+import TaskKanban, { estiloFiltroKanban } from '../../components/kanban/TaskKanban';
 import VaultPage from '../../components/sectors/creative/VaultPage';
 import DocsList from '../../components/sectors/socialMedia/docs/DocsList';
 import IdvAddServiceModal from '../../components/sectors/creative/IdvAddServiceModal';
@@ -209,45 +209,39 @@ export default function AdminDashboard() {
         ) : page === 'overview' ? (
           <AdminOverview clients={clients} collaborators={collaborators} tasks={tasks} onNavigate={setPage} />
         ) : page === 'kanban' ? (
-          <div>
-            {/* Admin filters */}
-            <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap' }}>
-              <select style={S.filterSelect} value={taskSectorFilter} onChange={e => { setTaskSectorFilter(e.target.value); setTaskCollabFilter(''); }}>
-                <option value="">Todos os setores</option>
-                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
-              </select>
-              <select style={S.filterSelect} value={taskCollabFilter} onChange={e => setTaskCollabFilter(e.target.value)}>
-                <option value="">Todos os colaboradores</option>
-                {collaborators.filter(c => c.active !== false && (!taskSectorFilter || c.sector === taskSectorFilter)).map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
-              {(taskSectorFilter || taskCollabFilter) && (
-                <button style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, padding: '8px 14px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }} onClick={() => { setTaskSectorFilter(''); setTaskCollabFilter(''); }}>
-                  Limpar filtros
-                </button>
-              )}
-            </div>
-            <TaskKanban
-              tasks={tasks}
-              clients={clients.filter(c => c.active !== false)}
-              allClients={clients}
-              collaborators={collaborators}
-              currentUser={user?.name}
-              currentUserSector={user?.sector || 'webdesign'}
-              isAdmin={true}
-              adminFilters={{ sector: taskSectorFilter, collaborator: taskCollabFilter }}
-              onCreateTask={handleCreateTask}
-              onMoveToProduction={moveToProduction}
-              onMoveToApproval={moveToApproval}
-              onApprove={approveTask}
-              onReject={rejectTask}
-              onAddComment={addComment}
-              onUpdateLinks={updateLinks}
+          <TaskKanban
+            tasks={tasks}
+            clients={clients.filter(c => c.active !== false)}
+            allClients={clients}
+            collaborators={collaborators}
+            currentUser={user?.name}
+            currentUserSector={user?.sector || 'webdesign'}
+            isAdmin={true}
+            adminFilters={{ sector: taskSectorFilter, collaborator: taskCollabFilter }}
+            filtrosExtras={(
+              <>
+                <select style={estiloFiltroKanban(!!taskSectorFilter)} value={taskSectorFilter} onChange={e => { setTaskSectorFilter(e.target.value); setTaskCollabFilter(''); }}>
+                  <option value="">Todos os setores</option>
+                  {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                </select>
+                <select style={estiloFiltroKanban(!!taskCollabFilter)} value={taskCollabFilter} onChange={e => setTaskCollabFilter(e.target.value)}>
+                  <option value="">Todos os colaboradores</option>
+                  {collaborators.filter(c => c.active !== false && (!taskSectorFilter || c.sector === taskSectorFilter)).map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+            onCreateTask={handleCreateTask}
+            onMoveToProduction={moveToProduction}
+            onMoveToApproval={moveToApproval}
+            onApprove={approveTask}
+            onReject={rejectTask}
+            onAddComment={addComment}
+            onUpdateLinks={updateLinks}
             onChangeDeadline={changeDeadline}
-              onDelete={deleteTask}
-            />
-          </div>
+            onDelete={deleteTask}
+          />
         ) : page === 'feed' ? (
           <AdminFeed
             clients={clients}
@@ -398,7 +392,3 @@ export default function AdminDashboard() {
     </AppShell>
   );
 }
-
-const S = {
-  filterSelect: { background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9, padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 180 },
-};

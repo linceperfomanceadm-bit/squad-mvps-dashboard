@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { LogOut, Plus, Bell, BellOff, Sun, Moon, Calendar, Check, Trash2, ChevronDown } from 'lucide-react';
+import { LogOut, Plus, Bell, BellOff, Sun, Moon, Calendar, Check, Trash2, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, useSectorTheme, useBrandLogo } from '../../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../../lib/firebase';
@@ -13,8 +13,15 @@ import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
 //
 // A aba `agenda` é retirada da sidebar e vira link no topo; o
 // dashboard continua tratando `onNav('agenda')` como sempre.
-// A largura de 224px é a mesma da sidebar antiga, então o
-// `marginLeft: 224` dos dashboards ainda não migrados continua certo.
+//
+// TELA DE REFERÊNCIA = NOTEBOOK (out/2026). A maior parte da agência
+// trabalha num notebook 1366×768, que no Chrome deixa ~1366×620 de área
+// útil. Abaixo de 1440px de largura a sidebar nasce só com ícones (68px)
+// e devolve ~150px para o conteúdo; em monitor ela nasce aberta. A pessoa
+// pode alternar pelo botão do rodapé, e a escolha fica lembrada neste
+// navegador SEPARADA por tipo de tela — quem abre no notebook e depois no
+// monitor não leva a escolha de um para o outro. Espaçamentos da casca
+// por tamanho de tela ficam em `.app-main`/`.app-top` no index.css.
 //
 // Categorias: um item de `navItems` pode ser um GRUPO, com
 // `children: [...]` no lugar de ser uma aba. O grupo não é página —
@@ -23,6 +30,38 @@ import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
 // mandam a lista plana continuam exatamente como eram.
 
 export const SIDEBAR_WIDTH = 224;
+export const SIDEBAR_COMPACTA = 68;
+
+const MQ_NOTEBOOK = '(max-width: 1440px)';
+
+function useSidebarCompacta() {
+  const [notebook, setNotebook] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia ? window.matchMedia(MQ_NOTEBOOK).matches : false
+  ));
+  useEffect(() => {
+    if (!window.matchMedia) return undefined;
+    const mq = window.matchMedia(MQ_NOTEBOOK);
+    const mudou = (e) => setNotebook(e.matches);
+    if (mq.addEventListener) mq.addEventListener('change', mudou); else mq.addListener(mudou);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', mudou); else mq.removeListener(mudou); };
+  }, []);
+
+  const chave = `sidebar-compacta:${notebook ? 'notebook' : 'monitor'}`;
+  const ler = (k) => {
+    try { const v = window.localStorage.getItem(k); return v === '1' ? true : v === '0' ? false : null; }
+    catch { return null; }
+  };
+  const [escolhas, setEscolhas] = useState({});
+  const escolha = chave in escolhas ? escolhas[chave] : ler(chave);
+  const compacta = escolha === null ? notebook : escolha;
+
+  const alternar = () => {
+    const nova = !compacta;
+    setEscolhas(e => ({ ...e, [chave]: nova }));
+    try { window.localStorage.setItem(chave, nova ? '1' : '0'); } catch { /* sem storage, vale só nesta aba */ }
+  };
+  return [compacta, alternar];
+}
 
 const configOf = (sectorId) => (sectorId === 'admin' ? ADMIN_CONFIG : SECTORS[sectorId]) || ADMIN_CONFIG;
 
@@ -39,11 +78,13 @@ export default function AppShell({ sectorId, navItems, activeKey, onNav, onAddCl
   const { user } = useAuth();
   const sector = configOf(sectorId);
   const hasAgenda = abasDe(navItems).some(n => n.key === 'agenda');
+  const [compacta, alternarSidebar] = useSidebarCompacta();
+  const largura = compacta ? SIDEBAR_COMPACTA : SIDEBAR_WIDTH;
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
-      <Aside sectorId={sectorId} navItems={navItems} activeKey={activeKey} onNav={onNav} onAddClient={onAddClient} addClientLabel={addClientLabel} />
-      <main style={{ flex: 1, marginLeft: SIDEBAR_WIDTH, padding: '18px 32px 32px', minHeight: '100vh', minWidth: 0 }}>
+    <div style={{ display: 'flex', minHeight: '100vh', '--sb-w': `${largura}px` }}>
+      <Aside sectorId={sectorId} navItems={navItems} activeKey={activeKey} onNav={onNav} onAddClient={onAddClient} addClientLabel={addClientLabel} compacta={compacta} onAlternar={alternarSidebar} />
+      <main className="app-main" style={{ marginLeft: largura }}>
         <TopBar
           sector={sector}
           user={user}
@@ -62,7 +103,7 @@ export default function AppShell({ sectorId, navItems, activeKey, onNav, onAddCl
 const abasDe = (items) => items.flatMap(n => (Array.isArray(n.children) ? n.children : [n]));
 
 // ─── Sidebar ──────────────────────────────────────────────────
-export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addClientLabel = 'Novo Cliente', showUser = false }) {
+export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addClientLabel = 'Novo Cliente', showUser = false, compacta = false, onAlternar = null }) {
   const { user, logout } = useAuth();
   const brand = useBrandLogo();
   const sector = configOf(sectorId);
@@ -79,6 +120,47 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
   const grupoDaAba = items.find(n => Array.isArray(n.children) && n.children.some(c => c.key === activeKey))?.key || null;
   const [aberto, setAberto] = useState(grupoDaAba);
   useEffect(() => { if (grupoDaAba) setAberto(grupoDaAba); }, [grupoDaAba]);
+
+  // Compacta: só ícones. Grupos viram blocos separados por um traço,
+  // com as ferramentas à mostra — um acordeão de ícones esconderia demais.
+  if (compacta) {
+    return (
+      <aside style={{ ...S.aside, width: SIDEBAR_COMPACTA, padding: '16px 10px' }}>
+        <div style={S.brandCompacta} title="Lince Performance">
+          <img src={sector.logo} alt="" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        </div>
+        <nav style={S.nav}>
+          {items.map((item, i) => (
+            Array.isArray(item.children) ? (
+              <div key={item.key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {i > 0 && <i style={S.divisoria} />}
+                {item.children.map(c => (
+                  <NavItem key={c.key} item={c} compacta on={activeKey === c.key} onClick={() => onNav(c.key)} />
+                ))}
+              </div>
+            ) : (
+              <NavItem key={item.key} item={item} compacta on={activeKey === item.key} onClick={() => onNav(item.key)} />
+            )
+          ))}
+        </nav>
+        <div style={S.foot}>
+          {onAddClient && (
+            <button className="ui-btn primary" style={{ width: '100%', justifyContent: 'center', height: 38, padding: 0 }} onClick={onAddClient} title={addClientLabel}>
+              <Plus size={16} />
+            </button>
+          )}
+          {onAlternar && (
+            <button className="sb-item compacta" onClick={onAlternar} title="Abrir o menu">
+              <PanelLeftOpen size={16} />
+            </button>
+          )}
+          <button className="sb-item compacta" onClick={logout} title="Sair">
+            <LogOut size={16} />
+          </button>
+        </div>
+      </aside>
+    );
+  }
 
   return (
     <aside style={S.aside}>
@@ -119,6 +201,11 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
             <Plus size={14} /> {addClientLabel}
           </button>
         )}
+        {onAlternar && (
+          <button className="sb-item" onClick={onAlternar} title="Deixar o menu só com ícones e ganhar espaço na tela">
+            <PanelLeftClose size={16} /> Recolher menu
+          </button>
+        )}
         <button className="sb-item" onClick={logout}>
           <LogOut size={16} /> Sair
         </button>
@@ -127,7 +214,15 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
   );
 }
 
-function NavItem({ item: { label, icon: Icon, badge, badgeDanger }, on, onClick, sub = false }) {
+function NavItem({ item: { label, icon: Icon, badge, badgeDanger }, on, onClick, sub = false, compacta = false }) {
+  if (compacta) {
+    return (
+      <button className={`sb-item compacta${on ? ' on' : ''}`} onClick={onClick} title={label} aria-label={label}>
+        {Icon && <Icon size={17} strokeWidth={on ? 1.9 : 1.6} />}
+        {badge > 0 && <span className={`sb-badge${badgeDanger ? ' danger' : ''}`}>{badge > 99 ? '99+' : badge}</span>}
+      </button>
+    );
+  }
   return (
     <button className={`sb-item${on ? ' on' : ''}`} onClick={onClick} style={sub ? S.subItem : undefined}>
       {Icon && <Icon size={sub ? 15 : 16} strokeWidth={on ? 1.9 : 1.6} />}
@@ -207,7 +302,7 @@ function TopBar({ sector, user, tag, agendaActive, onAgenda, extra }) {
   };
 
   return (
-    <div style={S.top}>
+    <div className="app-top">
       <div style={{ flex: 1 }} />
       {extra}
       {onAgenda && (
@@ -296,6 +391,8 @@ function quando(iso) {
 const S = {
   aside: { width: SIDEBAR_WIDTH, height: '100vh', background: 'var(--panel)', borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', padding: '22px 14px', position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 20, overflowY: 'auto' },
   brand: { display: 'flex', alignItems: 'center', padding: '4px 8px 26px' },
+  brandCompacta: { display: 'flex', justifyContent: 'center', padding: '2px 0 18px' },
+  divisoria: { display: 'block', height: 1, background: 'var(--border)', margin: '6px 8px' },
   user: { display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px 14px', marginBottom: 10, borderBottom: '1px solid var(--border)' },
   userAv: { width: 34, height: 34, borderRadius: 11, background: 'var(--bg3)', border: '1px solid var(--border-h)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   userName: { fontSize: 13, fontWeight: 500, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
@@ -307,7 +404,6 @@ const S = {
   subLista: { display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 6px 19px', paddingLeft: 9, borderLeft: '1px solid var(--border)' },
   subItem: { padding: '7px 10px', fontSize: 13, gap: 9 },
   foot: { paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 },
-  top: { display: 'flex', alignItems: 'center', gap: 6, height: 44, marginBottom: 16 },
   badge: { position: 'absolute', top: 4, right: 3, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 99, background: 'var(--c)', color: 'var(--on)', fontFamily: 'var(--fm)', fontSize: 9.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' },
   panel: { position: 'absolute', top: 44, right: 0, width: 340, background: 'var(--bg2)', border: '1px solid var(--border-h)', borderRadius: 16, boxShadow: '0 20px 50px -20px rgba(0,0,0,.5), var(--shadow)', zIndex: 60, overflow: 'hidden' },
   panelHead: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px 10px', borderBottom: '1px solid var(--border)' },

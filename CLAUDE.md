@@ -271,6 +271,16 @@ Os tokens vivem em `src/index.css` (bloco "Layout 01"). Não há `DESIGN.md`; o 
 
 A cor `#EE3363` ainda aparece fixa em cerca de 29 pontos fora do `firebase.js` (`AdminCharts.js`, `AdminPortalClients.js`, `ProductFormModal.js`, `TaskModal.js`, `useDocuments.js`...). É estilo anterior, não necessariamente bug; em código novo use `var(--c)` ou a constante.
 
+### Tela de referência: notebook
+
+A maior parte da agência trabalha num notebook **1366×768**, que no Chrome deixa ~**1366×620** de área útil. Toda tela é montada e conferida primeiro nesse tamanho; em monitor ela só ganha espaço (decisão de out/2026). Na prática:
+
+- **Casca** (`AppShell` + `.app-main`/`.app-top` no `index.css`): abaixo de 1440px de largura a sidebar nasce só com ícones (`SIDEBAR_COMPACTA`, 68px) e as margens encolhem; abaixo de 800px de altura, os espaços verticais também. A pessoa alterna a sidebar pelo rodapé dela, e a escolha fica lembrada no navegador separada por notebook/monitor. `--sb-w` tem a largura atual da sidebar.
+- **Quadro na altura da tela**: o Kanban (`TaskKanban`) ocupa o que sobra da tela e cada coluna rola por dentro, com cabeçalho fixo — a página não rola. Título, filtros e "Nova Task" ficam numa linha só; filtros de quem monta o quadro entram por `filtrosExtras`. Tela com lista longa segue o mesmo padrão.
+- **Modal**: altura máxima `calc(100vh - 32px)`, cabeçalho e botões fixos, só o miolo rola. Botão de ação nunca fica no fim de uma rolagem.
+- Não reduza o app com `zoom`/`scale`: embaça o texto e desalinha o arrastar e soltar do Kanban.
+- Antes de subir mudança visual, confira em 1366×620 e 1920×950.
+
 ### Estilo nos componentes
 
 Estilo com **objetos inline**, reunidos num `const S = {...}` no fim do arquivo. `className` só para animações, spinner, TV e as classes utilitárias do `index.css`: `ui-card`, `ui-btn` (`.primary`, `.small`, `.on`), `sb-item`, `top-btn`, `fade-up`, `fade-in`, `spinner`, `toast`.
@@ -283,7 +293,7 @@ Modais sempre via `ReactDOM.createPortal` no `document.body` — o `transform` r
 
 Antes de criar card, KPI, modal, campo, tag ou estado vazio à mão, use os kits:
 
-- **`src/components/shared/AppShell.js`** — casca única de todos os painéis: sidebar de 224px (`SIDEBAR_WIDTH`) com o item ativo no gradiente do setor e barra superior com Agenda, tema, notificações e perfil. Exporta `AppShell` e `Aside`.
+- **`src/components/shared/AppShell.js`** — casca única de todos os painéis: sidebar de 224px (`SIDEBAR_WIDTH`), ou só ícones no notebook (`SIDEBAR_COMPACTA`), com o item ativo no gradiente do setor e barra superior com Agenda, tema, notificações e perfil. Exporta `AppShell` e `Aside`.
 - **`src/components/shared/ui.js`** — kit do Layout 01, usado pelas visões gerais (admin, Social Media, WebDesign, Criativos, CS): `PageHeader`, `Card`, `Grid`, `Kpi`, `Breakdown`, `MiniBars`, `Goal`, `HBars`, `Pills`, `Trio`, `Tag`, `Row`, `Empty`. Tudo neutro; cor do painel por `var(--c)`/`var(--grad)`, semântica por `--green`/`--red`. **É o padrão para tela nova.**
 - **`src/components/planejamento/kit.js`** — peças do conteúdo: `Pill`/`Dot` de status (ponto oco = ainda não andou), `KpiFiltro` (KPI clicável, com ícone ou anel), `Linha`, `Sigla`, `MiniCalendario`, `MesNav`, `ChipsClientes`, `Midia`, `Janela` e `Gaveta` (portais com Esc) e os estilos `JANELA`/`BTN`.
 - **`src/components/commercial/ui.js`** — kit mais antigo, usado pelas telas da CS e por modais: constantes de estilo (`CARD`, `GRID`, `MODAL`, `LBL`, `INP`, `BTN_PRIMARY`, `BTN_GREEN`, `BTN_CANCEL`, `ICON_BTN`), componentes (`Overlay`, `ModalHeader`, `ConfirmModal`, `ScheduleModal`, `Field`, `Stat`, `Tag`, `Empty`, `Spinner`, `Section`, `RO`) e formatadores (`money`, `fmtDate`, `fmtDateTime`, `toLocalInput`). Para modal e formulário ainda é a peça certa. O comentário do topo cita SDR/Closer, que já não existem.

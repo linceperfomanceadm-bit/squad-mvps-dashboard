@@ -1,5 +1,5 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import React, { useState, useRef, useMemo, useEffect, useLayoutEffect } from 'react';
+import { Plus, X, RefreshCw } from 'lucide-react';
 import { TASK_COLUMNS, TASK_PRIORITIES } from '../../lib/firebase';
 import { saveTaskOrder } from '../../hooks/useTasks';
 import { taskCreatedAt } from '../../lib/taskTime';
@@ -57,6 +57,41 @@ const readSort = (userName) => {
   } catch { return 'manual'; }
 };
 
+// ─── Quadro na altura da tela ─────────────────────────────────
+// Tela de referência é o notebook (~620px de altura útil). Antes a
+// página inteira rolava: com uma coluna cheia, os títulos das colunas e
+// os filtros sumiam para cima e o arraste de um card até o fim de outra
+// coluna virava malabarismo. Agora o quadro ocupa o que sobra da tela e
+// cada coluna rola por dentro, com o cabeçalho sempre à vista.
+// Em tela baixa demais (abaixo de ALTURA_MIN) o quadro para de encolher
+// e a página volta a rolar.
+const ALTURA_MIN = 380;
+const FOLGA_RODAPE = 16;
+
+// Mede com offsetTop, e não getBoundingClientRect, porque a animação
+// .fade-up desloca o quadro na montagem e o transform não entra no
+// offsetTop. Remede quando a tela muda e quando o cabeçalho quebra
+// linha (filtros a mais, aviso de filtro ativo).
+function useAlturaAteOFim(alvoRef, topoRef) {
+  const [altura, setAltura] = useState(null);
+  useLayoutEffect(() => {
+    const alvo = alvoRef.current;
+    if (!alvo) return undefined;
+    const medir = () => {
+      let topo = 0;
+      for (let n = alvo; n; n = n.offsetParent) topo += n.offsetTop;
+      const h = Math.max(ALTURA_MIN, window.innerHeight - topo - FOLGA_RODAPE);
+      setAltura(a => (a === h ? a : h));
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    const ro = typeof ResizeObserver !== 'undefined' && topoRef.current ? new ResizeObserver(medir) : null;
+    if (ro) ro.observe(topoRef.current);
+    return () => { window.removeEventListener('resize', medir); if (ro) ro.disconnect(); };
+  }, [alvoRef, topoRef]);
+  return altura;
+}
+
 export default function TaskKanban({
   tasks, clients, collaborators,
   allClients,
@@ -69,6 +104,10 @@ export default function TaskKanban({
   myClientIds = null,
   title = 'Kanban de Tasks',
   subtitle = null,
+  // Filtros de quem monta o quadro (ex.: setor e colaborador no admin).
+  // Entram na mesma linha dos filtros do quadro, para não gastar uma
+  // linha de tela a mais.
+  filtrosExtras = null,
   onCreateTask, onMoveToProduction, onMoveToApproval,
   onApprove, onReject, onAddComment, onUpdateLinks, onChangeDeadline, onDelete,
 }) {
@@ -83,6 +122,9 @@ export default function TaskKanban({
   const [scope, setScope] = useState('mine');
   const [sortMode, setSortMode] = useState(() => readSort(currentUser));
   const dragTask = useRef(null);
+  const topoRef = useRef(null);
+  const quadroRef = useRef(null);
+  const alturaQuadro = useAlturaAteOFim(quadroRef, topoRef);
 
   // Preferência de ordenação por pessoa, lembrada neste navegador.
   useEffect(() => {
@@ -336,13 +378,14 @@ export default function TaskKanban({
 
   return (
     <div className="fade-up">
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-        <div>
-          <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>
+      {/* Cabeçalho: título à esquerda, filtros e Nova Task à direita,
+          numa linha só. Em tela estreita os filtros quebram para baixo. */}
+      <div ref={topoRef} style={S.topo}>
+        <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+          <h1 style={{ fontSize: 20, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 2 }}>
             {title}
           </h1>
-          <p style={{ fontSize: 13, color: 'var(--muted)' }}>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)' }}>
             {subtitle ? `${subtitle} · ` : ''}
             {filtroAtivo
               ? `${visibleTasks.length} de ${baseTasks.length} task${baseTasks.length !== 1 ? 's' : ''}`
@@ -354,86 +397,88 @@ export default function TaskKanban({
             )}
           </p>
         </div>
-        {!readOnly && (
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}
+
+        <div style={S.filtros}>
+          {/* Escopo (só no modo acompanhamento da CS) */}
+          {temEscopo && (
+            <div style={S.escopo}>
+              {[
+                { id: 'mine', label: 'Meus clientes' },
+                { id: 'all',  label: 'Todos' },
+              ].map(o => (
+                <button
+                  key={o.id}
+                  onClick={() => { setScope(o.id); setClientFilter(''); }}
+                  style={{ ...S.escopoBtn, ...(scope === o.id ? S.escopoOn : null) }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {filtrosExtras}
+
+          <select
+            value={clientFilter}
+            onChange={e => setClientFilter(e.target.value)}
+            style={{ ...S.filter, ...(clientFilter ? S.filterActive : null) }}
           >
-            <Plus size={15} /> Nova Task
-          </button>
-        )}
-      </div>
+            <option value="">Todos os clientes</option>
+            {clientOptions.map(c => (
+              <option key={c.id} value={c.id}>{c.name} ({c.count})</option>
+            ))}
+          </select>
 
-      {/* Escopo (só no modo acompanhamento da CS) */}
-      {temEscopo && (
-        <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-          {[
-            { id: 'mine', label: 'Meus clientes' },
-            { id: 'all',  label: 'Todos os clientes' },
-          ].map(o => (
-            <button
-              key={o.id}
-              onClick={() => { setScope(o.id); setClientFilter(''); }}
-              style={{
-                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: scope === o.id ? 'var(--grad)' : 'var(--bg3)',
-                color: scope === o.id ? 'var(--on)' : 'var(--muted)',
-                border: `1px solid ${scope === o.id ? 'transparent' : 'var(--border-h)'}`,
-              }}
-            >
-              {o.label}
+          <select
+            value={dateFilter}
+            onChange={e => setDateFilter(e.target.value)}
+            style={{ ...S.filter, ...(dateFilter ? S.filterActive : null) }}
+          >
+            {DATE_FILTERS.map(f => (
+              <option key={f.id} value={f.id}>
+                {f.label}{dateCounts[f.id] ? ` (${dateCounts[f.id]})` : ''}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={sortMode}
+            onChange={e => setSortMode(e.target.value)}
+            title="Ordem dos cards em cada coluna. Arraste um card dentro da coluna para montar a sua ordem."
+            style={{ ...S.filter, minWidth: 176 }}
+          >
+            {SORT_OPTIONS.map(o => (
+              <option key={o.id} value={o.id}>Ordenar: {o.label}</option>
+            ))}
+          </select>
+
+          {filtroAtivo && (
+            <button onClick={limparFiltros} style={S.clearBtn} title="Limpar filtros">
+              <X size={13} /> Limpar
             </button>
-          ))}
+          )}
+
+          {!readOnly && (
+            <button onClick={() => setShowCreate(true)} className="ui-btn primary" style={{ height: 36 }}>
+              <Plus size={15} /> Nova Task
+            </button>
+          )}
         </div>
-      )}
-
-      {/* Filtros */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
-        <select
-          value={clientFilter}
-          onChange={e => setClientFilter(e.target.value)}
-          style={{ ...S.filter, ...(clientFilter ? S.filterActive : null) }}
-        >
-          <option value="">Todos os clientes</option>
-          {clientOptions.map(c => (
-            <option key={c.id} value={c.id}>{c.name} ({c.count})</option>
-          ))}
-        </select>
-
-        <select
-          value={dateFilter}
-          onChange={e => setDateFilter(e.target.value)}
-          style={{ ...S.filter, ...(dateFilter ? S.filterActive : null) }}
-        >
-          {DATE_FILTERS.map(f => (
-            <option key={f.id} value={f.id}>
-              {f.label}{dateCounts[f.id] ? ` (${dateCounts[f.id]})` : ''}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={sortMode}
-          onChange={e => setSortMode(e.target.value)}
-          title="Ordem dos cards em cada coluna. Arraste um card dentro da coluna para montar a sua ordem."
-          style={{ ...S.filter, minWidth: 190 }}
-        >
-          {SORT_OPTIONS.map(o => (
-            <option key={o.id} value={o.id}>Ordenar: {o.label}</option>
-          ))}
-        </select>
-
-        {filtroAtivo && (
-          <button onClick={limparFiltros} style={S.clearBtn}>
-            <X size={13} /> Limpar filtros
-          </button>
-        )}
       </div>
 
       {/* Kanban columns */}
       {/* stretch: a coluna inteira vira área de soltar, e não só a
           altura dos cards que ela tem. */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, alignItems: 'stretch' }}>
+      <div
+        ref={quadroRef}
+        style={{
+          display: 'grid', gridTemplateColumns: 'repeat(4, minmax(220px, 1fr))', gap: 10,
+          alignItems: 'stretch', overflowX: 'auto',
+          height: alturaQuadro || undefined,
+          gridTemplateRows: alturaQuadro ? 'minmax(0, 1fr)' : undefined,
+        }}
+      >
         {TASK_COLUMNS.map(col => {
           const colTasks     = tasksByColumn(col.id);
           const reworkCount  = colTasks.filter(t => t.isRework).length;
@@ -445,7 +490,8 @@ export default function TaskKanban({
               style={{
                 background: isDragTarget ? `color-mix(in srgb, ${col.color} 3%, transparent)` : 'var(--bg2)',
                 border: `1px solid ${isDragTarget ? `color-mix(in srgb, ${col.color} 25%, transparent)` : `color-mix(in srgb, ${col.color} 9%, transparent)`}`,
-                borderRadius: 12, padding: '12px 10px', minHeight: 200,
+                borderRadius: 12, padding: '10px 6px 0 8px', minHeight: 200,
+                display: 'flex', flexDirection: 'column', minWidth: 0,
                 transition: 'all .15s ease',
               }}
               onDragOver={e => handleDragOver(e, col.id)}
@@ -453,7 +499,7 @@ export default function TaskKanban({
               onDrop={e => handleDrop(e, col.id)}
             >
               {/* Column header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, padding: '0 4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, padding: '0 6px 0 4px', flexShrink: 0 }}>
                 <span style={{ fontSize: 12, fontWeight: 700, color: col.color, fontFamily: 'var(--fm)' }}>
                   {col.label}
                   {col.id === 'done' && <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: 6, fontSize: 10.5 }}>este mês</span>}
@@ -465,8 +511,8 @@ export default function TaskKanban({
                     </span>
                   )}
                   {reworkCount > 0 && (
-                    <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>
-                      🔄 {reworkCount}
+                    <span title={`${reworkCount} em ajuste`} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 10, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)' }}>
+                      <RefreshCw size={9} /> {reworkCount}
                     </span>
                   )}
                   <span style={{ background: `color-mix(in srgb, ${col.color} 13%, transparent)`, borderRadius: 10, padding: '1px 8px', fontSize: 11, color: col.color, fontFamily: 'var(--fm)' }}>
@@ -478,6 +524,9 @@ export default function TaskKanban({
               {/* Tasks. O destaque de "soltar aqui" é a borda da coluna —
                   nada é inserido no meio da lista, então os cards não
                   pulam de lugar enquanto se arrasta. */}
+              {/* Lista rola por dentro da coluna. O respiro no topo deixa a
+                  linha de inserção do primeiro card à vista. */}
+              <div style={S.lista}>
               {colTasks.length === 0 ? (
                 <p style={{ fontSize: 12, color: isDragTarget ? col.color : 'var(--muted)', textAlign: 'center', padding: '24px 0', opacity: isDragTarget ? .9 : .5, fontFamily: isDragTarget ? 'var(--fm)' : undefined }}>
                   {isDragTarget && draggingId ? 'Soltar aqui' : filtroAtivo ? 'Nada com esse filtro' : 'Vazio'}
@@ -502,6 +551,7 @@ export default function TaskKanban({
                   </div>
                 </>
               )}
+              </div>
             </div>
           );
         })}
@@ -547,6 +597,10 @@ export default function TaskKanban({
   );
 }
 
+// Estilo dos filtros do quadro — exportado para quem passa
+// `filtrosExtras` montar selects iguais aos daqui.
+export const estiloFiltroKanban = (ativo = false) => (ativo ? { ...S.filter, ...S.filterActive } : S.filter);
+
 function DropLine({ color }) {
   return (
     <div style={{
@@ -557,18 +611,26 @@ function DropLine({ color }) {
 }
 
 const S = {
+  topo: { display: 'flex', alignItems: 'center', gap: '10px 16px', flexWrap: 'wrap', marginBottom: 12 },
+  filtros: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' },
+  escopo: { display: 'flex', gap: 2, padding: 3, borderRadius: 99, background: 'var(--bg3)', border: '1px solid var(--border)' },
+  escopoBtn: { height: 28, padding: '0 12px', borderRadius: 99, border: 'none', background: 'transparent', color: 'var(--muted)', fontSize: 12, fontWeight: 500, cursor: 'pointer' },
+  escopoOn: { background: 'var(--grad)', color: 'var(--on)', fontWeight: 600 },
+  lista: { flex: 1, minHeight: 0, overflowY: 'auto', padding: '6px 2px 8px 0' },
+  // backgroundColor (e não background) para não apagar a seta do select
+  // global do index.css.
   filter: {
-    background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
-    padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none',
-    cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 180,
+    backgroundColor: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 9,
+    height: 36, padding: '0 32px 0 12px', color: 'var(--text)', fontSize: 12.5, outline: 'none',
+    cursor: 'pointer', fontFamily: 'var(--f)', minWidth: 150, maxWidth: 220,
   },
   // Filtro com valor: borda na cor do painel, fundo tingido, texto forte.
   filterActive: {
-    borderColor: 'var(--c)', background: 'var(--c-dim)', color: 'var(--text)', fontWeight: 600,
+    borderColor: 'var(--c)', backgroundColor: 'var(--c-dim)', color: 'var(--text)', fontWeight: 600,
   },
   clearBtn: {
     display: 'flex', alignItems: 'center', gap: 6, background: 'transparent',
-    border: '1px solid var(--border)', borderRadius: 9, padding: '9px 13px',
+    border: '1px solid var(--border)', borderRadius: 9, height: 36, padding: '0 12px',
     color: 'var(--muted)', fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
     fontFamily: 'var(--f)',
   },

@@ -233,18 +233,24 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
     await saveResponsibles([name, ...respNames.filter(n => n !== name)]);
   };
 
+  // Ações no pé fixo da coluna esquerda. Antes ficavam no fim da rolagem,
+  // abaixo de prazo, tempo, responsáveis e links — no notebook o "Concluí"
+  // e o "Aprovar" (o que a pessoa mais usa) ficavam fora da tela.
+  const podeAgir = !readOnly && task.status !== 'done' && (isAdmin || isResponsible);
+  const temAcoes = (podeAgir && ['todo', 'doing', 'approval'].includes(task.status)) || showApprovalForm || showRejectForm;
+
   const content = (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99998, padding: 20, overflowY: 'auto' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.82)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99998, padding: 16 }}
       onClick={onClose}
     >
       <div
-        style={{ background: 'var(--bg2)', border: '1px solid var(--border-h)', borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,.8)', flexShrink: 0 }}
+        style={{ background: 'var(--bg2)', border: '1px solid var(--border-h)', borderRadius: 18, width: '100%', maxWidth: 860, maxHeight: 'calc(100vh - 32px)', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 80px rgba(0,0,0,.8)', flexShrink: 0 }}
         onClick={e => e.stopPropagation()}
         className="fade-up"
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '18px 22px', borderBottom: '1px solid rgba(255,255,255,.08)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, padding: '14px 20px', borderBottom: '1px solid rgba(255,255,255,.08)', flexShrink: 0 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
               {task.isRework && (
@@ -286,7 +292,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 
         <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
           {/* Left */}
-          <div style={{ flex: 1, padding: '18px 20px', overflowY: 'auto', borderRight: '1px solid var(--border)' }}>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--border)' }}>
+          <div style={{ flex: 1, minHeight: 0, padding: '16px 20px', overflowY: 'auto' }}>
             {/* Info grid */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
               {[
@@ -521,10 +528,13 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
               )}
             </div>
 
+          </div>
+
+          {(temAcoes || showDeleteConfirm) && (
+          <div style={S.rodapeAcoes}>
             {/* Actions */}
-            {task.status !== 'done' && !readOnly && (
+            {temAcoes && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <p style={{ fontSize: 10, letterSpacing: '.12em', color: 'var(--muted)', fontFamily: 'var(--fm)', fontWeight: 600, textTransform: 'uppercase', marginBottom: 4 }}>AÇÕES</p>
 
                 {/* todo → doing */}
                 {task.status === 'todo' && (isAdmin || isResponsible) && (
@@ -597,7 +607,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
             )}
 
             {showDeleteConfirm && (
-              <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: 12 }}>
+              <div style={{ background: 'var(--neon-dim)', border: '1px solid var(--neon-border)', borderRadius: 10, padding: 12, marginTop: temAcoes ? 10 : 0 }}>
                 <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 10 }}>Excluir esta task permanentemente?</p>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button style={{ ...S.actionBtn('var(--red)', true), flex: 1 }} onClick={() => { onDelete(task.id); onClose(); }}>Sim, excluir</button>
@@ -605,6 +615,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                 </div>
               </div>
             )}
+          </div>
+          )}
           </div>
 
           {/* Right — Chat */}
@@ -671,6 +683,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
 const ON_COLOR = { 'var(--blue)': '#0d0d10', 'var(--amber)': '#0d0d10', 'var(--green)': '#0d0d10', '#EE3363': '#fff', 'var(--neon)': '#fff', 'var(--red)': '#fff' };
 
 const S = {
+  rodapeAcoes: { flexShrink: 0, maxHeight: '60%', overflowY: 'auto', padding: '12px 20px 14px', borderTop: '1px solid var(--border)', background: 'var(--bg2)' },
   input: { background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)' },
   select: { background: 'var(--bg3)', border: '1px solid var(--border-h)', borderRadius: 8, padding: '9px 12px', color: 'var(--text)', fontSize: 13, outline: 'none', width: '100%', fontFamily: 'var(--f)', cursor: 'pointer' },
   // `color-mix(in srgb, ${color} 8%, transparent)` só funciona com hex — com var(--blue) o CSS descartava
