@@ -73,11 +73,10 @@ Coleção nova que só cresce segue o mesmo padrão: recorte ao vivo pelo que a 
 
 Coleções do Firestore: `clients`, `collaborators`, `tasks`, `requests`, `dayTasks` (agenda pessoal, filtrada por `ownerId`), `documents` (+ subcoleção `versions`), `planejamentos`, `vm_marcacoes`, `portal_clients`, `portal_products`, `userIndex` (escrito só pelas functions) e o `app_config` (`general` para a TV operacional e a agenda; `comercial` e `comercial_AAAA-MM` para o comercial).
 
-Quatro arquivos acessam o Firestore direto, cada um por um motivo:
+Três arquivos acessam o Firestore direto, cada um por um motivo:
 
 - `contexts/AuthContext.js` — lê o doc do colaborador durante o login, antes de qualquer hook montar; grava só `firstAccess` na troca de senha
 - `contexts/PortalAuthContext.js` — login do portal e `lastLoginAt`
-- `components/shared/PatchNotesPopup.js` — lê e grava `collaborators.lastPatchSeen`
 - `pages/sectors/DocPrintPage.js` — um `getDoc` sem listener, para o documento não mudar no meio da geração do PDF
 
 Tela nova deve consumir hook. Acesso direto só com motivo forte e comentado.
@@ -293,7 +292,7 @@ Se faltar uma peça que vai se repetir, crie no kit, não na tela. Tela nova dev
 
 ## Convenções
 
-- Depois de mudança visível ao usuário, incremente `PATCH_VERSION` e edite `PATCH_NOTES` em `src/components/shared/PatchNotesPopup.js` — cada colaborador vê o popup uma vez no próximo login (controle em `collaborators.lastPatchSeen`). Notas em linguagem de usuário, sem jargão.
+- **Não há popup de novidades.** O `PatchNotesPopup` foi removido em 26/out/2026 por decisão do usuário (as notas não filtravam o que era relevante para a equipe). Não recrie aviso de atualização sem pedido. O campo `collaborators.lastPatchSeen` ficou órfão nos docs antigos; é inofensivo.
 
 - Notificações de desktop são só Notification API (sem service worker/FCM): funcionam apenas com uma aba aberta. `NotificationCenter` é montado uma vez em `App.js` e é o único que dispara; `useDesktopNotifications` em outros lugares serve só como chave liga/desliga.
 - Credenciais e dados sensíveis (contratos, CPF/CNPJ, valores) nunca aparecem em tela, em código do cliente ou em documentação.

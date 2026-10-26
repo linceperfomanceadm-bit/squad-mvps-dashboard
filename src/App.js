@@ -3,7 +3,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { ToastContainer } from './components/shared/Toast';
-import PatchNotesPopup from './components/shared/PatchNotesPopup';
 import NotificationCenter from './components/shared/NotificationCenter';
 import TravaGravacoesAviso from './components/shared/TravaGravacoesAviso';
 import HomePage from './pages/HomePage';
@@ -93,7 +92,6 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <>
-      {user && !user.firstAccess && <PatchNotesPopup user={user} />}
       {/* Notificações de desktop — válidas em qualquer tela, por isso
           montadas aqui e não dentro de cada painel. */}
       {user && !user.firstAccess && <NotificationCenter />}
