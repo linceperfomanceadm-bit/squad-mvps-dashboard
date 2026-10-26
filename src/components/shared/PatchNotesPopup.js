@@ -16,13 +16,14 @@ import { db } from '../../lib/firebase';
  * login. Use só linguagem que faz sentido para o usuário (sem tecnês).
  */
  
-export const PATCH_VERSION = '2026-10-8';
+export const PATCH_VERSION = '2026-10-9';
  
 const PATCH_NOTES = {
   date: 'Outubro de 2026',
   title: 'Novidades no painel',
   items: [
-    { emoji: '⚡', text: 'Painéis mais leves: o Kanban e as visões gerais agora carregam só as tasks em andamento e as concluídas dos últimos 2 meses. O contador de concluídas e o Hall da Fama passam a mostrar esse período recente. O histórico completo continua guardado e pode ser consultado nos Relatórios do admin.' },
+    { emoji: '⚡', text: 'Painéis mais leves: o Kanban e as visões gerais agora mostram as tasks em andamento e as concluídas do mês. O histórico completo continua guardado e pode ser consultado nos Relatórios do admin.' },
+    { emoji: '🧹', text: 'Design e Videomaker: a aba Hall da Fama saiu do painel. Os destaques de cada squad continuam no Painel de TV.' },
     { emoji: '📋', text: 'CS: o briefing do cliente agora precisa ter conteúdo de verdade para concluir o cadastro — pelo menos 40 palavras sobre o negócio. Um medidor embaixo do campo mostra quanto falta, e o botão "Inserir roteiro" traz os tópicos para responder (o que o cliente faz, público, diferenciais, concorrentes, referências, tom de voz e objetivos). Ao editar um cliente, quem mexer no briefing também precisa deixá-lo completo.' },
     { emoji: '🎯', text: 'SDRs agora têm pontuação: 1 ponto por reunião realizada e 5 por assistência (call agendada que virou venda). O ranking, a meta individual e a porcentagem dos SDRs na TV do Comercial são em pontos.' },
     { emoji: '🏆', text: 'TV do Comercial de cara nova: pódio com a foto de cada Closer e SDR, ranking com a meta individual do mês, o funil no topo da tela dos SDRs e um card com os clientes que têm tasks em atraso.' },

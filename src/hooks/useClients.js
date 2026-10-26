@@ -387,7 +387,7 @@ export function useClients() {
   // O bloco é único por cliente: com um ID Visual em andamento, não
   // abre outro. Se o anterior já foi finalizado, ele vai para
   // `idvHistory[]` antes de o novo nascer — nada de sobrescrever a
-  // entrega passada, que o Hall da Fama e a CS ainda consultam.
+  // entrega passada, que a CS ainda consulta.
   // O dono também entra em `responsibles.design`, senão o cliente não
   // apareceria na carteira do designer (tasks, Brand Hub) — MAS só se
   // o cliente já passou do staffing. Em Kick Off ou staffing, quem

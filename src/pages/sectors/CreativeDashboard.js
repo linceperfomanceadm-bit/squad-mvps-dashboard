@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, BookOpen, Trophy, Kanban, Calendar, CalendarDays, ClipboardList, Palette, MessageSquare, ListChecks } from 'lucide-react';
+import { LayoutDashboard, BookOpen, Kanban, Calendar, CalendarDays, ClipboardList, Palette, MessageSquare, ListChecks } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { naCarteira } from '../../lib/firebase';
 import { useClients } from '../../hooks/useClients';
@@ -15,7 +15,6 @@ import VMOverview from '../../components/sectors/creative/VMOverview';
 import CalendarioConteudo from '../../components/planejamento/CalendarioConteudo';
 import ConteudoModais from '../../components/planejamento/ConteudoModais';
 import VaultPage from '../../components/sectors/creative/VaultPage';
-import HallOfFame from '../../components/sectors/creative/HallOfFame';
 import IdVisualBoard from '../../components/sectors/creative/IdVisualBoard';
 import TaskKanban from '../../components/kanban/TaskKanban';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
@@ -77,11 +76,6 @@ export default function CreativeDashboard({ sectorId }) {
     : [];
   const idvOpen = myIdVisual.filter(c => c.idv?.status === 'onboarding' || c.idv?.status === 'production').length;
 
-  // Hall of Fame uses tasks from BOTH design and videomaker
-  const hallTasks = tasks.filter(
-    t => (t.responsibleSector === 'design' || t.responsibleSector === 'videomaker')
-  );
-
   const openRequests = requests.filter(r => r.toName === user?.name && r.status === 'open').length;
 
   const handleUpdateBrandbook = async (clientId, brandbook, byName, bySector) => {
@@ -116,7 +110,6 @@ export default function CreativeDashboard({ sectorId }) {
     ...(isDesign ? [{ key: 'idvisual', label: 'ID Visual', icon: Palette }] : []),
     { key: 'onboarding', label: 'Onboarding de Clientes', icon: ClipboardList },
     { key: 'vault',     label: 'Brand Hub',      icon: BookOpen },
-    { key: 'hallofame', label: 'Hall da Fama',   icon: Trophy },
     { key: 'agenda',    label: 'Agenda',         icon: Calendar },
   ];
 
@@ -220,10 +213,8 @@ export default function CreativeDashboard({ sectorId }) {
             onAddMaterial={(clientId, data) => addBrandMaterial(clientId, data, user?.name, sectorId)}
             onRemoveMaterial={removeBrandMaterial}
           />
-        ) : page === 'agenda' ? (
-          <AgendaView />
         ) : (
-          <HallOfFame tasks={hallTasks} />
+          <AgendaView />
         )}
         {isVM && (
           <ConteudoModais
