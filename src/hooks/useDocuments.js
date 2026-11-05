@@ -10,7 +10,8 @@ import { semearPadroes, opcionaisIniciais } from '../lib/docs/motor';
 // Lince Docs — persistência
 //
 // Coleção `documents`. O documento inteiro (dados dos campos, slides
-// extras, seções opcionais e pendências) vive num único registro:
+// extras, seções opcionais, pendências, ordem dos slides e slides
+// removidos) vive num único registro:
 // é o que o protótipo salvava em .json e agora atravessa sessões,
 // máquinas e pessoas.
 //
@@ -58,6 +59,11 @@ export function useDocuments() {
         extras: [],
         opcionais: opcionaisIniciais(modelo),
         pendencias: [],
+        // Estrutura do deck: ordem escolhida e slides removidos, por id
+        // de slide. Vazio = ordem do catálogo. Documento antigo não tem
+        // os campos e funciona igual.
+        ordem: [],
+        removidos: [],
         // Janelas comparadas — regra 3.7, só o relatório usa
         periodoInicio: null,
         periodoFim: null,
@@ -106,6 +112,10 @@ export function useDocuments() {
         extras: documento.extras || [],
         opcionais: documento.opcionais || {},
         pendencias: documento.pendencias || [],
+        // A versão entregue precisa voltar com a mesma ordem e sem os
+        // mesmos slides — senão o PDF recuperado não é o que o cliente viu.
+        ordem: documento.ordem || [],
+        removidos: documento.removidos || [],
         autorName: byName || null,
         createdAt: serverTimestamp(),
       });

@@ -16,6 +16,18 @@
 //
 // REGRA 3.11 — `padrao: [...]` na coluna pré-preenche as linhas
 // quando o documento abre. Seção com `iniciaDesligada` nasce fora.
+//
+// NENHUM CAMPO É OBRIGATÓRIO. Na apresentação e no PDF, o que não foi
+// preenchido some sozinho (ver `limparSlide` em motor.js). No HTML do
+// `render`, duas classes ajudam a limpeza:
+//   `so-com-valor` — rótulo que não faz sentido sem o valor dentro
+//   `fixo`         — texto do próprio catálogo (inclusive título fixo
+//                    de card), que não segura sozinho um slide que
+//                    ninguém preencheu
+//
+// Ordem dos slides e slides removidos são escolha de cada documento
+// (`ordem` e `removidos`). Todo slide precisa de `id` estável; a capa
+// é `capa` e o encerramento é `fim` — esses dois não andam nem saem.
 // ─────────────────────────────────────────────────────────────
 
 import { esc, v, lista, num, delta } from './motor';
@@ -302,7 +314,7 @@ export const DOCS = [
         <div class="grid g2" style="align-items:start">
           <div><p>${v(d.sobre1, 'o que o documento apresenta')}</p>
                <p style="margin-top:1.2cqw">${v(d.sobre2, 'em que a análise se baseia')}</p></div>
-          <div class="card claro"><h3>Prioridades, em ordem</h3>
+          <div class="card claro"><h3 class="fixo">Prioridades, em ordem</h3>
             <ol style="margin-left:1.6cqw;display:flex;flex-direction:column;gap:.7cqw">
             ${lista(d.prioridades).map((r) => `<li>${v(r.t, 'prioridade')}</li>`).join('')}</ol></div>
         </div><div class="logo"></div></section>`);
@@ -335,7 +347,7 @@ export const DOCS = [
         <div class="grid g3">${lista(d.voz).map((r, i) => `<div class="card solid">
           <span class="num">${i + 1}</span><h3>${v(r.t, 'característica')}</h3><p>${v(r.d, 'o que muda na escrita')}</p></div>`).join('')}</div>
         <div class="grid g2" style="align-items:start;margin-top:1.6cqw">
-          <div class="card claro"><h3>O que a marca nunca faz</h3>
+          <div class="card claro"><h3 class="fixo">O que a marca nunca faz</h3>
             <ul class="ast" style="margin-top:1cqw">${lista(d.vozEvitar).map((r) =>
     `<li><strong>${v(r.t, 'evitar')}${r.t ? '.' : ''}</strong> ${r.d ? esc(r.d) : ''}</li>`).join('')}</ul></div>
           <div class="fecho" style="margin:0"><span class="rot">No tom certo, soa assim</span>
@@ -348,8 +360,8 @@ export const DOCS = [
       B('pilares', '04 · Pilares', `<section class="slide"><span class="pg"></span>
         <div class="eyebrow">Seção 04</div><h2>Pilares de conteúdo</h2><div class="bar"></div>
         <p style="margin-bottom:1.6cqw">${v(d.pilaresIntro, 'por que os pesos são desiguais')}</p>
-        <div class="pesos">${pil.map((r, i) => `<div class="${cls[i]}" style="flex:${num(r.p, 25)}">${num(r.p, 25)}%</div>`).join('')}</div>
-        <div class="grid g4">${pil.map((r) => `<div class="card">
+        <div class="pesos">${pil.map((r, i) => `<div class="${cls[i]}" data-linha="${i}" style="flex:${num(r.p, 25)}">${num(r.p, 25)}%</div>`).join('')}</div>
+        <div class="grid g4">${pil.map((r, i) => `<div class="card" data-linha="${i}">
           ${r.f ? `<span class="tag">${esc(r.f)} de funil</span>`
     : '<span class="tag vazio">[etapa do funil]</span>'}
           <h3>${v(r.n, 'pilar')}</h3><p>${v(r.d, 'o que entra aqui')}</p></div>`).join('')}</div>
@@ -362,7 +374,7 @@ export const DOCS = [
           <table><thead><tr><th>Dia</th><th>Pilar</th><th>Formato</th><th>Horário</th></tr></thead>
           <tbody>${lista(d.grade).map((r) => `<tr><td>${v(r.dia, '—')}</td><td>${v(r.pilar, '—')}</td>
             <td>${v(r.fmt, '—')}</td><td>${v(r.hora, '—')}</td></tr>`).join('')}</tbody></table></div>
-          <div class="card claro"><h3>Cada formato tem função</h3>
+          <div class="card claro fixo"><h3 class="fixo">Cada formato tem função</h3>
             <ul class="ast" style="margin-top:1cqw">
               <li><strong>Reels</strong> — encontrar gente nova. Otimiza tempo de visualização e envios por DM.</li>
               <li><strong>Carrossel</strong> — construir confiança. Otimiza salvamentos.</li>
@@ -379,7 +391,7 @@ export const DOCS = [
           <div class="grid g4" style="gap:1.2cqw">${lista(d.mockup).map((r) => `
             <div class="card ${est[r.f] || ''}"><p>${v(r.t, 'tema')}</p>
             <span class="num" style="font-size:1.5cqw;margin-top:.6cqw">${esc(r.f || '—')} · ${esc(r.fn || '—')}</span></div>`).join('')}</div>
-          <div class="fecho" style="margin-top:1.6cqw"><span class="rot">Legenda</span>
+          <div class="fecho fixo" style="margin-top:1.6cqw"><span class="rot">Legenda</span>
             <p><strong>E</strong> = Estático · fazer desejar &nbsp;|&nbsp; <strong>C</strong> = Carrossel · fazer entender
             &nbsp;|&nbsp; <strong>V</strong> = Vídeo · fazer acreditar<br>
             <strong>T</strong> = Topo · descobrir &nbsp;|&nbsp; <strong>M</strong> = Meio · considerar
@@ -391,14 +403,14 @@ export const DOCS = [
         <div class="eyebrow">Seção 06</div><h2>Métricas</h2><div class="bar"></div>
         <p style="margin-bottom:1.6cqw">${v(d.metricasIntro, 'por que este conjunto')}</p>
         <div class="grid g2" style="align-items:start">
-          <div class="card"><h3>O que prova ${v(d.objetivo, 'o objetivo')}</h3>
+          <div class="card"><h3 class="so-com-valor">O que prova ${v(d.objetivo, 'o objetivo')}</h3>
             <ul class="ast" style="margin-top:1cqw">${lista(d.metricas).map((r) =>
     `<li><strong>${v(r.n, 'métrica')}${r.n ? '.' : ''}</strong> ${v(r.d, 'por quê')}</li>`).join('')}</ul></div>
-          <div class="card claro"><h3>O que prova lead</h3>
-            <ul class="ast" style="margin-top:1cqw">
+          <div class="card claro"><h3 class="fixo">O que prova lead</h3>
+            <ul class="ast fixo" style="margin-top:1cqw">
               <li>Cliques no link e DMs que partem de um post específico.</li>
               <li>Perguntar a cada novo cliente como chegou e registrar o canal. Em três meses, vira dado real de retorno.</li></ul>
-            <p style="margin-top:1.2cqw;font-size:1.2cqw"><strong>Base de cálculo adotada:</strong> ${v(d.base, 'defina a base')}</p></div>
+            <p class="so-com-valor" style="margin-top:1.2cqw;font-size:1.2cqw"><strong>Base de cálculo adotada:</strong> ${v(d.base, 'defina a base')}</p></div>
         </div>
         <div class="fecho"><span class="rot">Régua mensal</span><p>${v(d.regua, 'as três perguntas do relatório')}</p></div>
         <div class="logo"></div></section>`);
@@ -654,8 +666,8 @@ export const DOCS = [
           ${tabela(arr)}
           ${extra || ''}
           <div class="grid g2" style="margin-top:1.6cqw">
-            <div class="card"><h3>O que aconteceu</h3><p>${v(leitura, 'causa por trás do número')}</p></div>
-            <div class="card claro"><h3>O que faremos</h3><p>${v(acao, 'decisão para o mês seguinte')}</p></div>
+            <div class="card"><h3 class="fixo">O que aconteceu</h3><p>${v(leitura, 'causa por trás do número')}</p></div>
+            <div class="card claro"><h3 class="fixo">O que faremos</h3><p>${v(acao, 'decisão para o mês seguinte')}</p></div>
           </div>
           <div class="logo"></div></section>`;
 
@@ -676,7 +688,7 @@ export const DOCS = [
   (destaque.length ? destaque : [{}, {}, {}, {}]).map((r) => `<div class="card kpi">
             <span class="rotulo">${v(r.n, 'métrica')}</span>
             <span class="valor">${v(r.b, '—')}</span>
-            <span class="antes">antes ${v(r.a, '—')}</span>
+            <span class="antes so-com-valor">antes ${v(r.a, '—')}</span>
             ${delta(r.a, r.b, r.dir)}</div>`).join('')}</div>
         <div class="fecho"><span class="rot">O mês em uma frase</span>
           <p>${v(d.frase, 'diga se a agulha se moveu')}</p></div>
@@ -685,7 +697,7 @@ export const DOCS = [
       B('c1', 'Camada 1 · Distribuição', camada(1, 'Distribuição', 'O algoritmo<br>deu chance?', d.m1, d.l1, d.a1));
       B('c2', 'Camada 2 · Atenção', camada(2, 'Atenção', 'O criativo<br>prendeu?', d.m2, d.l2, d.a2));
       B('c3', 'Camada 3 · Ação', camada(3, 'Ação', 'Motivou<br>reação?', d.m3, d.l3, d.a3,
-        `<p style="margin-top:1.2cqw;font-size:1.25cqw;color:var(--rosaclaro)">
+        `<p class="so-com-valor" style="margin-top:1.2cqw;font-size:1.25cqw;color:var(--rosaclaro)">
           Base de cálculo do engajamento: <strong>${v(d.base, 'declare a base')}</strong> — a mesma de todos os relatórios anteriores.</p>`));
       B('c4', 'Camada 4 · Negócio', camada(4, 'Negócio', 'Virou<br>resultado?', d.m4, d.l4, d.a4));
 
@@ -715,9 +727,9 @@ export const DOCS = [
             <tbody>${(linhas(d.entrega).length ? linhas(d.entrega) : [{}]).map((r) => `<tr>
               <td>${v(r.f, 'formato')}</td><td>${v(r.p, '—')}</td>
               <td><strong>${v(r.e, '—')}</strong></td><td>${v(r.o, '—')}</td></tr>`).join('')}</tbody></table></div>
-          <div class="card claro"><h3>Por etapa do funil</h3>
+          <div class="card claro"><h3 class="fixo">Por etapa do funil</h3>
             <ul class="ast" style="margin-top:1cqw">${(linhas(d.funil).length ? linhas(d.funil) : [{}, {}, {}]).map((r) =>
-    `<li><strong>${v(r.e, 'etapa')}</strong> · ${v(r.q, '—')} ${String(r.q) === '1' ? 'peça' : 'peças'}<br>${v(r.o, 'leitura')}</li>`).join('')}</ul></div>
+    `<li><strong>${v(r.e, 'etapa')}</strong> <span class="so-com-valor">· ${v(r.q, '—')} ${String(r.q) === '1' ? 'peça' : 'peças'}</span><br>${v(r.o, 'leitura')}</li>`).join('')}</ul></div>
         </div>
         <div class="logo"></div></section>`);
 

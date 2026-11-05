@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import { LAYOUTS } from '../../../../lib/docs/layouts';
 import { varsDaMarca } from '../../../../lib/docs/marca';
-import { blocosFinais } from '../../../../lib/docs/motor';
+import {
+  blocosFinais, dadosDaVersaoFinal, ordenarSlides, slideTravado, lista,
+} from '../../../../lib/docs/motor';
 
 // ─────────────────────────────────────────────────────────────
 // Lince Docs — PRÉ-VISUALIZAÇÃO
@@ -15,14 +17,21 @@ import { blocosFinais } from '../../../../lib/docs/motor';
 // nunca chega cru até aqui.
 // ─────────────────────────────────────────────────────────────
 
-// Monta a lista de blocos: os slides fixos do documento com os
-// extras encaixados logo depois do slide escolhido.
-export function blocosDoDeck(doc, dados, opcionais, extras) {
+// Monta a lista de blocos: os slides fixos do documento, na ordem que
+// a pessoa escolheu e sem os removidos, com os extras encaixados logo
+// depois do slide escolhido.
+//
+// `estrutura` = { ordem, removidos } do documento — os dois opcionais.
+// Extra preso a um slide removido não some junto: entra onde o slide
+// estaria, depois do último slide que ficou. Quem o colocou ali ainda
+// quer que ele apareça.
+export function blocosDoDeck(doc, dados, opcionais, extras, estrutura) {
   if (!doc || typeof doc.render !== 'function') return [];
-  const fixos = doc.render(dados || {}, opcionais || {});
+  const removidos = lista(estrutura?.removidos);
+  const fixos = ordenarSlides(doc.render(dados || {}, opcionais || {}), estrutura?.ordem);
   const saida = [];
   fixos.forEach((b) => {
-    saida.push({ ...b, extra: false });
+    if (slideTravado(b.id) || !removidos.includes(b.id)) saida.push({ ...b, extra: false });
     (extras || []).filter((e) => e.depois === b.id).forEach((e, i) => {
       const layout = LAYOUTS[e.layout];
       if (layout) {
@@ -39,6 +48,15 @@ export function blocosDoDeck(doc, dados, opcionais, extras) {
   return saida;
 }
 
+// O deck que vai para o cliente — apresentação e PDF. Duas limpezas:
+// antes de montar, linha de lista que só tem o valor padrão vira
+// vazia (`dadosDaVersaoFinal`); depois de montar, sai todo marcador
+// de campo vazio e o que ficou sem conteúdo (`blocosFinais`). Nenhum
+// campo é obrigatório: o que não foi preenchido simplesmente não vai.
+export const deckFinal = (doc, dados, opcionais, extras, estrutura) => blocosFinais(
+  blocosDoDeck(doc, dadosDaVersaoFinal(doc, dados), opcionais, extras, estrutura),
+);
+
 // O `scrollHeight` do slide não serve para detectar transbordo: a
 // marca d'água do lince fica de propósito para fora da caixa
 // (`bottom:-14cqw`) e contaria como conteúdo que passou da página.
@@ -54,18 +72,18 @@ function textoSobrando(el) {
 }
 
 export default function DocPreview({
-  doc, dados, opcionais, extras, secaoAtiva, onTransbordo,
+  doc, dados, opcionais, extras, estrutura, secaoAtiva, onTransbordo,
   imprimindo = false, apenasSecao = false,
 }) {
   const refs = useRef([]);
   // Na tela de edição o deck mostra os campos vazios entre colchetes
   // (regra 3.1). Na impressão não: o PDF vai para o cliente, então
-  // passa por `blocosFinais` — marcador some, e o que ficou sem
+  // passa por `deckFinal` — marcador some, e o que ficou sem
   // conteúdo (linha, card, slide inteiro) sai junto.
-  const todos = useMemo(() => {
-    const brutos = blocosDoDeck(doc, dados, opcionais, extras);
-    return imprimindo ? blocosFinais(brutos) : brutos;
-  }, [doc, dados, opcionais, extras, imprimindo]);
+  const todos = useMemo(() => (imprimindo
+    ? deckFinal(doc, dados, opcionais, extras, estrutura)
+    : blocosDoDeck(doc, dados, opcionais, extras, estrutura)
+  ), [doc, dados, opcionais, extras, estrutura, imprimindo]);
 
   // Mostrar só os slides da seção aberta troca aproximação por
   // correspondência exata: o que está à direita é o que o campo à

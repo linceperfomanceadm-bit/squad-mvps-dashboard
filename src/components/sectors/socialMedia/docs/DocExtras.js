@@ -74,9 +74,11 @@ function CamposDoExtra({ extra, onChange }) {
   );
 }
 
-export default function DocExtras({ doc, extras, onChange }) {
+export default function DocExtras({ doc, extras, estrutura, onChange }) {
   const [aberto, setAberto] = useState(null);
-  const pontos = pontosDeInsercao(doc);
+  // Na ordem que o documento tem hoje, e não na do catálogo: "depois
+  // de" tem que bater com o que a pessoa vê no deck.
+  const pontos = pontosDeInsercao(doc, estrutura);
   const lista = extras || [];
 
   const adicionar = () => {

@@ -127,6 +127,10 @@ export default function DocPrintPage() {
     return <p style={{ padding: 40, color: '#eaeaf5' }}>Tipo de documento desconhecido: {documento.tipo}</p>;
   }
 
+  // Ordem e slides removidos escolhidos no editor. Documento antigo
+  // não tem os campos e sai na ordem do catálogo.
+  const estrutura = { ordem: documento.ordem, removidos: documento.removidos };
+
   return (
     <div style={{ background: '#050509', minHeight: '100vh' }}>
       {/* Só existe na tela. O @media print acima esconde na hora de
@@ -165,6 +169,7 @@ export default function DocPrintPage() {
         dados={documento.dados || {}}
         opcionais={documento.opcionais || {}}
         extras={documento.extras || []}
+        estrutura={estrutura}
         imprimindo
       />
     </div>

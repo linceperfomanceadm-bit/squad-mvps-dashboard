@@ -4,8 +4,7 @@ import {
   ChevronLeft, ChevronRight, X, Maximize2, Minimize2, LayoutGrid, FileDown,
 } from 'lucide-react';
 import { varsDaMarca } from '../../../../lib/docs/marca';
-import { blocosDoDeck } from './DocPreview';
-import { blocosFinais } from '../../../../lib/docs/motor';
+import { deckFinal } from './DocPreview';
 import '../../../../styles/lince-docs.css';
 
 // ─────────────────────────────────────────────────────────────
@@ -48,15 +47,18 @@ const semErro = (p) => { if (p && typeof p.catch === 'function') p.catch(() => {
 const comNumero = (html, n) => html.replace('<span class="pg"></span>', `<span class="pg">${n}</span>`);
 
 export default function DocPresenter({
-  doc, dados, opcionais, extras, titulo, inicio = 0, onClose, onSalvarPDF,
+  doc, dados, opcionais, extras, estrutura, titulo, inicio = 0, onClose, onSalvarPDF,
 }) {
   // Apresentação é versão final: o que não foi preenchido não
   // aparece. Nada de "[frase de recorte]" na frente do cliente —
-  // `blocosFinais` tira o marcador e o que ficou vazio junto com ele,
-  // inclusive o slide inteiro quando nada foi preenchido nele.
+  // `deckFinal` tira o marcador e o que ficou vazio junto com ele,
+  // inclusive o slide inteiro quando nada foi preenchido nele. A
+  // ordem e os slides removidos (`estrutura`) valem aqui também.
+  const ordem = estrutura?.ordem;
+  const removidos = estrutura?.removidos;
   const blocos = useMemo(
-    () => blocosFinais(blocosDoDeck(doc, dados, opcionais, extras)),
-    [doc, dados, opcionais, extras],
+    () => deckFinal(doc, dados, opcionais, extras, { ordem, removidos }),
+    [doc, dados, opcionais, extras, ordem, removidos],
   );
   const total = blocos.length;
 

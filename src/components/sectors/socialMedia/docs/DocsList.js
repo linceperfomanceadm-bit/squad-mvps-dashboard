@@ -219,6 +219,7 @@ export default function DocsList({
           dados={apresentando.dados || {}}
           opcionais={apresentando.opcionais || {}}
           extras={apresentando.extras || []}
+          estrutura={{ ordem: apresentando.ordem, removidos: apresentando.removidos }}
           titulo={`${apresentando.clientName || 'Sem cliente'} · ${docApresentando.nome.split('—')[0].trim()}`}
           onClose={() => setApresentandoId(null)}
           onSalvarPDF={onSalvarPDF ? () => onSalvarPDF(apresentando) : undefined}

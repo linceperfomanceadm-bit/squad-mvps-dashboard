@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileDown, Check, Layers, Rows, Square, Play } from 'lucide-react';
+import {
+  ArrowLeft, FileDown, Check, Layers, Rows, Square, Play, GripVertical, Trash2, RotateCcw,
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useDocuments, DOC_STATUS } from '../../hooks/useDocuments';
@@ -9,6 +11,7 @@ import { docPorId } from '../../lib/docs/catalogo';
 import { marcaPendente } from '../../lib/docs/marca';
 import {
   semearPadroes, colunasVisiveis, linhasVisiveis, campoVisivel,
+  ordemEfetiva, slideTravado, SLIDE_INICIO, SLIDE_FIM,
 } from '../../lib/docs/motor';
 import DocForm from '../../components/sectors/socialMedia/docs/DocForm';
 import DocPreview, { blocosDoDeck } from '../../components/sectors/socialMedia/docs/DocPreview';
@@ -25,19 +28,25 @@ import '../../styles/lince-docs.css';
 // formulário de imposto de renda — e porque assim o deck acompanha a
 // seção sem depender de adivinhar posição de rolagem.
 //
+// A coluna da esquerda também é a estrutura do deck: cada seção é um
+// slide, e arrastar uma seção muda a ordem dos slides daquele
+// documento. A lixeira tira o slide do documento sem apagar o que foi
+// escrito nele — ele vai para "Removidos" e volta com um clique.
+// Capa e encerramento não andam nem saem.
+//
 // O documento vem do array ao vivo do hook, como o Kanban faz com as
 // tasks: edição de outra pessoa aparece na hora, sem segundo listener.
 // ─────────────────────────────────────────────────────────────
 
 const ATRASO_SALVAR = 800;
 
-// Conta os campos que ainda vão sair marcados no slide.
+// Conta os campos que ainda vão sair marcados no slide do rascunho.
 // Uma linha de lista conta cada coluna em branco: é o que aparece
-// como [rótulo] em itálico enquanto o documento está sendo montado
-// (no PDF e na apresentação eles somem).
+// como [rótulo] em itálico enquanto o documento está sendo montado.
 //
-// É o contador de progresso de cada seção, e ele conta tudo: o
-// formulário não esconde mais campo nenhum.
+// É só o indicador de progresso de cada seção na coluna da esquerda.
+// Nenhum campo é obrigatório: na apresentação e no PDF, o que não foi
+// preenchido simplesmente não aparece.
 const vazio = (v) => !v || !String(v).trim();
 
 function vaziosDoCampo(campo, valor, essencial) {
@@ -55,13 +64,6 @@ function vaziosDaSecao(secao, dados, essencial) {
   return secao.campos.reduce((acc, c) => acc + vaziosDoCampo(c, dados[c.id], essencial), 0);
 }
 
-function contarVazios(doc, dados, opcionais) {
-  if (!doc || !doc.secoes) return 0;
-  return doc.secoes
-    .filter((s) => !(s.opcional && opcionais[s.t] === false))
-    .reduce((acc, s) => acc + vaziosDaSecao(s, dados), 0);
-}
-
 export default function DocEditorPage() {
   const { docId } = useParams();
   const navigate = useNavigate();
@@ -70,7 +72,7 @@ export default function DocEditorPage() {
   const { clients, updateClient } = useClients();
   const { documents, loading, updateDocument, saveVersion } = useDocuments();
 
-  const [aba, setAba] = useState(0); // índice da seção; -1 = slides extras
+  const [aba, setAba] = useState(0); // índice da seção no catálogo; -1 = slides extras
   const [transbordo, setTransbordo] = useState(0);
   const [salvando, setSalvando] = useState(false);
   const [rascunho, setRascunho] = useState(null);
@@ -84,6 +86,13 @@ export default function DocEditorPage() {
   // Modo apresentação — usa o rascunho local, então o que a pessoa
   // acabou de digitar já aparece, mesmo antes de ir para o Firestore.
   const [apresentando, setApresentando] = useState(false);
+
+  // Arrastar seções na coluna da esquerda: qual slide está sendo
+  // arrastado, onde ele vai cair (antes ou depois de qual) e sobre
+  // qual seção o mouse está (para mostrar a lixeira).
+  const [arrastando, setArrastando] = useState(null);
+  const [alvo, setAlvo] = useState(null);
+  const [sobre, setSobre] = useState(null);
 
   const colMeio = useRef(null);
   const colDeck = useRef(null);
@@ -139,6 +148,10 @@ export default function DocEditorPage() {
       extras: documento.extras || [],
       opcionais: documento.opcionais || {},
       pendencias: documento.pendencias || [],
+      // Documento antigo não tem os dois campos: ordem do catálogo,
+      // nada removido.
+      ordem: documento.ordem || [],
+      removidos: documento.removidos || [],
     });
     if (dados !== original) gravar({ dados });
   }, [documento, doc, gravar]);
@@ -187,6 +200,12 @@ export default function DocEditorPage() {
     });
   };
 
+  // Ordem e slides removidos. Mesmo caminho das outras edições:
+  // rascunho na hora, Firestore depois do intervalo.
+  const alterarEstrutura = (patch) => {
+    setRascunho((r) => { gravar(patch); return { ...r, ...patch }; });
+  };
+
   // REGRA 3.2 — a base fica no cliente, não no documento.
   const baseSalva = cliente?.sm?.baseCalculo || '';
   const baseDesde = cliente?.sm?.baseCalculoDesde || '';
@@ -207,14 +226,30 @@ export default function DocEditorPage() {
   // um objeto novo a cada render refaz o deck inteiro por tecla.
   const dados = useMemo(() => rascunho?.dados || {}, [rascunho]);
 
-  const vazios = useMemo(
-    () => contarVazios(doc, dados, rascunho?.opcionais || {}),
-    [doc, dados, rascunho],
+  // ── Estrutura do deck ────────────────────────────────────────
+  // Os slides do catálogo, sem dado nenhum: só para saber quais
+  // existem e qual seção gera qual slide. O casamento é pelo nome — o
+  // `nome` do slide é o título da seção, o mesmo casamento que o deck
+  // já usa para acompanhar a seção aberta.
+  const slidesCatalogo = useMemo(
+    () => (doc && typeof doc.render === 'function' ? doc.render({}, {}) : []),
+    [doc],
   );
+  const slideDaSecao = useMemo(
+    () => Object.fromEntries(slidesCatalogo.map((b) => [b.nome, b.id])),
+    [slidesCatalogo],
+  );
+  const ordemSalva = rascunho ? rascunho.ordem : undefined;
+  const removidos = useMemo(() => (rascunho && rascunho.removidos) || [], [rascunho]);
+  const ordemIds = useMemo(
+    () => ordemEfetiva(slidesCatalogo.map((b) => b.id), ordemSalva),
+    [slidesCatalogo, ordemSalva],
+  );
+  const estrutura = useMemo(() => ({ ordem: ordemSalva, removidos }), [ordemSalva, removidos]);
 
   const totalSlides = useMemo(
-    () => blocosDoDeck(doc, dados, rascunho?.opcionais || {}, rascunho?.extras || []).length,
-    [doc, dados, rascunho],
+    () => blocosDoDeck(doc, dados, rascunho?.opcionais || {}, rascunho?.extras || [], estrutura).length,
+    [doc, dados, rascunho, estrutura],
   );
 
   // Quando a base ainda não existe no cliente, o que a pessoa digitar
@@ -241,13 +276,14 @@ export default function DocEditorPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseSalva, doc, rascunho?.id]);
 
-  // REGRA 3.6 — o aviso soma o que está incompleto, mas não impede.
-  // Documento pela metade às vezes é exatamente o que se quer mostrar
-  // numa reunião de alinhamento.
+  // REGRA 3.6 — o aviso soma o que pode estragar o PDF, mas não
+  // impede. Campo em branco não entra no aviso: nenhum campo é
+  // obrigatório, e o que não foi preenchido já não vai para o PDF.
+  // Ficam o texto maior que a página (seria cortado) e as pendências
+  // em aberto (dado que ainda precisa de conferência).
   const gerarPDF = async () => {
     const abertas = (rascunho?.pendencias || []).filter((p) => !p.ok).length;
     const partes = [];
-    if (vazios) partes.push(`${vazios} campo${vazios > 1 ? 's' : ''} em branco`);
     if (transbordo) partes.push(`${transbordo} slide${transbordo > 1 ? 's' : ''} com texto maior que a página`);
     if (abertas) partes.push(`${abertas} pendência${abertas > 1 ? 's' : ''} em aberto`);
 
@@ -289,6 +325,132 @@ export default function DocEditorPage() {
 
   const status = DOC_STATUS[documento.status] || DOC_STATUS.rascunho;
 
+  // ── Seções na ordem do deck ──────────────────────────────────
+  // `aba` continua sendo o índice no catálogo (é o que o formulário
+  // usa); só a exibição segue a ordem escolhida. Capa sempre primeiro.
+  // Seção sem slide correspondente (não existe hoje) fica no fim, sem
+  // alça, na ordem do catálogo.
+  const itens = secoes.map((s, i) => ({ s, i, slide: slideDaSecao[s.t] || null }));
+  const foiRemovido = (it) => !!it.slide && !slideTravado(it.slide) && removidos.includes(it.slide);
+  const posicao = (it) => {
+    if (it.slide === SLIDE_INICIO) return -1;
+    const p = it.slide ? ordemIds.indexOf(it.slide) : -1;
+    return p < 0 ? Number.MAX_SAFE_INTEGER : p;
+  };
+  const noDocumento = itens.filter((it) => !foiRemovido(it))
+    .sort((a, b) => (posicao(a) - posicao(b)) || (a.i - b.i));
+  const foraDoDocumento = itens.filter(foiRemovido);
+
+  const slideAtual = secaoAtual ? slideDaSecao[secaoAtual.t] : null;
+  const atualRemovido = secaoAtual ? foiRemovido({ slide: slideAtual }) : false;
+
+  // ── Arrastar ─────────────────────────────────────────────────
+  const fimArraste = () => { setArrastando(null); setAlvo(null); };
+
+  const inicioArraste = (e, slideId) => {
+    e.dataTransfer.effectAllowed = 'move';
+    // O Firefox só começa o arraste se houver algum dado anexado.
+    try { e.dataTransfer.setData('text/plain', slideId); } catch { /* navegador recusou, segue */ }
+    setArrastando(slideId);
+  };
+
+  // Metade de cima da seção = cai antes dela; metade de baixo = depois.
+  // Na capa só dá para cair depois: nada vem antes dela.
+  const arrastandoSobre = (e, it) => {
+    if (!arrastando || !it.slide || it.slide === arrastando || it.slide === SLIDE_FIM) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    const caixa = e.currentTarget.getBoundingClientRect();
+    const depois = it.slide === SLIDE_INICIO || e.clientY > caixa.top + caixa.height / 2;
+    if (!alvo || alvo.id !== it.slide || alvo.depois !== depois) setAlvo({ id: it.slide, depois });
+  };
+
+  const soltar = (e) => {
+    e.preventDefault();
+    if (arrastando && alvo && alvo.id !== arrastando) {
+      const nova = ordemIds.filter((id) => id !== arrastando);
+      // A capa não está na ordem (indexOf = -1): cair depois dela é
+      // ir para a primeira posição.
+      const ref = nova.indexOf(alvo.id);
+      nova.splice(ref + (alvo.depois ? 1 : 0), 0, arrastando);
+      alterarEstrutura({ ordem: nova });
+    }
+    fimArraste();
+  };
+
+  // ── Remover e trazer de volta ────────────────────────────────
+  // Remover não apaga nada: os campos continuam guardados e o slide
+  // volta para o mesmo lugar da ordem.
+  const removerSlide = (it) => {
+    alterarEstrutura({ removidos: [...removidos.filter((id) => id !== it.slide), it.slide] });
+    toast(`"${it.s.t}" saiu do documento. Dá para trazer de volta em Removidos.`);
+  };
+  const restaurarSlide = (slideId) => {
+    alterarEstrutura({ removidos: removidos.filter((id) => id !== slideId) });
+  };
+
+  const itemNav = (it, n, removido) => {
+    const { s, i } = it;
+    const faltam = vaziosDaSecao(s, dados, essencial);
+    const desligada = s.opcional && rascunho.opcionais[s.t] === false;
+    const ativa = aba === i;
+    const movel = !removido && !!it.slide && !slideTravado(it.slide);
+    const linhaDeSoltar = alvo && alvo.id === it.slide && arrastando
+      ? (alvo.depois ? S.soltarDepois : S.soltarAntes) : null;
+    const mostrarLixeira = movel && (ativa || sobre === s.t) && !arrastando;
+
+    return (
+      <div
+        key={s.t}
+        draggable={movel}
+        onDragStart={movel ? (e) => inicioArraste(e, it.slide) : undefined}
+        onDragEnd={fimArraste}
+        onDragOver={removido ? undefined : (e) => arrastandoSobre(e, it)}
+        onDrop={removido ? undefined : soltar}
+        onMouseEnter={() => setSobre(s.t)}
+        onMouseLeave={() => setSobre((x) => (x === s.t ? null : x))}
+        style={{
+          ...S.navLinha,
+          ...(ativa ? S.navAtivo : {}),
+          ...(linhaDeSoltar || {}),
+          ...(arrastando === it.slide ? { opacity: 0.4 } : {}),
+          cursor: movel ? 'grab' : 'default',
+        }}
+      >
+        <span style={{ ...S.alca, visibility: movel ? 'visible' : 'hidden' }} aria-hidden="true">
+          <GripVertical size={12} color="var(--dim)" />
+        </span>
+
+        <button type="button" style={S.navBtn} onClick={() => setAba(i)} title={movel ? 'Arraste para mudar a ordem' : undefined}>
+          <span style={{ ...S.navNum, ...(ativa ? { color: 'var(--c)' } : {}) }}>
+            {removido ? '—' : String(n).padStart(2, '0')}
+          </span>
+          <span style={{ flex: 1, minWidth: 0, textAlign: 'left', ...(removido ? S.navRemovido : {}) }}>{s.t}</span>
+          {removido ? null : desligada ? (
+            <span style={S.navOff}>fora</span>
+          ) : faltam === 0 ? (
+            <Check size={13} color="var(--green)" />
+          ) : (
+            <span style={S.navFalta}>{faltam}</span>
+          )}
+        </button>
+
+        {/* Lugar fixo para o botão, para a linha não pular quando ele aparece. */}
+        <span style={S.navAcao}>
+          {removido ? (
+            <button type="button" style={S.icone} onClick={() => restaurarSlide(it.slide)} title="Trazer de volta para o documento">
+              <RotateCcw size={12} color="var(--muted)" />
+            </button>
+          ) : mostrarLixeira ? (
+            <button type="button" style={S.icone} onClick={() => removerSlide(it)} title="Remover este slide do documento">
+              <Trash2 size={12} color="var(--muted)" />
+            </button>
+          ) : null}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div style={S.tela}>
       {/* ── Topo ─────────────────────────────────────────── */}
@@ -305,7 +467,6 @@ export default function DocEditorPage() {
           <p style={S.subTopo}>
             {salvando ? 'Salvando…' : `Salvo${documento.updatedByName ? ` · por ${documento.updatedByName}` : ''}`}
             {' · '}{totalSlides} slides
-            {vazios > 0 && ` · ${vazios} campo${vazios > 1 ? 's' : ''} em branco`}
             {transbordo > 0 && ` · ${transbordo} com texto sobrando`}
           </p>
         </div>
@@ -345,6 +506,7 @@ export default function DocEditorPage() {
           dados={dados}
           opcionais={rascunho.opcionais}
           extras={rascunho.extras}
+          estrutura={estrutura}
           titulo={`${documento.clientName || 'Sem cliente'} · ${doc.nome.split('—')[0].trim()}`}
           onClose={() => setApresentando(false)}
           onSalvarPDF={gerarPDF}
@@ -360,39 +522,24 @@ export default function DocEditorPage() {
 
       {/* ── Corpo ────────────────────────────────────────── */}
       <div style={S.corpo}>
-        <nav style={S.nav}>
-          {secoes.map((s, i) => {
-            const faltam = vaziosDaSecao(s, dados, essencial);
-            const desligada = s.opcional && rascunho.opcionais[s.t] === false;
-            const ativa = aba === i;
-            return (
-              <button
-                key={s.t}
-                type="button"
-                style={{ ...S.navItem, ...(ativa ? S.navAtivo : {}) }}
-                onClick={() => setAba(i)}
-              >
-                <span style={{ ...S.navNum, ...(ativa ? { color: 'var(--neon)' } : {}) }}>
-                  {String(i + 1).padStart(2, '0')}
-                </span>
-                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>{s.t}</span>
-                {desligada ? (
-                  <span style={S.navOff}>fora</span>
-                ) : faltam === 0 ? (
-                  <Check size={13} color="var(--green)" />
-                ) : (
-                  <span style={S.navFalta}>{faltam}</span>
-                )}
-              </button>
-            );
-          })}
+        <nav style={S.nav} onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setAlvo(null); }}>
+          <p style={S.navDica}>Arraste para mudar a ordem dos slides.</p>
+
+          {noDocumento.map((it, n) => itemNav(it, n + 1, false))}
+
+          {foraDoDocumento.length > 0 && (
+            <>
+              <p style={S.navGrupo}>Removidos</p>
+              {foraDoDocumento.map((it) => itemNav(it, 0, true))}
+            </>
+          )}
 
           <button
             type="button"
             style={{ ...S.navItem, ...S.navExtras, ...(aba === -1 ? S.navAtivo : {}) }}
             onClick={() => setAba(-1)}
           >
-            <Layers size={13} color={aba === -1 ? 'var(--neon)' : 'var(--muted)'} />
+            <Layers size={13} color={aba === -1 ? 'var(--c)' : 'var(--muted)'} />
             <span style={{ flex: 1, textAlign: 'left' }}>Slides extras</span>
             {rascunho.extras.length > 0 && <span style={S.navFalta}>{rascunho.extras.length}</span>}
           </button>
@@ -400,9 +547,20 @@ export default function DocEditorPage() {
 
         <section style={S.meio} ref={colMeio}>
           {aba === -1 ? (
-            <DocExtras doc={doc} extras={rascunho.extras} onChange={alterarExtras} />
+            <DocExtras doc={doc} extras={rascunho.extras} estrutura={estrutura} onChange={alterarExtras} />
           ) : (
             <>
+              {atualRemovido && (
+                <div style={S.avisoRemovido}>
+                  <span style={{ flex: 1 }}>
+                    Este slide foi removido: não entra na apresentação nem no PDF.
+                    O que você escreveu continua guardado.
+                  </span>
+                  <button type="button" style={S.btnGhost} onClick={() => restaurarSlide(slideAtual)}>
+                    <RotateCcw size={13} /> Trazer de volta
+                  </button>
+                </div>
+              )}
               <DocForm
                 secao={secaoAtual}
                 dados={dados}
@@ -435,8 +593,9 @@ export default function DocEditorPage() {
             dados={dados}
             opcionais={rascunho.opcionais}
             extras={rascunho.extras}
+            estrutura={estrutura}
             secaoAtiva={secaoAtual ? secaoAtual.t : null}
-            apenasSecao={!deckCompleto && aba >= 0}
+            apenasSecao={!deckCompleto && aba >= 0 && !atualRemovido}
             onTransbordo={setTransbordo}
           />
         </section>
@@ -491,11 +650,45 @@ const S = {
     fontSize: 12, color: 'var(--amber)', background: 'var(--amber-dim)',
     borderBottom: '1px solid var(--amber-b)', padding: '9px 22px', lineHeight: 1.5,
   },
+  avisoRemovido: {
+    display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20,
+    fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5,
+    background: 'var(--surface)', border: '1px dashed var(--border-h)',
+    borderRadius: 10, padding: '12px 14px',
+  },
   corpo: { flex: 1, display: 'grid', gridTemplateColumns: '236px minmax(360px,1fr) minmax(420px,1.15fr)', minHeight: 0 },
   nav: {
     borderRight: '1px solid var(--border)', padding: 14,
     display: 'flex', flexDirection: 'column', gap: 2, overflowY: 'auto',
   },
+  navDica: { fontSize: 10.5, color: 'var(--muted)', padding: '0 6px 8px', lineHeight: 1.4 },
+  navGrupo: {
+    fontSize: 10, fontWeight: 600, color: 'var(--muted)', letterSpacing: '.1em', textTransform: 'uppercase',
+    margin: '12px 0 4px', padding: '12px 6px 0', borderTop: '1px solid var(--border)',
+  },
+  // Linha de seção: alça, botão que abre a seção e lugar da ação
+  // (lixeira ou trazer de volta). Div, não botão, porque leva botões
+  // dentro e é ela quem arrasta.
+  navLinha: {
+    display: 'flex', alignItems: 'center', gap: 2, width: '100%',
+    border: '1px solid transparent', borderRadius: 9, padding: '0 4px 0 2px',
+    fontSize: 12.5, color: 'var(--muted)', userSelect: 'none',
+  },
+  navBtn: {
+    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 9,
+    background: 'transparent', border: 'none', padding: '9px 4px',
+    fontSize: 'inherit', fontWeight: 'inherit', color: 'inherit', textAlign: 'left', cursor: 'pointer',
+  },
+  alca: { display: 'flex', alignItems: 'center', width: 12, flexShrink: 0 },
+  navAcao: { width: 24, display: 'flex', justifyContent: 'center', flexShrink: 0 },
+  icone: {
+    background: 'transparent', border: '1px solid var(--border)', borderRadius: 6,
+    width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+  },
+  // Onde a seção arrastada vai cair: uma linha na cor do painel, em
+  // cima ou embaixo da seção sob o mouse.
+  soltarAntes: { boxShadow: 'inset 0 2px 0 var(--c)' },
+  soltarDepois: { boxShadow: 'inset 0 -2px 0 var(--c)' },
   navItem: {
     display: 'flex', alignItems: 'center', gap: 9, width: '100%',
     background: 'transparent', border: '1px solid transparent', borderRadius: 9,
@@ -511,6 +704,7 @@ const S = {
     borderRadius: 100, padding: '1px 7px', flexShrink: 0,
   },
   navOff: { fontSize: 10, color: 'var(--muted)', fontStyle: 'italic', flexShrink: 0 },
+  navRemovido: { textDecoration: 'line-through', textDecorationColor: 'var(--dim)' },
   navExtras: { marginTop: 10, borderTop: '1px solid var(--border)', borderRadius: 0, paddingTop: 14 },
   meio: { padding: '26px 26px 60px', overflowY: 'auto', borderRight: '1px solid var(--border)' },
   direita: { padding: 22, overflowY: 'auto', background: 'var(--bg)' },

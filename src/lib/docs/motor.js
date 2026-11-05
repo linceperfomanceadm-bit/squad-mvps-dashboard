@@ -13,7 +13,9 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
 
 // REGRA 3.1 — campo vazio nunca é invisível.
 // Sem valor, o slide mostra o nome do que falta entre colchetes, em
-// itálico apagado. Continua marcado no PDF, de propósito.
+// itálico apagado. Vale só para o rascunho do editor: apresentação e
+// PDF passam por `blocosFinais`, que tira o marcador e o que ficou
+// vazio com ele. Nenhum campo é obrigatório para o slide sair.
 export const v = (val, ph) => (val && String(val).trim())
   ? esc(val).replace(/\n/g, '<br>')
   : `<span class="ph">[${esc(ph)}]</span>`;
@@ -35,6 +37,14 @@ export const lista = (a) => (Array.isArray(a) ? a : []);
 // Feito no HTML, e não no catálogo, de propósito: assim vale para
 // todos os documentos e para os slides extras, sem obrigar cada
 // `render` a conhecer duas versões de si mesmo.
+//
+// Duas marcas que o `render` pode usar para ajudar a limpeza:
+//   `.so-com-valor` — o elemento só existe com o valor dentro dele.
+//     Serve para rótulo que fica solto quando o campo está vazio
+//     ("Base de cálculo adotada:", "antes —", "O que prova ...").
+//   `.fixo` — texto que o catálogo escreve sozinho (legenda, card
+//     explicativo). Aparece quando o slide tem conteúdo, mas não
+//     segura sozinho um slide que ninguém preencheu.
 
 // Decoração não conta como conteúdo: numeração do card, rótulo do
 // fecho, etiqueta de funil, número da página e o logo.
@@ -49,15 +59,25 @@ const temConteudo = (el, ignorar = '') => {
   return texto.length > 0 || !!copia.querySelector('img');
 };
 
-// Card e fecho vivem do corpo, não do título: um card que sobrou só
-// com o `<h3>` é uma caixa vazia com nome bonito.
-const temCorpo = (el) => temConteudo(el, 'h3');
+// Card e fecho não vivem de título fixo: um card que sobrou só com
+// "O que aconteceu" é uma caixa vazia com nome bonito. Mas título que
+// a pessoa escreveu é conteúdo — pilar só com o nome, brecha só com o
+// título, peça sem descrição: tudo isso aparece. Por isso só o `<h3>`
+// marcado como `.fixo` no catálogo é ignorado. Antes todo `<h3>` era,
+// e um card com o nome preenchido sumia por falta da descrição.
+const temCorpo = (el) => temConteudo(el, 'h3.fixo');
 
 export function limparSlide(html) {
   if (!html || typeof DOMParser === 'undefined') return html;
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
   const slide = doc.body.firstElementChild;
   if (!slide) return html;
+
+  // 0 · rótulo que depende de um valor vazio sai com ele. Precisa vir
+  //     antes do passo 1, enquanto o marcador ainda denuncia o vazio.
+  slide.querySelectorAll('.so-com-valor').forEach((el) => {
+    if (el.querySelector('.ph')) el.remove();
+  });
 
   // 1 · fora os marcadores de campo vazio
   slide.querySelectorAll('.ph, .tag.vazio').forEach((el) => el.remove());
@@ -81,19 +101,49 @@ export function limparSlide(html) {
   });
 
   // 4 · as barras de peso dos pilares são desenhadas fora dos cards;
-  //     sobra uma barra para cada pilar que acabou de sair.
+  //     sobra uma barra para cada pilar que acabou de sair. Barra e
+  //     card carregam o mesmo `data-linha`, então sai exatamente a
+  //     barra do pilar vazio — antes cortava as últimas, e com um
+  //     pilar vazio no meio sobrava a barra errada.
   const barras = slide.querySelector('.pesos');
   if (barras) {
-    const cards = slide.querySelectorAll('.grid .card').length;
-    Array.from(barras.children).slice(cards).forEach((b) => b.remove());
+    const cards = Array.from(slide.querySelectorAll('.grid .card'));
+    const vivos = new Set(cards.map((c) => c.getAttribute('data-linha')).filter((x) => x !== null));
+    if (vivos.size) {
+      Array.from(barras.children).forEach((b) => {
+        if (!vivos.has(b.getAttribute('data-linha'))) b.remove();
+      });
+    } else {
+      Array.from(barras.children).slice(cards.length).forEach((b) => b.remove());
+    }
     if (!barras.children.length) barras.remove();
   }
 
-  // 5 · slide que ficou só com título não entra. Capa e encerramento
-  //     são exceção: vivem de texto fixo e fecham o deck.
+  // 4b · no fluxo, as setas ficam entre os cards. Card que saiu deixa
+  //      seta sobrando no começo, no fim ou duas seguidas.
+  slide.querySelectorAll('.fluxo').forEach((fluxo) => {
+    let anteriorEraCard = false;
+    Array.from(fluxo.children).forEach((el) => {
+      if (el.classList.contains('seta')) {
+        if (!anteriorEraCard) el.remove();
+        else anteriorEraCard = false;
+      } else {
+        anteriorEraCard = true;
+      }
+    });
+    const ultimo = fluxo.lastElementChild;
+    if (ultimo && ultimo.classList.contains('seta')) ultimo.remove();
+    if (!fluxo.children.length) fluxo.remove();
+  });
+
+  // 5 · slide sem nada preenchido não entra — texto `.fixo` do
+  //     catálogo não conta. Capa e encerramento são exceção: vivem de
+  //     texto fixo e fecham o deck.
   const fixo = slide.classList.contains('capa') || slide.classList.contains('fechamento');
+  const vivo = slide.cloneNode(true);
+  vivo.querySelectorAll('.fixo').forEach((el) => el.remove());
   const restou = ['p', 'li', 'tr', '.card', '.fecho']
-    .some((sel) => Array.from(slide.querySelectorAll(sel))
+    .some((sel) => Array.from(vivo.querySelectorAll(sel))
       .some((el) => ((sel === '.card' || sel === '.fecho') ? temCorpo(el) : temConteudo(el))));
   if (!fixo && !restou) return '';
 
@@ -104,6 +154,31 @@ export function limparSlide(html) {
 export const blocosFinais = (blocos) => lista(blocos)
   .map((b) => ({ ...b, html: limparSlide(b.html) }))
   .filter((b) => b.html);
+
+// ─── Versão final: linha que só tem o padrão não foi preenchida ──
+// A regra 3.11 pré-preenche colunas (nome da métrica, direção, etapa
+// do funil, formato). No rascunho isso ajuda; na versão final, uma
+// linha que só tem o que veio pronto é linha que ninguém preencheu —
+// e aparecia no slide como "Alcance" sem número nenhum.
+//
+// Coluna com `padrao` é rótulo: sozinha não faz a linha contar. A
+// linha entra quando alguma coluna sem padrão tem valor. Linha vazia
+// vira `{}` no mesmo lugar (e não sai do array) porque a posição
+// importa: é ela que numera card e escolhe o destaque de cada camada.
+export function dadosDaVersaoFinal(doc, dados) {
+  if (!doc || !doc.secoes) return dados || {};
+  const saida = { ...(dados || {}) };
+  doc.secoes.forEach((sec) => sec.campos.forEach((c) => {
+    if (c.tipo !== 'lista' || !Array.isArray(saida[c.id])) return;
+    const contam = c.cols.filter((col) => !Array.isArray(col.padrao));
+    if (contam.length === c.cols.length) return; // lista sem padrão: nada a fazer
+    saida[c.id] = saida[c.id].map((linha) => {
+      const preenchida = linha && contam.some((col) => linha[col.id] && String(linha[col.id]).trim());
+      return preenchida ? linha : {};
+    });
+  }));
+  return saida;
+}
 
 export const num = (x, fallback) => {
   const n = parseFloat(x);
@@ -197,11 +272,58 @@ export function montarDeck(doc, dados, opcionais, extras, LAYOUTS) {
     .join('')).join('');
 }
 
-// Pontos de inserção disponíveis para os slides extras.
-// O encerramento fica de fora: nada entra depois do "Obrigado".
-export function pontosDeInsercao(doc) {
+// ─── Estrutura do deck: ordem e slides removidos ──────────────
+// Cada documento pode reordenar e tirar slides, sem tocar no
+// catálogo. Fica gravado no próprio documento, por id de slide:
+//   `ordem`     — ids na ordem escolhida (só os do meio)
+//   `removidos` — ids que saíram do documento
+// Documento antigo não tem nenhum dos dois e abre na ordem do
+// catálogo, sem nada removido.
+//
+// Capa e encerramento não andam nem saem: a capa é a identidade do
+// documento e o "Obrigado" fecha o deck. Os ids são convenção de
+// todos os documentos do catálogo.
+export const SLIDE_INICIO = 'capa';
+export const SLIDE_FIM = 'fim';
+export const slideTravado = (id) => id === SLIDE_INICIO || id === SLIDE_FIM;
+
+// Ordem final dos slides do meio. Slide que não está na ordem salva
+// (documento novo no catálogo, ou ordem gravada antes de ele existir)
+// entra logo depois do vizinho que vinha antes dele no catálogo, em
+// vez de cair no fim do deck.
+export function ordemEfetiva(idsDoCatalogo, ordem) {
+  const meio = lista(idsDoCatalogo).filter((id) => !slideTravado(id));
+  const saida = lista(ordem).filter((id, i, arr) => meio.includes(id) && arr.indexOf(id) === i);
+  meio.forEach((id, i) => {
+    if (saida.includes(id)) return;
+    const vizinho = meio.slice(0, i).reverse().find((x) => saida.includes(x));
+    saida.splice(vizinho ? saida.indexOf(vizinho) + 1 : 0, 0, id);
+  });
+  return saida;
+}
+
+// Aplica a ordem a uma lista de blocos `{ id, ... }`: capa primeiro,
+// encerramento por último, o resto como a pessoa arrumou.
+export function ordenarSlides(blocos, ordem) {
+  const todos = lista(blocos);
+  const ids = ordemEfetiva(todos.map((b) => b.id), ordem);
+  return [
+    ...todos.filter((b) => b.id === SLIDE_INICIO),
+    ...ids.map((id) => todos.find((b) => b.id === id)).filter(Boolean),
+    ...todos.filter((b) => b.id === SLIDE_FIM),
+  ];
+}
+
+// Pontos de inserção disponíveis para os slides extras, na ordem do
+// documento. O encerramento fica de fora: nada entra depois do
+// "Obrigado". Slide removido continua na lista, marcado — um extra
+// preso a ele entra no lugar onde ele estaria.
+export function pontosDeInsercao(doc, estrutura) {
   if (!doc || typeof doc.render !== 'function') return [];
-  return doc.render({}, {}).filter((b) => b.id !== 'fim').map((b) => ({ id: b.id, nome: b.nome }));
+  const removidos = lista(estrutura?.removidos);
+  return ordenarSlides(doc.render({}, {}), estrutura?.ordem)
+    .filter((b) => b.id !== SLIDE_FIM)
+    .map((b) => ({ id: b.id, nome: removidos.includes(b.id) ? `${b.nome} (removido)` : b.nome }));
 }
 
 // ─── REGRA 3.3 — balanço do funil ─────────────────────────────
