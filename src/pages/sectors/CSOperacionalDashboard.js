@@ -79,7 +79,7 @@ export default function CSOperacionalDashboard() {
     setSectorResponsibles, nudgeSectorLeader,
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
-    saveCadastro, saveEscopo, marcarEntrega, ajustarMesEntregas, transferirCS,
+    saveCadastro, saveEscopo, marcarEntrega, ajustarMesEntregas, transferirCS, idvRemover,
   } = useClients();
   const { collaborators } = useCollaborators();
   const {
@@ -116,7 +116,7 @@ export default function CSOperacionalDashboard() {
 
   // CS completa cadastro, define escopo, ajusta o mês e corrige marcação.
   const acoesEntregas = acoesDeEntregas(
-    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas },
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, idvRemover },
     me, toast
   );
   // Setores que esta pessoa pode preencher: os que ela lidera (e todos,

@@ -1,6 +1,6 @@
-import React from 'react';
-import { Check, X, Trash2, Plus, Repeat, CircleDot, Lock, ListPlus } from 'lucide-react';
-import { SECTORS, ENTREGAVEIS, ENTREGA_SECTORS, BRIEFING_MIN_PALAVRAS, BRIEFING_MIN_DISTINTAS } from '../../lib/firebase';
+import React, { useState } from 'react';
+import { Check, X, Trash2, Plus, Repeat, CircleDot, Lock, ListPlus, Palette } from 'lucide-react';
+import { SECTORS, ENTREGAVEIS, ENTREGA_SECTORS, BRIEFING_MIN_PALAVRAS, BRIEFING_MIN_DISTINTAS, ID_VISUAL_CONFIG } from '../../lib/firebase';
 import { novoIdItem } from '../../lib/entregas';
 import { avaliarBriefing, roteiroBriefing } from '../../lib/cadastro';
 import { asArray } from '../../lib/wdJobs';
@@ -121,6 +121,92 @@ export function Chip({ ativo, onClick, children, title }) {
     >
       {ativo && <Check size={12} />} {children}
     </button>
+  );
+}
+
+/*
+ * ID Visual na edição do cadastro. Mostra em que pé está e deixa CS,
+ * líder e admin removerem um ID Visual que entrou por engano (marcado
+ * no cadastro sem ter sido vendido). A remoção grava na hora, com
+ * confirmação — não espera o "Salvar" do formulário, porque some do
+ * painel do designer e não faz sentido ficar pendurada num rascunho.
+ *
+ * Finalizado não tem botão: é entrega feita. Sem `onRemover`, o bloco
+ * é só informativo.
+ */
+const IDV_FASE = {
+  onboarding: 'Em onboarding',
+  production: 'Em produção',
+  finished: 'Finalizado',
+};
+
+export function IdVisualCadastro({ client, onRemover }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const [motivo, setMotivo] = useState('');
+  const [removendo, setRemovendo] = useState(false);
+  const [erro, setErro] = useState('');
+
+  const idv = client?.idv || {};
+  const temBloco = !!(idv.status || idv.responsible);
+  const vendido = client?.contrato?.hasIdVisual === true;
+  if (!temBloco && !vendido) return null;
+
+  const finalizado = idv.status === 'finished';
+  const situacao = temBloco
+    ? `${IDV_FASE[idv.status] || 'Aberto'} · ${idv.responsible || 'sem designer'}`
+    : 'Marcado no cadastro · aguardando o líder de Design indicar o designer';
+  const historico = Array.isArray(client?.idvHistory) ? client.idvHistory.length : 0;
+
+  const remover = async () => {
+    setErro('');
+    setRemovendo(true);
+    const r = await onRemover(motivo.trim());
+    setRemovendo(false);
+    if (!r?.success) { setErro(r?.error || 'Não foi possível remover.'); return; }
+    setConfirmando(false);
+    setMotivo('');
+  };
+
+  return (
+    <Bloco titulo="ID VISUAL">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Palette size={15} color="var(--dim)" style={{ flexShrink: 0 }} />
+        <span style={{ flex: 1, fontSize: 13, color: 'var(--text)' }}>{situacao}</span>
+        {onRemover && !finalizado && !confirmando && (
+          <button type="button" className="ui-btn small" style={S.removerBtn} onClick={() => setConfirmando(true)}>
+            <Trash2 size={13} /> Remover
+          </button>
+        )}
+      </div>
+
+      {finalizado && (
+        <p style={S.hint}>Entregue — não pode ser removido. Um ID Visual novo para este cliente é aberto pelo admin.</p>
+      )}
+
+      {confirmando && (
+        <div style={S.confirma}>
+          <p style={{ fontSize: 12.5, color: 'var(--text)', lineHeight: 1.5 }}>
+            {historico > 0
+              ? `O ${ID_VISUAL_CONFIG.label} em aberto sai do painel ${idv.responsible ? `de ${idv.responsible}` : 'do designer'} e o anterior, já entregue, volta a ser o ID Visual do cliente.`
+              : `O ${ID_VISUAL_CONFIG.label} sai do cadastro e do painel ${idv.responsible ? `de ${idv.responsible}` : 'do designer'}. O cliente e os demais serviços continuam como estão.`}
+          </p>
+          <textarea
+            rows={2}
+            value={motivo}
+            onChange={e => setMotivo(e.target.value)}
+            placeholder="Motivo (opcional) — ex.: marcado por engano, não foi vendido"
+            style={{ ...INP, resize: 'vertical' }}
+          />
+          {erro && <p style={{ fontSize: 12, color: 'var(--red)' }}>{erro}</p>}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button type="button" className="ui-btn small" onClick={() => { setConfirmando(false); setErro(''); }} disabled={removendo}>Voltar</button>
+            <button type="button" className="ui-btn small" style={S.removerBtn} onClick={remover} disabled={removendo}>
+              <Trash2 size={13} /> {removendo ? 'Removendo...' : 'Confirmar remoção'}
+            </button>
+          </div>
+        </div>
+      )}
+    </Bloco>
   );
 }
 
@@ -250,7 +336,10 @@ const S = {
   medidorBarra: { height: '100%', borderRadius: 99, transition: 'width .25s ease, background .25s ease' },
   respLinha: { display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)' },
   respSetor: { fontSize: 13, color: 'var(--text)', fontWeight: 500, width: 120, flexShrink: 0, paddingTop: 7 },
-  fora: { background: 'var(--red-dim)', color: 'var(--red)', borderColor: 'var(--red-b)', gap: 5 },
+  // `--red-b` não existe nos tokens: a borda vem da própria cor.
+  fora: { background: 'var(--red-dim)', color: 'var(--red)', borderColor: 'color-mix(in srgb, var(--red) 30%, transparent)', gap: 5 },
+  removerBtn: { color: 'var(--red)', borderColor: 'color-mix(in srgb, var(--red) 30%, transparent)', gap: 6 },
+  confirma: { display: 'flex', flexDirection: 'column', gap: 8, background: 'var(--red-dim)', border: '1px solid color-mix(in srgb, var(--red) 30%, transparent)', borderRadius: 10, padding: 12 },
   itemLinha: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 },
   tipo: { width: 86, flexShrink: 0, justifyContent: 'center', height: 'auto', alignSelf: 'stretch' },
   iconBtn: { width: 34, height: 34, flexShrink: 0, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' },

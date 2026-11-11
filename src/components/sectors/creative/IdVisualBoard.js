@@ -162,6 +162,12 @@ function IdvCard({ client, onMoveToProduction, onMoveBackToOnboarding, onUpdateC
               ↺ Reabrir produção
             </button>
           )}
+
+          {/* Remover é correção de cadastro, não decisão do designer:
+              fica com a CS/admin, no formulário do cliente. */}
+          {(isOnboarding || isProduction) && (
+            <p style={S.nota}>Este ID Visual não foi vendido? Peça à CS do cliente para removê-lo pelo cadastro (aba Serviços).</p>
+          )}
         </div>
       )}
     </div>
@@ -261,5 +267,6 @@ const S = {
   doneBox: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 10, padding: 14, marginBottom: 14 },
   btnFin: { background: 'var(--green-dim)', border: '1px solid var(--green-b)', borderRadius: 8, padding: 8, color: 'var(--green)', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   aguardando: { display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--blue)', background: 'color-mix(in srgb, var(--blue) 8%, transparent)', border: '1px solid color-mix(in srgb, var(--blue) 25%, transparent)', borderRadius: 8, padding: '8px 10px', marginBottom: 10, lineHeight: 1.45 },
+  nota: { fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginTop: 12 },
   asec: { display: 'flex', alignItems: 'center', gap: 5, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 7, padding: '6px 12px', color: 'var(--muted)', fontSize: 12, cursor: 'pointer' },
 };

@@ -13,7 +13,7 @@ import {
 } from '../../lib/cadastro';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, money } from '../commercial/ui';
 import { Tag } from '../shared/ui';
-import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, ResponsaveisSetor, EscopoEditor } from './kit';
+import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, ResponsaveisSetor, EscopoEditor, IdVisualCadastro } from './kit';
 
 /*
  * CADASTRO DO CLIENTE — formulário único.
@@ -35,7 +35,9 @@ import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, Responsaveis
  *                              campos). Aqui nada é obrigatório além do
  *                              formato: o selo de pendências mostra o
  *                              que falta. A aba Equipe e a troca de
- *                              nome só aparecem para o admin.
+ *                              nome só aparecem para o admin. ID Visual
+ *                              marcado por engano sai pela aba Serviços
+ *                              (`onRemoverIdv`, grava na hora).
  *
  * No cadastro novo as abas funcionam como etapas (Continuar confere a
  * etapa); na edição dá para pular direto para a aba que interessa.
@@ -71,6 +73,7 @@ export default function ClienteForm({
   onSaveEscopo,     // editar: (escopo) => { success, desde, corrigiuAtual }
   onRenomear,       // editar, admin: (nome) => { success }
   onSalvarEquipe,   // editar, admin: (responsibles) => { success }
+  onRemoverIdv,     // editar, CS/líder/admin: (motivo) => { success }
 }) {
   const novo = modo === 'novo';
   // Na edição a aba Equipe depende de ter onde salvar (só o admin recebe).
@@ -367,6 +370,7 @@ export default function ClienteForm({
                   </div>
                 </Bloco>
               )}
+              {!novo && <IdVisualCadastro client={client} onRemover={onRemoverIdv} />}
               {!novo && (
                 <p style={S.hint}>Site de cliente que já está na casa é adicionado no painel de Web; ID Visual, pelo admin.</p>
               )}

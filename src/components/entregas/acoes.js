@@ -38,6 +38,15 @@ export function acoesDeEntregas(fns, me, toast, { soMarcar = false } = {}) {
       ? async (clientId, escopo) => fns.saveEscopo(clientId, escopo, me)
       : undefined,
     upload: fns.uploadClientFile,
+    // Correção de cadastro: ID Visual que entrou sem ter sido vendido.
+    // CS, líder e admin recebem; quem produz, não.
+    removerIdv: fns.idvRemover
+      ? async (clientId, motivo) => {
+        const r = await fns.idvRemover(clientId, { motivo }, me);
+        if (r?.success && toast) toast('ID Visual removido do cliente.');
+        return r;
+      }
+      : undefined,
     // Só o admin recebe estas duas (formulário único: nome e equipe).
     // O nome vai pelo renameClient porque está copiado em tasks,
     // requests e documents, e só ele propaga.

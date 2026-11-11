@@ -56,6 +56,13 @@ Create React App (JavaScript, sem TypeScript, sem biblioteca de estado, sem fram
 
 Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco próprio do cliente, `idv`, do designer responsável (`ID_VISUAL_CONFIG`, renderizado por `IdVisualBoard.js`). A lista atual de serviços de Web é `WD_WEB_SERVICES`; `WD_SERVICE_CONFIG.id_visual` sobrevive só para clientes do fluxo antigo. Adicionar ID Visual a cliente que já está na casa é exclusivo do admin.
 
+**Remover ID Visual** (marcado no cadastro sem ter sido vendido) é correção de cadastro: CS, líder e admin, na aba Serviços da edição do cliente (`IdVisualCadastro` em `cadastro/kit.js` → `acoes.removerIdv` → `idvRemover` no `useClients`). O designer não remove pelo painel dele — o card só orienta a pedir à CS. Regras do `idvRemover`:
+- zera `contrato.hasIdVisual` junto com o bloco `idv` — sem isso, a próxima indicação de responsável do Design recria o bloco (`setSectorResponsibles`);
+- ID Visual `finished` não sai (entrega feita);
+- havendo um anterior em `idvHistory[]`, ele volta a ser o `idv` (e `hasIdVisual` continua `true`);
+- nada é apagado de vez: o bloco removido vai para `idvRemovidos[]` com `removedAt`, `removedBy` e `motivo`;
+- `responsibles.design` não é mexido — se o designer estava no cliente só pelo ID Visual, o admin tira pela aba Equipe.
+
 ### Serviços de WebDesign por cliente
 
 `src/lib/wdJobs.js`. O bloco `wd` do cliente é o serviço principal (legado, id `'main'`); serviços contratados depois ficam em `wdJobs[]` no mesmo documento — nunca cliente duplicado. Use `wdJobsOf(client)` para a lista normalizada e `WD_ACTIVE_STATUSES` para saber o que está em andamento. O mesmo arquivo exporta `asArray`, o normalizador de campos que podem ser string ou array.
@@ -235,7 +242,7 @@ Social Media monta o mês de cada cliente, manda um link sem login e o cliente a
 
 - `modo="novo"` pela CS → nasce em `kickoff` e segue o fluxo.
 - `modo="novo"` + `admin` → mesmos dados obrigatórios, mas nasce `live` com a equipe definida (pula só Kick Off e onboarding).
-- `modo="editar"` (via `ClienteFicha`) → CS, líder e admin completam ou corrigem; só formato é validado. Aba Equipe e troca de nome só para o admin (`acoes.salvarEquipe` / `acoes.renomear`, que só o `AdminDashboard` passa para `acoesDeEntregas`).
+- `modo="editar"` (via `ClienteFicha`) → CS, líder e admin completam ou corrigem; só formato é validado. Aba Equipe e troca de nome só para o admin (`acoes.salvarEquipe` / `acoes.renomear`, que só o `AdminDashboard` passa para `acoesDeEntregas`). Remover ID Visual por engano fica na aba Serviços e grava na hora, sem esperar o Salvar (`onRemoverIdv`, que CS e admin passam via `idvRemover`).
 
 CPF, CNPJ, valor e pagamento são só escrita na edição: a tela diz "já cadastrado" e aceita valor novo, nunca mostra o gravado. A gravação da edição é o `saveCadastro` (bloco `contrato` + espelhos do topo do doc).
 

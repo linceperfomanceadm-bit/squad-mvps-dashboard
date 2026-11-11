@@ -33,6 +33,7 @@ export default function ClienteFicha({ client, acoes = {}, collaborators = [], o
         onSaveEscopo={(escopo) => acoes.saveEscopo(client.id, escopo)}
         onRenomear={acoes.renomear ? (nome) => acoes.renomear(client.id, nome) : undefined}
         onSalvarEquipe={comEquipe ? (responsibles) => acoes.salvarEquipe(client.id, responsibles) : undefined}
+        onRemoverIdv={acoes.removerIdv ? (motivo) => acoes.removerIdv(client.id, motivo) : undefined}
       />
     );
   }

@@ -434,6 +434,64 @@ export function useClients() {
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
+  // Remove um ID Visual que entrou por engano (ex.: marcado no
+  // cadastro sem ter sido vendido). É correção de cadastro, então mora
+  // com quem cuida do contrato (CS, líder e admin), pelo formulário do
+  // cliente — o designer não decide que um serviço vendido não existe.
+  //
+  // Três cuidados:
+  //   · `contrato.hasIdVisual` volta a `false`. Sem isso, a próxima
+  //     indicação de responsável do Design recriaria o bloco `idv`
+  //     (ver `setSectorResponsibles`).
+  //   · ID Visual já finalizado não sai: é entrega feita, que a CS
+  //     consulta e que conta no histórico do cliente.
+  //   · Se havia um ID Visual anterior em `idvHistory[]` (o admin abriu
+  //     um novo sobre um já entregue), o anterior volta para `idv` — a
+  //     entrega passada não some junto com o engano.
+  // Nada é apagado de vez: o bloco removido vai para `idvRemovidos[]`
+  // com quem removeu, quando e por quê. `responsibles.design` fica como
+  // está — o designer pode estar no cliente por outros serviços; se
+  // não estiver, o admin tira pela aba Equipe.
+  const idvRemover = async (clientId, { motivo = '' } = {}, byName = null) => {
+    try {
+      const ref = doc(db, 'clients', clientId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado');
+        const data = snap.data();
+        const atual = data.idv;
+        const temBloco = !!(atual?.status || atual?.responsible);
+        if (!temBloco && !data.contrato?.hasIdVisual) {
+          throw new Error(`${data.name} não tem ID Visual para remover.`);
+        }
+        if (atual?.status === 'finished') {
+          throw new Error('Este ID Visual já foi finalizado — entrega feita não pode ser removida.');
+        }
+        const now = new Date().toISOString();
+        const historico = Array.isArray(data.idvHistory) ? data.idvHistory : [];
+        const anterior = historico.length ? historico[historico.length - 1] : null;
+        const upd = {
+          idvRemovidos: [...(data.idvRemovidos || []), {
+            ...(temBloco ? atual : {}),
+            removedAt: now,
+            removedBy: byName || null,
+            motivo: String(motivo || '').trim(),
+          }],
+        };
+        if (anterior) {
+          const { archivedAt, ...restaurado } = anterior;
+          upd.idv = restaurado;
+          upd.idvHistory = historico.slice(0, -1);
+        } else {
+          upd.idv = deleteField();
+          upd['contrato.hasIdVisual'] = false;
+        }
+        tx.update(ref, upd);
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
   const idvMoveStatus = async (clientId, newStatus) => {
     try {
       const patch = { 'idv.status': newStatus };
@@ -1314,7 +1372,7 @@ export function useClients() {
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     wdAddService, wdRemoveService,
-    idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus, idvAddService,
+    idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus, idvAddService, idvRemover,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,
     setSectorResponsibles, scheduleOnboarding, cancelStaffing,
