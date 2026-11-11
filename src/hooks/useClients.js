@@ -12,6 +12,30 @@ import { planoSemNomes } from '../lib/responsaveis';
 // Responsável pode estar salvo como string (docs antigos) ou array.
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 
+// Estágios em que o cliente ainda não entrou na base (Kick Off,
+// staffing e onboarding). É nesse intervalo que o cadastro pode ser
+// corrigido por inteiro — setores, site, ID Visual e CS.
+const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
+
+// O que muda no documento quando o último setor recebe responsável.
+// Como a call de onboarding pode ter sido agendada enquanto os
+// líderes indicavam, o bloco `kickoff` só nasce se ainda não houver
+// agendamento — senão a data marcada seria apagada e o cliente
+// sumiria do time. Usado pela indicação do líder e pela correção de
+// cadastro em fluxo (tirar um setor também pode fechar o quadro).
+const fechamentoDoQuadro = (client, agora) => {
+  const patch = { stage: 'onboarding', 'staffing.completedAt': agora };
+  if (!client?.kickoff?.at) {
+    patch.active = false;
+    patch.kickoff = {
+      pending: true, at: null, meetLink: '',
+      scheduledBy: null, scheduledAt: null,
+      confirmedAt: null, confirmedBy: null,
+    };
+  }
+  return patch;
+};
+
 export function useClients() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -639,22 +663,9 @@ export function useClients() {
       const aindaFalta = pendingSectorsOf(simulado);
       const fechou = aindaFalta.length === 0 && client.stage === 'staffing';
 
-      if (fechou) {
-        // Quadro completo. Como a call de onboarding pode ter sido
-        // agendada enquanto os líderes indicavam, o bloco `kickoff`
-        // só nasce aqui se ainda não existir agendamento — senão a
-        // data marcada seria apagada e o cliente sumiria do time.
-        patch.stage = 'onboarding';
-        patch['staffing.completedAt'] = new Date().toISOString();
-        if (!client.kickoff?.at) {
-          patch.active = false;
-          patch.kickoff = {
-            pending: true, at: null, meetLink: '',
-            scheduledBy: null, scheduledAt: null,
-            confirmedAt: null, confirmedBy: null,
-          };
-        }
-      }
+      // Quadro completo: avança para o onboarding (preservando a call
+      // que já estiver marcada — ver `fechamentoDoQuadro`).
+      if (fechou) Object.assign(patch, fechamentoDoQuadro(client, new Date().toISOString()));
 
       await updateDoc(doc(db, 'clients', clientId), patch);
       return { success: true, activated: fechou, trocado: troca };
@@ -810,6 +821,152 @@ export function useClients() {
       }
       await deleteDoc(doc(db, 'clients', clientId));
       return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // ── Correção do cadastro em fluxo ───────────────────────────
+  // Cliente cadastrado com setor, site, ID Visual ou CS errados ficava
+  // preso: o formulário de edição só mexia no contrato, e o setor que
+  // não existia no projeto seguia pedindo responsável — a CS tinha de
+  // indicar qualquer pessoa só para fechar o quadro. Enquanto o cliente
+  // não entrou na base (Kick Off, staffing, onboarding), CS e admin
+  // corrigem tudo isso por aqui.
+  //
+  // `dados` traz só o que mudou:
+  //   sectors       → nova lista de `staffing.sectors`. Setor que sai
+  //                   leva junto quem já tinha sido indicado nele (o
+  //                   setor não faz parte do projeto) e fica registrado
+  //                   em `staffing.removidos[]`.
+  //   wdService     → troca ou tira o site. Só enquanto ele está em
+  //                   onboarding; site em produção se ajusta no Web.
+  //   addIdVisual   → ID Visual que faltou marcar. Se o Design já tem
+  //                   responsável, o bloco `idv` nasce com o primeiro
+  //                   dele (o líder não vai indicar de novo); senão,
+  //                   nasce na indicação, como no cadastro normal.
+  //                   Tirar ID Visual continua no `idvRemover` (motivo
+  //                   obrigatório).
+  //   cs            → { de, para }: troca da CS responsável.
+  //
+  // Mesmo sem `dados`, o estágio é recalculado — é o que o admin usa
+  // depois de mexer na equipe pela aba Equipe. Tirar o último setor
+  // pendente fecha o quadro; incluir um setor sem responsável num
+  // quadro fechado devolve o cliente ao staffing. Tudo numa transação,
+  // lendo o documento atual.
+  const corrigirFluxo = async (clientId, dados = {}, byName) => {
+    try {
+      const ref = doc(db, 'clients', clientId);
+      const res = await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado');
+        const data = { id: clientId, ...snap.data() };
+        const estagio = stageOf(data);
+        if (!EM_FLUXO.includes(estagio)) {
+          throw new Error(`${data.name} já entrou na base — setores e equipe agora se ajustam pelo admin.`);
+        }
+        const agora = new Date().toISOString();
+        const upd = {};
+        const campos = [];
+        const resp = Object.fromEntries(Object.entries(data.responsibles || {}).map(([k, v]) => [k, asArray(v)]));
+        const antes = asArray(data.staffing?.sectors);
+        let setores = antes;
+
+        if (Array.isArray(dados.sectors)) {
+          setores = [...new Set(dados.sectors.filter(sid => sid && sid !== 'cs'))];
+          if (!setores.length) throw new Error('O cliente precisa de ao menos um setor envolvido.');
+          const saem = antes.filter(sid => !setores.includes(sid));
+          const removidos = [];
+          saem.forEach(sid => {
+            if (resp[sid]?.length) {
+              removidos.push({ sector: sid, responsaveis: resp[sid], by: byName || null, at: agora });
+              upd[`responsibles.${sid}`] = deleteField();
+              delete resp[sid];
+            }
+            // Vaga e cobrança de um setor que não existe mais no
+            // projeto não podem continuar acendendo alerta.
+            upd[`vagas.${sid}`] = deleteField();
+            upd[`staffing.nudges.${sid}`] = deleteField();
+          });
+          upd['staffing.sectors'] = setores;
+          if (removidos.length) upd['staffing.removidos'] = [...asArray(data.staffing?.removidos), ...removidos];
+          campos.push('sectors');
+        }
+
+        if ('wdService' in dados) {
+          const novoWd = dados.wdService || null;
+          const status = data.wd?.status || null;
+          if (status && status !== 'onboarding') {
+            throw new Error('O site já está em produção — ajuste o serviço pelo painel de Web.');
+          }
+          upd['wd.service'] = novoWd;
+          upd['wd.status'] = novoWd ? 'onboarding' : null;
+          upd['wd.onboardingStartedAt'] = novoWd ? (data.wd?.onboardingStartedAt || agora) : null;
+          upd['contrato.wdService'] = novoWd;
+          if (novoWd && !setores.includes('webdesign')) throw new Error('O site exige o setor WebDesign entre os envolvidos.');
+          campos.push('wdService');
+        }
+
+        if (dados.addIdVisual) {
+          const temIdv = !!(data.idv?.status || data.idv?.responsible) || data.contrato?.hasIdVisual === true;
+          if (!temIdv) {
+            if (!setores.includes('design')) throw new Error('O ID Visual exige o setor Design entre os envolvidos.');
+            upd['contrato.hasIdVisual'] = true;
+            const designer = asArray(resp.design)[0];
+            if (designer) {
+              upd.idv = {
+                responsible: designer,
+                status: 'onboarding',
+                onboardingStartedAt: agora,
+                productionStartedAt: null,
+                checklist: [],
+                notes: '',
+                addedBy: byName || null,
+                addedAt: agora,
+              };
+            }
+            campos.push('hasIdVisual');
+          }
+        }
+
+        // Site e ID Visual que continuam no cliente seguram o setor
+        // dono deles — tirar o setor deixaria o serviço sem ninguém.
+        const wdFinal = 'wdService' in dados ? (dados.wdService || null) : (data.wd?.service || null);
+        const idvFinal = !!(data.idv?.status || data.idv?.responsible) || data.contrato?.hasIdVisual === true || !!upd['contrato.hasIdVisual'];
+        if (Array.isArray(dados.sectors)) {
+          if (wdFinal && !setores.includes('webdesign')) throw new Error('O cliente tem site — o setor WebDesign não pode sair. Tire o site antes.');
+          if (idvFinal && !setores.includes('design')) throw new Error('O cliente tem ID Visual — o setor Design não pode sair. Remova o ID Visual antes.');
+        }
+
+        if (dados.cs?.para) {
+          const { de, para } = dados.cs;
+          const lista = asArray(resp.cs).filter(n => n !== de);
+          if (!lista.includes(para)) lista.push(para);
+          resp.cs = lista;
+          upd['responsibles.cs'] = lista;
+          upd.csLog = [...asArray(data.csLog), { de: de || null, para, by: byName || null, at: agora }];
+          campos.push('cs');
+        }
+
+        // Estágio com o quadro novo. No Kick Off ninguém foi indicado
+        // ainda, então não há o que recalcular.
+        const faltam = setores.filter(sid => !asArray(resp[sid]).length);
+        let fechou = false;
+        let reabriu = false;
+        if (estagio === 'staffing' && !faltam.length) {
+          Object.assign(upd, fechamentoDoQuadro(data, agora));
+          fechou = true;
+        } else if (estagio === 'onboarding' && faltam.length) {
+          upd.stage = 'staffing';
+          upd['staffing.completedAt'] = deleteField();
+          if (!data.staffing?.startedAt) upd['staffing.startedAt'] = agora;
+          reabriu = true;
+        }
+
+        if (!Object.keys(upd).length) return { fechou, reabriu, faltam };
+        if (campos.length) upd.cadastroLog = [...asArray(data.cadastroLog), { campos, by: byName || null, at: agora }];
+        tx.update(ref, upd);
+        return { fechou, reabriu, faltam };
+      });
+      return { success: true, ...res };
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
@@ -1384,6 +1541,6 @@ export function useClients() {
     renewContract, closeContract, reopenContract,
     inativarCliente, reativarCliente,
     saveCadastro, saveEscopo, ajustarMesEntregas, marcarEntrega, marcarMarcoSM, transferirCS,
-    removerResponsaveis, dispensarVaga,
+    corrigirFluxo, removerResponsaveis, dispensarVaga,
   };
 }

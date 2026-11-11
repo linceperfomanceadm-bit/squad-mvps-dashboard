@@ -2,15 +2,16 @@ import React, { useMemo, useState } from 'react';
 import { Paperclip, FileCheck2, X, FolderOpen, ExternalLink, Lock } from 'lucide-react';
 import {
   SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE_CONFIG, WD_WEB_SERVICES,
-  CADASTRO_PENDENCIAS, normalizaLink, linkValido,
+  CADASTRO_PENDENCIAS, normalizaLink, linkValido, stageOf,
 } from '../../lib/firebase';
 import {
   cadastroPendencias, inicioNovaVersao, mesChave, rotuloMes, versoesDoEscopo, aplicarCorrecoesNoMes,
 } from '../../lib/entregas';
 import {
   UFS, formVazio, formDoCliente, sensiveisDoCliente, contaFinanceiro, itensDoEscopo, errosPorEtapa,
-  montarClienteNovo, dadosAlterados, briefingExigido,
+  montarClienteNovo, dadosAlterados, fluxoAlterado, briefingExigido,
 } from '../../lib/cadastro';
+import { asArray } from '../../lib/wdJobs';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, money } from '../commercial/ui';
 import { Tag } from '../shared/ui';
 import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, ResponsaveisSetor, EscopoEditor, IdVisualCadastro } from './kit';
@@ -38,6 +39,13 @@ import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, Responsaveis
  *                              nome só aparecem para o admin. ID Visual
  *                              marcado por engano sai pela aba Serviços
  *                              (`onRemoverIdv`, grava na hora).
+ *   modo="editar" + cliente em fluxo (Kick Off, staffing, onboarding)
+ *                            → a aba Serviços também corrige setores
+ *                              envolvidos, site, ID Visual que faltou e
+ *                              a CS (`onSalvarFluxo` → `corrigirFluxo`).
+ *                              Antes isso só era possível com o cliente
+ *                              na base, e um setor marcado por engano
+ *                              travava o quadro pedindo responsável.
  *
  * No cadastro novo as abas funcionam como etapas (Continuar confere a
  * etapa); na edição dá para pular direto para a aba que interessa.
@@ -56,6 +64,9 @@ const ETAPAS = [
 ];
 
 const SETORES_ENVOLVIDOS = Object.values(SECTORS).filter(s => s.id !== 'cs');
+// Estágios antes da base, em que setores e site ainda se corrigem.
+const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
+const FASE_WD = { production: 'em produção', finished: 'finalizado' };
 const ORDEM_EQUIPE = ['cs', ...SETORES_ENVOLVIDOS.map(s => s.id)];
 
 export default function ClienteForm({
@@ -74,6 +85,7 @@ export default function ClienteForm({
   onRenomear,       // editar, admin: (nome) => { success }
   onSalvarEquipe,   // editar, admin: (responsibles) => { success }
   onRemoverIdv,     // editar, CS/líder/admin: (motivo) => { success }
+  onSalvarFluxo,    // editar, cliente em fluxo: (dados) => { success, fechou, reabriu }
 }) {
   const novo = modo === 'novo';
   // Na edição a aba Equipe depende de ter onde salvar (só o admin recebe).
@@ -96,12 +108,33 @@ export default function ClienteForm({
   const setEnd = (k, v) => setF(x => ({ ...x, endereco: { ...x.endereco, [k]: v } }));
   const setFin = (k, v) => setF(x => ({ ...x, financeiro: { ...x.financeiro, [k]: v } }));
 
-  const erros = errosPorEtapa(f, { novo, admin: comEquipe, financeiroAberto, briefingInicial: inicial.briefing });
   const idx = etapas.findIndex(e => e.id === etapa);
   const pendencias = novo ? [] : cadastroPendencias(client);
   const podeRenomear = novo || !!onRenomear;
   const pj = f.personType === 'pj';
   const csAtivas = collaborators.filter(c => c.active !== false && c.sector === 'cs');
+
+  // Cliente em fluxo: lê o estágio do documento vivo — o quadro pode
+  // fechar com o formulário aberto (um líder indicou alguém).
+  const emFluxo = !novo && !!onSalvarFluxo && EM_FLUXO.includes(stageOf(client));
+  const idvAgora = !novo && (!!(client?.idv?.status || client?.idv?.responsible) || client?.contrato?.hasIdVisual === true);
+  const wdStatus = client?.wd?.status || null;
+  const wdEditavel = emFluxo && (!wdStatus || wdStatus === 'onboarding');
+  // Setores que saem no salvar levam junto quem já foi indicado neles.
+  const saindo = emFluxo
+    ? inicial.sectors.filter(sid => !f.sectors.includes(sid) && asArray(client.responsibles?.[sid]).length)
+    : [];
+  const designerAtual = asArray(client?.responsibles?.design)[0] || '';
+  // CS que não está mais ativa continua aparecendo para não sumir do
+  // seletor sem ninguém ter trocado.
+  const opcoesCs = [
+    ...csAtivas.map(c => ({ value: c.name, label: c.name })),
+    ...(inicial.csResponsible && !csAtivas.some(c => c.name === inicial.csResponsible) ? [{ value: inicial.csResponsible, label: inicial.csResponsible }] : []),
+  ];
+  const erros = errosPorEtapa(f, {
+    novo, admin: comEquipe, financeiroAberto, briefingInicial: inicial.briefing,
+    fluxo: emFluxo ? { comEquipe, idvAgora } : null,
+  });
 
   // Marcar um serviço sugere o setor dele; desmarcar não tira, porque o
   // setor pode estar ali por outro serviço ou de propósito.
@@ -110,13 +143,14 @@ export default function ClienteForm({
     if (id in s) { delete s[id]; return { ...x, servicos: s }; }
     s[id] = '';
     const setor = SERVICE_SECTOR_MAP[id];
-    const sectors = novo && setor && !x.sectors.includes(setor) ? [...x.sectors, setor] : x.sectors;
+    const sectors = (novo || emFluxo) && setor && !x.sectors.includes(setor) ? [...x.sectors, setor] : x.sectors;
     return { ...x, servicos: s, sectors };
   });
   const toggleSetor = (id) => setF(x => ({ ...x, sectors: x.sectors.includes(id) ? x.sectors.filter(s => s !== id) : [...x.sectors, id] }));
   // Pipeline próprio puxa o setor dono dele.
   const setWd = (v) => setF(x => ({ ...x, wdService: v, sectors: v && !x.sectors.includes('webdesign') ? [...x.sectors, 'webdesign'] : x.sectors }));
   const toggleIdv = () => setF(x => ({ ...x, hasIdVisual: !x.hasIdVisual, sectors: !x.hasIdVisual && !x.sectors.includes('design') ? [...x.sectors, 'design'] : x.sectors }));
+  const toggleAddIdv = () => setF(x => ({ ...x, addIdv: !x.addIdv, sectors: !x.addIdv && !x.sectors.includes('design') ? [...x.sectors, 'design'] : x.sectors }));
 
   const enviarContrato = async (file) => {
     if (!file) return;
@@ -167,12 +201,27 @@ export default function ClienteForm({
     const corrigeMesAtual = versoesDoEscopo(client).length > 0 && desdeNovo > mesChave()
       && aplicarCorrecoesNoMes(versoesDoEscopo(client).filter(v => v.desde < desdeNovo), itens, mesChave()).corrigiu;
     const escopoMudou = f.semRecorrencia !== inicial.semRecorrencia || chave(itens) !== chave(itensDoEscopo(inicial.itens)) || corrigeMesAtual;
-    const equipeMudou = comEquipe && JSON.stringify(f.responsibles) !== JSON.stringify(inicial.responsibles);
+    // Em fluxo, setor que sai leva junto quem estava nele — a equipe
+    // salva pelo admin não pode trazer essa pessoa de volta.
+    const removidos = emFluxo ? inicial.sectors.filter(sid => !f.sectors.includes(sid)) : [];
+    const equipe = Object.fromEntries(Object.entries(f.responsibles).filter(([sid, v]) => !removidos.includes(sid) && asArray(v).length));
+    const equipeIni = Object.fromEntries(Object.entries(inicial.responsibles).filter(([, v]) => asArray(v).length));
+    const equipeMudou = comEquipe && JSON.stringify(equipe) !== JSON.stringify(equipeIni);
+    const fluxo = emFluxo ? fluxoAlterado(f, inicial, { comEquipe, idvAgora }) : {};
+    const fluxoMudou = Object.keys(fluxo).length > 0;
 
-    if (!mudouNome && !Object.keys(dados).length && !escopoMudou && !equipeMudou) { onClose(); return; }
+    if (!mudouNome && !Object.keys(dados).length && !escopoMudou && !equipeMudou && !fluxoMudou) { onClose(); return; }
 
     setSalvando(true);
     const falha = (msg) => { setSalvando(false); setErro(msg); };
+    // Setores, site e ID Visual primeiro: são os que podem ser recusados
+    // (ex.: site já em produção), e aí nada mais do formulário grava.
+    let quadro = null;
+    if (fluxoMudou) {
+      const r = await onSalvarFluxo(fluxo);
+      if (!r?.success) return falha(r?.error || 'Não foi possível corrigir setores e serviços.');
+      quadro = r;
+    }
     if (mudouNome) {
       const r = await onRenomear(nome);
       if (!r?.success) return falha(r?.error || 'Não foi possível renomear.');
@@ -190,16 +239,27 @@ export default function ClienteForm({
       corrigiuAtual = !!r.corrigiuAtual;
     }
     if (equipeMudou) {
-      const r = await onSalvarEquipe(f.responsibles);
+      const r = await onSalvarEquipe(equipe);
       if (!r?.success) return falha(r?.error || 'Não foi possível salvar a equipe.');
+      // Equipe mexida com o cliente em fluxo: recalcula o estágio (o
+      // admin pode ter preenchido o último setor ou esvaziado um).
+      if (emFluxo) {
+        const q = await onSalvarFluxo({});
+        if (!q?.success) return falha(q?.error || 'Equipe salva, mas não foi possível atualizar o estágio do cliente.');
+        quadro = { fechou: !!(quadro?.fechou || q.fechou), reabriu: !!q.reabriu && !q.fechou };
+      }
     }
     setSalvando(false);
     if (toast) {
       const futuro = desde && desde > mesChave();
       const mes = futuro ? rotuloMes(desde, true).toLowerCase() : '';
-      toast(futuro && corrigiuAtual
+      const base = futuro && corrigiuAtual
         ? `Cadastro salvo. Setor e nome já valem neste mês; o resto das entregas vale a partir de ${mes}.`
-        : futuro ? `Cadastro salvo. As novas entregas valem a partir de ${mes}.` : 'Cadastro salvo.');
+        : futuro ? `Cadastro salvo. As novas entregas valem a partir de ${mes}.` : 'Cadastro salvo.';
+      const extra = quadro?.fechou
+        ? ' Todos os setores têm responsável: o cliente seguiu para o onboarding.'
+        : quadro?.reabriu ? ' Agora falta responsável em algum setor: o cliente voltou a aguardar os líderes.' : '';
+      toast(base + extra);
     }
     onClose();
   };
@@ -370,8 +430,61 @@ export default function ClienteForm({
                   </div>
                 </Bloco>
               )}
+              {emFluxo && !comEquipe && (
+                <Bloco titulo="CS RESPONSÁVEL *" hint="Quem toca este cliente no dia a dia, da call de Kick Off em diante.">
+                  <Selecao value={f.csResponsible} onChange={v => set('csResponsible', v)} opcoes={opcoesCs} />
+                </Bloco>
+              )}
+
+              {emFluxo && (
+                <Bloco
+                  titulo="SETORES ENVOLVIDOS *"
+                  hint="O cliente ainda não entrou na base, então dá para corrigir. Cada setor marcado precisa de um responsável antes da call de onboarding ser dada como realizada — tire o que não faz parte do projeto."
+                >
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {SETORES_ENVOLVIDOS.map(s => (
+                      <Chip key={s.id} ativo={f.sectors.includes(s.id)} onClick={() => toggleSetor(s.id)}>{s.label}</Chip>
+                    ))}
+                  </div>
+                  {saindo.length > 0 && (
+                    <p style={{ ...S.hint, color: 'var(--amber)' }}>
+                      Ao salvar, sai do cliente: {saindo.map(sid => `${SECTORS[sid]?.label || sid} (${asArray(client.responsibles?.[sid]).join(', ')})`).join('; ')}.
+                    </p>
+                  )}
+                </Bloco>
+              )}
+
+              {emFluxo && (
+                <Bloco titulo="SITE E ID VISUAL" hint="Abrem acompanhamento próprio no painel do time e contam como entrega quando o serviço é finalizado.">
+                  {wdEditavel ? (
+                    <Selecao
+                      label="Serviço de WebDesign"
+                      value={f.wdService}
+                      onChange={setWd}
+                      vazio="Nenhum"
+                      opcoes={[...new Set([...WD_WEB_SERVICES, ...(inicial.wdService ? [inicial.wdService] : [])])].map(k => ({ value: k, label: WD_SERVICE_CONFIG[k]?.label || k }))}
+                    />
+                  ) : (
+                    <p style={{ fontSize: 13, color: 'var(--text)' }}>
+                      {WD_SERVICE_CONFIG[client.wd?.service]?.label || client.wd?.service || 'Site'} · {FASE_WD[wdStatus] || wdStatus}
+                      <span style={{ ...S.hint, display: 'block', marginTop: 4 }}>Site que já saiu do onboarding se ajusta pelo painel de Web.</span>
+                    </p>
+                  )}
+                  {!idvAgora && (
+                    <div>
+                      <Chip ativo={f.addIdv} onClick={toggleAddIdv}>ID Visual — criação de marca completa</Chip>
+                      <p style={{ ...S.hint, marginTop: 6 }}>
+                        {designerAtual
+                          ? `Faltou marcar no cadastro? Ao salvar, o ID Visual abre com ${designerAtual}, já indicado no Design.`
+                          : 'Faltou marcar no cadastro? O designer da marca é definido pelo líder de Design, na indicação de responsáveis.'}
+                      </p>
+                    </div>
+                  )}
+                </Bloco>
+              )}
+
               {!novo && <IdVisualCadastro client={client} onRemover={onRemoverIdv} />}
-              {!novo && (
+              {!novo && !emFluxo && (
                 <p style={S.hint}>Site de cliente que já está na casa é adicionado no painel de Web; ID Visual, pelo admin.</p>
               )}
             </>
@@ -451,6 +564,8 @@ export default function ClienteForm({
                 <p style={S.hint}>
                   {novo || !versoesDoEscopo(client).length
                     ? 'O que o contrato prevê. Vale já para este mês.'
+                    : emFluxo
+                    ? 'O cliente ainda não entrou na base, então a correção vale já, a partir deste mês, no lugar do que foi cadastrado.'
                     : `Quantidades e entregas novas ou removidas valem a partir de ${rotuloMes(inicioNovaVersao(client), true).toLowerCase()}. Correção de setor ou de nome vale já, inclusive neste mês. O histórico não muda.`}
                 </p>
                 <p style={{ ...S.hint, marginTop: 6 }}>

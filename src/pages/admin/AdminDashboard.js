@@ -83,7 +83,7 @@ export default function AdminDashboard() {
     updateBrandbook,
     addBrandMaterial,
     removeBrandMaterial,
-    idvAddService, idvRemover,
+    idvAddService, idvRemover, corrigirFluxo,
     saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas,
     inativarCliente, reativarCliente, removerResponsaveis,
   } = useClients();
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
   // Admin completa cadastro, define escopo, ajusta mês e corrige
   // marcação. Só ele recebe renomear e equipe no formulário único.
   const acoesEntregas = acoesDeEntregas(
-    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, renameClient, updateClient, idvRemover },
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, renameClient, updateClient, idvRemover, corrigirFluxo },
     user?.name, toast
   );
 

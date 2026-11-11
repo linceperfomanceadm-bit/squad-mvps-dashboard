@@ -12,7 +12,10 @@ import ClienteForm from '../cadastro/ClienteForm';
  * `acoes` sai de `acoesDeEntregas` — ação ausente esconde o botão.
  * A aba Equipe e a troca de nome aparecem só quando `acoes` traz
  * `salvarEquipe`/`renomear` (admin) e a tela passa `collaborators`.
- * `editar` abre direto no formulário (botão "Editar" da lista do admin).
+ * `editar` abre direto no formulário (botão "Editar" da lista do admin
+ * e "Editar cadastro" do cliente em Kick Off/Onboarding, na CS).
+ * `acoes.salvarFluxo` libera, para cliente que ainda não entrou na
+ * base, a correção de setores, site, ID Visual e CS.
  */
 export default function ClienteFicha({ client, acoes = {}, collaborators = [], onClose, toast, editar = false, etapaInicial }) {
   const [editando, setEditando] = useState(editar);
@@ -34,6 +37,7 @@ export default function ClienteFicha({ client, acoes = {}, collaborators = [], o
         onRenomear={acoes.renomear ? (nome) => acoes.renomear(client.id, nome) : undefined}
         onSalvarEquipe={comEquipe ? (responsibles) => acoes.salvarEquipe(client.id, responsibles) : undefined}
         onRemoverIdv={acoes.removerIdv ? (motivo) => acoes.removerIdv(client.id, motivo) : undefined}
+        onSalvarFluxo={acoes.salvarFluxo ? (dados) => acoes.salvarFluxo(client.id, dados) : undefined}
       />
     );
   }

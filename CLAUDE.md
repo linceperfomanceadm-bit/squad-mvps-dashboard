@@ -244,6 +244,13 @@ Social Media monta o mês de cada cliente, manda um link sem login e o cliente a
 - `modo="novo"` + `admin` → mesmos dados obrigatórios, mas nasce `live` com a equipe definida (pula só Kick Off e onboarding).
 - `modo="editar"` (via `ClienteFicha`) → CS, líder e admin completam ou corrigem; só formato é validado. Aba Equipe e troca de nome só para o admin (`acoes.salvarEquipe` / `acoes.renomear`, que só o `AdminDashboard` passa para `acoesDeEntregas`). Remover ID Visual por engano fica na aba Serviços e grava na hora, sem esperar o Salvar (`onRemoverIdv`, que CS e admin passam via `idvRemover`).
 
+- `modo="editar"` com o cliente **em fluxo** (Kick Off, staffing, onboarding) e `acoes.salvarFluxo` → a aba Serviços também corrige setores envolvidos, site, ID Visual que faltou marcar e a CS (`corrigirFluxo` no `useClients`). A CS abre pelo botão "Editar cadastro" do detalhe do cliente (`ClientOnboardingModal`); o admin, pelo Editar da lista. Regras do `corrigirFluxo` (transação):
+  - setor que sai leva junto quem já foi indicado nele (registrado em `staffing.removidos[]`) e apaga vaga e cobrança do setor;
+  - site só troca enquanto está em onboarding; site e ID Visual seguram o setor dono deles;
+  - ID Visual que faltou: `contrato.hasIdVisual = true` e, se o Design já tem responsável, o bloco `idv` nasce com o primeiro dele;
+  - o estágio é recalculado sempre — tirar o último setor pendente fecha o quadro (`fechamentoDoQuadro`, o mesmo da indicação do líder), incluir setor sem responsável num quadro fechado devolve o cliente ao staffing. O admin chama com `{}` depois de mexer na aba Equipe só para recalcular.
+  - com o cliente em fluxo, o escopo de entregas corrigido vale já (`inicioNovaVersao`), não no próximo dia 1: ele ainda não começou a receber nada.
+
 CPF, CNPJ, valor e pagamento são só escrita na edição: a tela diz "já cadastrado" e aceita valor novo, nunca mostra o gravado. A gravação da edição é o `saveCadastro` (bloco `contrato` + espelhos do topo do doc).
 
 ### Comercial (Hunters)

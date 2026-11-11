@@ -79,7 +79,7 @@ export default function CSOperacionalDashboard() {
     setSectorResponsibles, nudgeSectorLeader,
     renameClient, addClientAttachment, removeClientAttachment,
     renewContract, closeContract, reopenContract,
-    saveCadastro, saveEscopo, marcarEntrega, ajustarMesEntregas, transferirCS, idvRemover,
+    saveCadastro, saveEscopo, marcarEntrega, ajustarMesEntregas, transferirCS, idvRemover, corrigirFluxo,
   } = useClients();
   const { collaborators } = useCollaborators();
   const {
@@ -108,6 +108,9 @@ export default function CSOperacionalDashboard() {
   const [staffingTarget, setStaffingTarget] = useState(null);
   const [taskId, setTaskId] = useState(null);
   const [fichaId, setFichaId] = useState(null);
+  // Cadastro aberto para correção a partir do cliente em Kick Off ou
+  // Onboarding (botão "Editar cadastro" do detalhe).
+  const [editarFluxoId, setEditarFluxoId] = useState(null);
 
   const me = user?.name;
   // Gestão do time e comercial: líder da CS (e o admin, se um dia abrir
@@ -115,8 +118,10 @@ export default function CSOperacionalDashboard() {
   const isLider = modoGestao || !!user?.isAdmin;
 
   // CS completa cadastro, define escopo, ajusta o mês e corrige marcação.
+  // `corrigirFluxo`: com o cliente ainda fora da base, corrige também
+  // setores envolvidos, site, ID Visual e CS.
   const acoesEntregas = acoesDeEntregas(
-    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, idvRemover },
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, idvRemover, corrigirFluxo },
     me, toast
   );
   // Setores que esta pessoa pode preencher: os que ela lidera (e todos,
@@ -232,6 +237,7 @@ export default function CSOperacionalDashboard() {
   // Clientes na base com cadastro incompleto (antigos, em geral).
   const cadastrosIncompletos = activeClients.filter(c => stageOf(c) === 'live' && cadastroPendencias(c).length > 0).length;
   const fichaClient = fichaId ? clients.find(c => c.id === fichaId) || null : null;
+  const editarFluxoClient = editarFluxoId ? clients.find(c => c.id === editarFluxoId) || null : null;
 
   const NAV = modoGestao ? [
     { key: 'time',      label: 'Gestão do Time',       icon: UsersRound },
@@ -578,6 +584,7 @@ export default function CSOperacionalDashboard() {
         <ClientOnboardingModal
           client={flowClient}
           onClose={() => setFlowId(null)}
+          onEditar={() => { setEditarFluxoId(flowClient.id); setFlowId(null); }}
           onScheduleKickoff={flowStage === 'kickoff'
             ? () => { setKickoffSchedule(flowClient); setFlowId(null); }
             : undefined}
@@ -731,6 +738,21 @@ export default function CSOperacionalDashboard() {
           onUpdateLinks={updateLinks}
           onChangeDeadline={changeDeadline}
           onDelete={async (...args) => { await deleteTask(...args); setTaskId(null); }}
+        />
+      )}
+
+      {/* Correção do cadastro de cliente em Kick Off ou Onboarding —
+          o mesmo formulário da Carteira, com setores, site, ID Visual e
+          CS liberados enquanto ele não entra na base. Ao fechar, volta
+          para o detalhe do cliente. */}
+      {editarFluxoClient && (
+        <ClienteFicha
+          client={editarFluxoClient}
+          acoes={acoesEntregas}
+          toast={toast}
+          editar
+          etapaInicial="servicos"
+          onClose={() => { setFlowId(editarFluxoClient.id); setEditarFluxoId(null); }}
         />
       )}
 

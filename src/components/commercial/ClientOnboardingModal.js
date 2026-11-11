@@ -26,6 +26,12 @@ const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
  *     → CS e admin, depois do Kick Off realizado. Agendar não depende
  *       do quadro; marcar como realizada, sim.
  *
+ *   onEditar
+ *     → abre o formulário de cadastro para corrigir o que entrou errado
+ *       ou faltou (setores, site, ID Visual, CS, contrato, entregas).
+ *       É da CS: antes da base, um setor marcado por engano travava o
+ *       quadro pedindo responsável.
+ *
  *   onRename
  *     → libera a edição do nome do cliente. Quem renomeia mexe em
  *       card, solicitação e documento já criados (o nome está
@@ -48,7 +54,7 @@ export default function ClientOnboardingModal({
   client, onClose,
   onScheduleKickoff, onCancelKickoff, onConfirmKickoffCall,
   onSchedule, onReschedule, onConfirm,
-  onRename, onAddAttachment, onRemoveAttachment,
+  onEditar, onRename, onAddAttachment, onRemoveAttachment,
   onRenewContract, onCloseContract, onReopenContract,
 }) {
   const [editandoNome, setEditandoNome] = useState(false);
@@ -146,8 +152,13 @@ export default function ClientOnboardingModal({
           </button>
         ))}
 
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
           <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
+          {onEditar && (
+            <button type="button" className="ui-btn small" onClick={onEditar} title="Corrigir setores, serviços, contrato e entregas">
+              <Pencil size={13} /> Editar cadastro
+            </button>
+          )}
         </div>
 
         {/* ── Call 1: Kick Off ── */}

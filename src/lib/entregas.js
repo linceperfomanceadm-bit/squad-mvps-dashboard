@@ -101,8 +101,12 @@ export const temEscopoDefinido = (c) => versoesDoEscopo(c).length > 0 || c?.esco
 // Mês a partir do qual um escopo salvo agora passa a valer. Primeiro
 // escopo do cliente vale já (é o caso do cliente antigo sendo
 // completado); mudança de escopo existente vale no próximo dia 1.
+// Cliente que ainda não entrou na base (Kick Off, staffing,
+// onboarding) também corrige já: a regra do dia 1 protege o combinado
+// de um mês em andamento, e ele ainda não começou a receber nada —
+// esperar só deixaria o escopo errado do cadastro valendo no 1º mês.
 export const inicioNovaVersao = (c, agora = new Date()) => (
-  versoesDoEscopo(c).length ? somaMeses(mesChave(agora), 1) : mesChave(agora)
+  versoesDoEscopo(c).length && stageOf(c) === 'live' ? somaMeses(mesChave(agora), 1) : mesChave(agora)
 );
 
 // Correções que valem JÁ, mesmo com o escopo esperando o próximo dia 1.

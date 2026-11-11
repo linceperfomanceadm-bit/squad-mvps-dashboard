@@ -78,10 +78,11 @@ export function formVazio() {
     contactEmail: '',
     endereco: { ...ENDERECO_VAZIO },
     servicos: {},          // { [serviceId]: 'o que foi vendido' }
-    sectors: [],           // setores envolvidos (só no cadastro novo)
-    csResponsible: '',     // CS do cliente (cadastro novo da CS)
+    sectors: [],           // setores envolvidos (cadastro novo e cliente em fluxo)
+    csResponsible: '',     // CS do cliente (cadastro novo da CS e cliente em fluxo)
     wdService: '',
     hasIdVisual: false,
+    addIdv: false,         // ID Visual que faltou marcar (cliente em fluxo)
     contractMonths: '',
     contractStart: '',
     financeiro: { ...FINANCEIRO_VAZIO },
@@ -124,7 +125,29 @@ export function formDoCliente(c) {
       .map(it => ({ ...it, qtd: String(it.qtd), unica: it.unica === true })),
     semRecorrencia: c.escopo?.semRecorrencia === true,
     responsibles: Object.fromEntries(Object.entries(c.responsibles || {}).map(([k, v]) => [k, asArray(v)])),
+    // Só são editáveis com o cliente em fluxo (antes da base); fora
+    // disso o formulário nem mostra e o salvar não envia.
+    sectors: asArray(c.staffing?.sectors),
+    wdService: c.wd?.service || '',
+    csResponsible: asArray(c.responsibles?.cs)[0] || '',
   };
+}
+
+// Cliente em fluxo: o que mudou nos campos que só o `corrigirFluxo`
+// grava (setores, site, ID Visual que faltou, CS). `idvAgora` diz se o
+// cliente tem ID Visual neste momento — ele pode ter sido removido com
+// o formulário aberto, e aí a marca do formulário não vale mais.
+export function fluxoAlterado(f, ini, { comEquipe, idvAgora }) {
+  const d = {};
+  const ordena = (l) => [...(l || [])].sort().join('|');
+  if (ordena(f.sectors) !== ordena(ini.sectors)) d.sectors = f.sectors;
+  if ((f.wdService || '') !== (ini.wdService || '')) d.wdService = f.wdService || null;
+  if (f.addIdv && !idvAgora) d.addIdVisual = true;
+  // Com a aba Equipe (admin), a CS se troca por lá.
+  if (!comEquipe && f.csResponsible && f.csResponsible !== ini.csResponsible) {
+    d.cs = { de: ini.csResponsible || null, para: f.csResponsible };
+  }
+  return d;
 }
 
 // O que de sensível o cliente já tem gravado (sem expor o valor).
@@ -219,7 +242,7 @@ export const briefingExigido = (f, { novo, briefingInicial }) =>
 // Na edição só valem as regras de formato, para não travar o
 // cliente antigo que ainda está incompleto — exceto o briefing, que
 // trava sempre que é alterado (`briefingExigido`).
-export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicial = '' }) {
+export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicial = '', fluxo = null }) {
   const e = { cliente: '', servicos: '', contrato: '', entregas: '', equipe: '' };
   const pj = f.personType === 'pj';
   const end = f.endereco;
@@ -243,6 +266,13 @@ export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicia
     else if (!admin && !f.csResponsible) e.servicos = 'Escolha a CS responsável pelo cliente.';
     else if (f.wdService && !f.sectors.includes('webdesign')) e.servicos = 'O serviço de WebDesign exige o setor WebDesign marcado.';
     else if (f.hasIdVisual && !f.sectors.includes('design')) e.servicos = 'O ID Visual exige o setor Design marcado.';
+  } else if (fluxo) {
+    // Cliente em fluxo: mesmas amarras do cadastro novo para setores,
+    // site e ID Visual. `fluxo.idvAgora`: o cliente tem ID Visual.
+    if (!f.sectors.length) e.servicos = 'Escolha ao menos um setor envolvido.';
+    else if (!fluxo.comEquipe && !f.csResponsible) e.servicos = 'Escolha a CS responsável pelo cliente.';
+    else if (f.wdService && !f.sectors.includes('webdesign')) e.servicos = 'O serviço de WebDesign exige o setor WebDesign marcado.';
+    else if ((fluxo.idvAgora || f.addIdv) && !f.sectors.includes('design')) e.servicos = 'O ID Visual exige o setor Design marcado.';
   }
 
   const briefing = briefingExigido(f, { novo, briefingInicial }) ? avaliarBriefing(f.briefing) : null;

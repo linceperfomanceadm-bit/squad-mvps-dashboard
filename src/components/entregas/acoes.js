@@ -47,6 +47,12 @@ export function acoesDeEntregas(fns, me, toast, { soMarcar = false } = {}) {
         return r;
       }
       : undefined,
+    // Correção de cadastro de cliente que ainda não entrou na base:
+    // setores envolvidos, site, ID Visual que faltou e CS. O formulário
+    // só mostra esses campos com o cliente em fluxo.
+    salvarFluxo: fns.corrigirFluxo
+      ? async (clientId, dados) => fns.corrigirFluxo(clientId, dados, me)
+      : undefined,
     // Só o admin recebe estas duas (formulário único: nome e equipe).
     // O nome vai pelo renameClient porque está copiado em tasks,
     // requests e documents, e só ele propaga.
