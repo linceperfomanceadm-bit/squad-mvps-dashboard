@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronRight, CalendarClock, SlidersHorizontal, CheckCircle2, Circle } from 'lucide-react';
-import { SECTORS } from '../../lib/firebase';
+import { ChevronDown, ChevronRight, CalendarClock, SlidersHorizontal, CheckCircle2, Circle, CircleSlash } from 'lucide-react';
+import { SECTORS, ID_VISUAL_CONFIG } from '../../lib/firebase';
 import {
   rotuloMes, entregasDoMes, resumoMes, historicoMeses, entregasUnicas,
   escopoAgendado, mesesEditaveis, itemConcluido, temEscopoDefinido,
@@ -16,6 +16,10 @@ import { Tag, Empty } from '../shared/ui';
  *   1. Recorrentes do mês — o checklist que cada setor vai marcando.
  *   2. Entregas únicas   — site e ID Visual, lidos dos painéis de Web
  *                          e Design (ninguém marca nada novo aqui).
+ *                          ID Visual removido por engano aparece aqui
+ *                          também, com quem removeu, quando e o motivo
+ *                          (`idvRemovidos[]`) — é o registro que a CS
+ *                          consulta se o cliente ou o designer perguntar.
  *   3. Histórico         — cada mês fechado com o resultado final.
  *
  * Handlers opcionais:
@@ -32,6 +36,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
   const resumo = resumoMes(itens);
   const agendado = escopoAgendado(client);
   const unicas = entregasUnicas(client);
+  const removidos = Array.isArray(client?.idvRemovidos) ? client.idvRemovidos : [];
   const historico = historicoMeses(client).filter(h => h.mes !== mes);
   const semRecorrencia = client?.escopo?.semRecorrencia === true;
 
@@ -105,7 +110,7 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
       )}
 
       {/* ── Entregas únicas ─────────────────────────── */}
-      {unicas.length > 0 && (
+      {(unicas.length > 0 || removidos.length > 0) && (
         <>
           <div style={{ ...S.cab, marginTop: 22 }}>
             <h4 style={S.tit}>Entregas únicas</h4>
@@ -131,6 +136,21 @@ export default function EntregasCliente({ client, onMarcar, onAjustar }) {
                   </p>
                 )}
               </div>
+            </div>
+          ))}
+          {removidos.map((r, i) => (
+            <div key={`idv-removido-${r.removedAt || i}`} style={S.unica}>
+              <CircleSlash size={16} color="var(--dim)" style={{ flexShrink: 0 }} />
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <p style={{ ...S.unicaNome, color: 'var(--muted)' }}>{ID_VISUAL_CONFIG.label}</p>
+                <p style={S.nota}>
+                  {r.removedAt ? `Removido em ${new Date(r.removedAt).toLocaleDateString('pt-BR')}` : 'Removido'}
+                  {r.removedBy ? ` por ${r.removedBy}` : ''}
+                  {r.responsible ? ` · estava com ${r.responsible}` : ''}
+                </p>
+                {r.motivo && <p style={{ ...S.nota, color: 'var(--text)', marginTop: 3 }}>{r.motivo}</p>}
+              </div>
+              <Tag>Removido</Tag>
             </div>
           ))}
         </>

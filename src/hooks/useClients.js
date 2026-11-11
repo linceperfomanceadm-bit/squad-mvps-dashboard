@@ -449,11 +449,13 @@ export function useClients() {
   //     um novo sobre um já entregue), o anterior volta para `idv` — a
   //     entrega passada não some junto com o engano.
   // Nada é apagado de vez: o bloco removido vai para `idvRemovidos[]`
-  // com quem removeu, quando e por quê. `responsibles.design` fica como
+  // com quem removeu, quando e por quê (motivo obrigatório), e aparece
+  // na ficha do cliente, em Entregas únicas. `responsibles.design` fica como
   // está — o designer pode estar no cliente por outros serviços; se
   // não estiver, o admin tira pela aba Equipe.
   const idvRemover = async (clientId, { motivo = '' } = {}, byName = null) => {
     try {
+      if (!String(motivo || '').trim()) throw new Error('Informe o motivo da remoção.');
       const ref = doc(db, 'clients', clientId);
       await runTransaction(db, async (tx) => {
         const snap = await tx.get(ref);

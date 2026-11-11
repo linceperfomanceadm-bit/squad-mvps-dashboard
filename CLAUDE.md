@@ -60,7 +60,7 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 - zera `contrato.hasIdVisual` junto com o bloco `idv` — sem isso, a próxima indicação de responsável do Design recria o bloco (`setSectorResponsibles`);
 - ID Visual `finished` não sai (entrega feita);
 - havendo um anterior em `idvHistory[]`, ele volta a ser o `idv` (e `hasIdVisual` continua `true`);
-- nada é apagado de vez: o bloco removido vai para `idvRemovidos[]` com `removedAt`, `removedBy` e `motivo`;
+- nada é apagado de vez: o bloco removido vai para `idvRemovidos[]` com `removedAt`, `removedBy` e `motivo` (obrigatório), e aparece na ficha do cliente, em Entregas únicas (`EntregasCliente`);
 - `responsibles.design` não é mexido — se o designer estava no cliente só pelo ID Visual, o admin tira pela aba Equipe.
 
 ### Serviços de WebDesign por cliente

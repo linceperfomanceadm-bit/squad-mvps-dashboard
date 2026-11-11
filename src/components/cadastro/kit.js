@@ -158,6 +158,9 @@ export function IdVisualCadastro({ client, onRemover }) {
   const historico = Array.isArray(client?.idvHistory) ? client.idvHistory.length : 0;
 
   const remover = async () => {
+    // O motivo é o que fica no registro da ficha do cliente — sem ele,
+    // a CS não sabe depois por que o ID Visual saiu.
+    if (!motivo.trim()) { setErro('Escreva o motivo da remoção. Ele fica registrado na ficha do cliente.'); return; }
     setErro('');
     setRemovendo(true);
     const r = await onRemover(motivo.trim());
@@ -189,18 +192,19 @@ export function IdVisualCadastro({ client, onRemover }) {
             {historico > 0
               ? `O ${ID_VISUAL_CONFIG.label} em aberto sai do painel ${idv.responsible ? `de ${idv.responsible}` : 'do designer'} e o anterior, já entregue, volta a ser o ID Visual do cliente.`
               : `O ${ID_VISUAL_CONFIG.label} sai do cadastro e do painel ${idv.responsible ? `de ${idv.responsible}` : 'do designer'}. O cliente e os demais serviços continuam como estão.`}
+            {' '}A remoção fica registrada na ficha do cliente, em Entregas únicas.
           </p>
           <textarea
             rows={2}
             value={motivo}
             onChange={e => setMotivo(e.target.value)}
-            placeholder="Motivo (opcional) — ex.: marcado por engano, não foi vendido"
+            placeholder="Motivo * — ex.: marcado por engano, não foi vendido"
             style={{ ...INP, resize: 'vertical' }}
           />
           {erro && <p style={{ fontSize: 12, color: 'var(--red)' }}>{erro}</p>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" className="ui-btn small" onClick={() => { setConfirmando(false); setErro(''); }} disabled={removendo}>Voltar</button>
-            <button type="button" className="ui-btn small" style={S.removerBtn} onClick={remover} disabled={removendo}>
+            <button type="button" className="ui-btn small" style={S.removerBtn} onClick={remover} disabled={removendo || !motivo.trim()}>
               <Trash2 size={13} /> {removendo ? 'Removendo...' : 'Confirmar remoção'}
             </button>
           </div>
