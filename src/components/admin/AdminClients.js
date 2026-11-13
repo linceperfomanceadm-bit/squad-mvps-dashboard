@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState } from '../../lib/firebase';
+import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX, ShoppingBag } from 'lucide-react';
+import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState, temTiktokShop } from '../../lib/firebase';
+import { SeloTiktokShop } from '../shared/ui';
 import { cadastroPendencias } from '../../lib/entregas';
 import { exColaboradores } from '../../lib/responsaveis';
 import ClienteFicha from '../entregas/ClienteFicha';
@@ -141,6 +142,8 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
   const [inativarId, setInativarId] = useState(null);
   const [reativarId, setReativarId] = useState(null);
   const [showLimpeza, setShowLimpeza] = useState(false);
+  // Soma aos outros filtros (aba e busca): mostra só quem tem TikTok Shop.
+  const [soTiktok, setSoTiktok] = useState(false);
 
   // Nomes presos em clientes que não existem mais como colaborador.
   const orfaos = exColaboradores(clients, collaborators);
@@ -150,8 +153,10 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
   const clientesComOrfao = new Set(orfaos.flatMap(o => o.clientes.map(c => c.id))).size;
 
   const inativos = clients.filter(isInativo);
-  const filtered = clients
-    .filter(c => (aba === 'inativos' ? isInativo(c) : !isInativo(c)))
+  const daAba = clients.filter(c => (aba === 'inativos' ? isInativo(c) : !isInativo(c)));
+  const tiktokNaAba = daAba.filter(temTiktokShop).length;
+  const filtered = daAba
+    .filter(c => !soTiktok || temTiktokShop(c))
     .filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
   const clienteInativar = inativarId ? clients.find(c => c.id === inativarId) : null;
   const clienteReativar = reativarId ? clients.find(c => c.id === reativarId) : null;
@@ -182,6 +187,10 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
         <button type="button" className={`ui-btn small ${aba === 'inativos' ? 'on' : ''}`} onClick={() => setAba('inativos')}>
           Inativos <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: inativos.length ? 'var(--text)' : 'var(--dim)' }}>{inativos.length}</span>
         </button>
+        <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
+        <button type="button" className={`ui-btn small ${soTiktok ? 'on' : ''}`} onClick={() => setSoTiktok(v => !v)} title="Mostrar só os clientes com TikTok Shop contratado">
+          <ShoppingBag size={13} /> TikTok Shop <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: tiktokNaAba ? 'var(--text)' : 'var(--dim)' }}>{tiktokNaAba}</span>
+        </button>
       </div>
 
       {onLimparExColaboradores && orfaos.length > 0 && (
@@ -209,6 +218,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                 <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
                     {c.name}
+                    {temTiktokShop(c) && <SeloTiktokShop altura={14} style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
                     {isStaffing(c) && (
                       <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)', verticalAlign: 'middle' }}>
                         AGUARDANDO RESPONSÁVEIS
@@ -294,7 +304,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={Object.keys(SECTORS).length + 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{aba === 'inativos' && !search ? 'Nenhum cliente inativo.' : 'Nenhum cliente encontrado.'}</td></tr>
+                <tr><td colSpan={Object.keys(SECTORS).length + 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{soTiktok && !search ? 'Nenhum cliente com TikTok Shop aqui.' : aba === 'inativos' && !search ? 'Nenhum cliente inativo.' : 'Nenhum cliente encontrado.'}</td></tr>
               )}
             </tbody>
           </table>

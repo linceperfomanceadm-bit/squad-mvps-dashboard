@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LayoutGrid, AlertTriangle, Award, HeartPulse, Volume2, Check, ChevronDown,
   Flame, Eye, RotateCw, Target, BadgeCheck, Zap, Users, Calendar, Layers,
-  Trophy, Gem, PauseCircle,
+  Trophy, Gem, PauseCircle, VolumeX,
 } from 'lucide-react';
 import { useTVData } from '../hooks/useTVData';
+import { useTVRadio } from '../hooks/useTVRadio';
 
 /*
  * TVPanel — painel de parede da agência (rota pública /tv).
@@ -205,6 +206,7 @@ const CSS = `
 .tv-cf{position:absolute;top:0;border-radius:2px;display:block}
 .tv-standby{position:absolute;inset:0;z-index:60;background:#0a0709;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqh}
 .tv-sound{position:absolute;right:2cqw;bottom:2cqw;z-index:40;display:flex;align-items:center;gap:.6cqw;background:#fff;color:#1a1216;border:none;border-radius:.8cqw;padding:.9cqw 1.4cqw;font-family:'Lexend',sans-serif;font-size:1cqw;font-weight:500;cursor:pointer;box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.tv-sound.off{background:rgba(255,255,255,.08);color:#8a7b83;border:1px solid rgba(255,255,255,.12);box-shadow:none;font-size:.85cqw;cursor:default}
 `;
 
 // ─── Blocos ────────────────────────────────────────────────────
@@ -706,8 +708,6 @@ export default function TVPanel() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [scale, setScale] = useState(1);
-  const [audioBlocked, setAudioBlocked] = useState(false);
-  const audioRef = useRef(null);
 
   // Prioridade: pausa > modo visita > cena travada > rotação.
   const visita = d.tvVisitMode === true;
@@ -749,22 +749,8 @@ export default function TVPanel() {
   }, []);
 
   // ── Rádio (URL, play/pause e volume vêm do admin) ────────────
-  useEffect(() => {
-    const el = audioRef.current; if (!el) return;
-    const v = Number(d.tvRadioVolume);
-    el.volume = Math.min(1, Math.max(0, (Number.isFinite(v) ? v : 50) / 100));
-  }, [d.tvRadioVolume, d.tvRadioUrl]);
-
-  useEffect(() => {
-    const el = audioRef.current; if (!el) return;
-    if (!d.tvRadioUrl || !d.tvRadioPlaying) { el.pause(); setAudioBlocked(false); return; }
-    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
-  }, [d.tvRadioUrl, d.tvRadioPlaying]);
-
-  const liberarSom = () => {
-    const el = audioRef.current; if (!el) return;
-    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
-  };
+  // Qualquer botão do controle libera o som — ver useTVRadio.
+  const radio = useTVRadio({ url: d.tvRadioUrl, playing: d.tvRadioPlaying, volume: d.tvRadioVolume });
 
   const shift = (activeIndex % 4) * 3; // anti burn-in
   const dateLabel = cap(now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }));
@@ -773,7 +759,7 @@ export default function TVPanel() {
   return (
     <div className="tv-root">
       <style>{CSS}</style>
-      {d.tvRadioUrl && <audio key={d.tvRadioUrl} ref={audioRef} src={d.tvRadioUrl} preload="none" />}
+      {d.tvRadioUrl && <audio key={d.tvRadioUrl} ref={radio.audioRef} src={d.tvRadioUrl} preload="none" />}
 
       <div className="tv-stage" style={{ transform: `translate(-50%,-50%) scale(${scale})` }}>
         <div className="tv-prog">
@@ -795,7 +781,7 @@ export default function TVPanel() {
                 <div key={ROTATION[i].id} className={`tv-ic ${!visita && i === activeIndex ? 'on' : ''}`}><Icon size={19} strokeWidth={1.8} /></div>
               ))}
               <div style={{ flex: 1 }} />
-              <div className="tv-ic" style={{ color: d.tvRadioPlaying && !audioBlocked ? '#f5eff2' : '#8a7b83' }}><Volume2 size={19} strokeWidth={1.8} /></div>
+              <div className="tv-ic" style={{ color: radio.status === 'tocando' ? '#f5eff2' : '#8a7b83' }}><Volume2 size={19} strokeWidth={1.8} /></div>
               <div className={`tv-live ${d.online ? '' : 'off'}`} />
             </aside>
 
@@ -821,8 +807,12 @@ export default function TVPanel() {
 
         {d.celebration && <Celebration data={d.celebration} hideClient={visita} key={d.celebration.key} />}
 
-        {audioBlocked && (
-          <button className="tv-sound" onClick={liberarSom}><Volume2 size={22} strokeWidth={2.2} /> Ligar som</button>
+        {radio.status === 'bloqueado' && (
+          // autoFocus: o OK do controle remoto aperta o botão focado.
+          <button className="tv-sound" autoFocus onClick={radio.liberarSom}><Volume2 size={22} strokeWidth={2.2} /> Aperte qualquer botão do controle para ligar o som</button>
+        )}
+        {radio.status === 'sem-sinal' && (
+          <div className="tv-sound off"><VolumeX size={18} strokeWidth={2} /> Rádio sem sinal · tentando reconectar</div>
         )}
 
         {d.tvPaused && (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Video, CalendarPlus, Pencil, Paperclip, Trash2, Check, X } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES, driveDoCliente } from '../../lib/firebase';
+import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES, driveDoCliente, temTiktokShop } from '../../lib/firebase';
+import { SeloTiktokShop, bordaTiktok } from '../shared/ui';
 import { clientCallCalendarUrl } from '../../lib/calendarLink';
 import ContractBlock from './ContractBlock';
 import {
@@ -72,6 +73,7 @@ export default function ClientOnboardingModal({
   const drive = driveDoCliente(client);
 
   const stage = stageOf(client);
+  const tiktok = temTiktokShop(client);
   const kickoffCall = client.kickoffCall || {};
   const onboardingCall = client.kickoff || {};
 
@@ -111,8 +113,9 @@ export default function ClientOnboardingModal({
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 600, maxHeight: '88vh', overflowY: 'auto' }}>
+      <div style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 16, padding: 24, width: '100%', maxWidth: 600, maxHeight: '88vh', overflowY: 'auto', ...(tiktok ? bordaTiktok('var(--bg2)', { brilho: true }) : null) }}>
         <ModalHeader title={client.name} onClose={onClose} />
+        {tiktok && <SeloTiktokShop altura={20} style={{ marginBottom: 12 }} />}
 
         {onRename && (editandoNome ? (
           <div style={{ marginBottom: 14 }}>

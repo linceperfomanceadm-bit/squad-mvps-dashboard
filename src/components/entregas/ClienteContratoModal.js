@@ -1,9 +1,9 @@
 import React from 'react';
 import { ClipboardEdit } from 'lucide-react';
-import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState, driveDoCliente, isInativo } from '../../lib/firebase';
+import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState, driveDoCliente, isInativo, temTiktokShop } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
 import { Overlay, ModalHeader, MODAL, fmtDate, LinkDrive } from '../commercial/ui';
-import { Tag } from '../shared/ui';
+import { Tag, SeloTiktokShop, bordaTiktok } from '../shared/ui';
 import EntregasCliente from './EntregasCliente';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -20,11 +20,13 @@ export default function ClienteContratoModal({ client, onClose, onEditar, onMarc
   const ct = contractState(client);
   const cfg = CONTRACT_STATUS[ct.status] || CONTRACT_STATUS.unknown;
   const cs = asArray(client.responsibles?.cs);
+  const tiktok = temTiktokShop(client);
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...MODAL, maxWidth: 640 }}>
+      <div style={{ ...MODAL, maxWidth: 640, ...(tiktok ? bordaTiktok(MODAL.background, { brilho: true }) : null) }}>
         <ModalHeader title={client.name} onClose={onClose} />
+        {tiktok && <SeloTiktokShop altura={20} style={{ marginBottom: 12 }} />}
 
         <div style={S.topo}>
           <div style={{ minWidth: 0, flex: 1 }}>

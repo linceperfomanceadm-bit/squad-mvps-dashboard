@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck, ShoppingBag } from 'lucide-react';
 import {
   SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS,
-  stageOf, naCarteira, contractState,
+  stageOf, naCarteira, contractState, temTiktokShop,
 } from '../../lib/firebase';
+import { SeloTiktokShop, bordaTiktok } from '../shared/ui';
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
 import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
@@ -54,6 +55,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
   const [csFilter, setCsFilter] = useState(csInicial);
   const [statusFilter, setStatusFilter] = useState('all');
   const [busca, setBusca] = useState('');
+  // Soma aos outros filtros (CS, etapa e busca): só quem tem TikTok Shop.
+  const [soTiktok, setSoTiktok] = useState(false);
 
   const carteira = useMemo(() => clients.filter(naCarteira), [clients]);
 
@@ -121,11 +124,12 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         if (statusFilter === 'incompleto') return it.pendencias.length > 0;
         return true;
       })
+      .filter(({ client }) => !soTiktok || temTiktokShop(client))
       .filter(({ client }) => !q || (client.name || '').toLowerCase().includes(q))
       // Mais atrasadas primeiro; empate por nome.
       .sort((a, b) => (b.atrasadas.length - a.atrasadas.length)
         || (a.client.name || '').localeCompare(b.client.name || '', 'pt-BR'));
-  }, [itens, csFilter, statusFilter, busca, me]);
+  }, [itens, csFilter, statusFilter, soTiktok, busca, me]);
 
   const resumo = useMemo(() => ({
     clientes: filtrados.length,
@@ -163,6 +167,15 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
             style={{ ...S.input, width: '100%', paddingLeft: 32 }}
           />
         </div>
+
+        <button
+          type="button"
+          className={`ui-btn small ${soTiktok ? 'on' : ''}`}
+          onClick={() => setSoTiktok(v => !v)}
+          title="Mostrar só os clientes com TikTok Shop contratado"
+        >
+          <ShoppingBag size={13} /> TikTok Shop
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -227,9 +240,12 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
   const time = Object.entries(client.responsibles || {})
     .filter(([sid, v]) => sid !== 'cs' && asArray(v).length);
   const contato = client.contrato?.contactName || client.contactName;
+  const tiktok = temTiktokShop(client);
 
   return (
-    <div style={{ ...CARD, border: `1px solid ${atrasadas.length ? `color-mix(in srgb, ${opsLv.color} 30%, transparent)` : 'var(--border)'}` }}>
+    // TikTok Shop ganha o contorno da marca; o atraso continua visível
+    // no farol de Operação e no contador de Atrasadas.
+    <div style={{ ...CARD, ...(tiktok ? bordaTiktok('var(--bg2)') : { border: `1px solid ${atrasadas.length ? `color-mix(in srgb, ${opsLv.color} 30%, transparent)` : 'var(--border)'}` }) }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -237,6 +253,7 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
             <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
           )}
         </div>
+        {tiktok && <SeloTiktokShop altura={16} style={{ marginTop: 8 }} />}
         {contato && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>👤 {contato}</p>}
         {mostraCs && (
           <p style={{ fontSize: 11, color: COLOR, fontFamily: 'var(--fm)', marginTop: 5 }}>
