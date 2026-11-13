@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Video, CalendarPlus, Pencil, Paperclip, Trash2, Check, X } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES, driveDoCliente } from '../../lib/firebase';
+import { SECTORS, WD_SERVICE_CONFIG, stageOf, CLIENT_STAGES, driveDoCliente, temTiktokShop } from '../../lib/firebase';
+import { SeloTiktokShop } from '../shared/ui';
 import { clientCallCalendarUrl } from '../../lib/calendarLink';
 import ContractBlock from './ContractBlock';
 import {
@@ -153,7 +154,10 @@ export default function ClientOnboardingModal({
         ))}
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
-          <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
+            {temTiktokShop(client) && <SeloTiktokShop />}
+          </div>
           {onEditar && (
             <button type="button" className="ui-btn small" onClick={onEditar} title="Corrigir setores, serviços, contrato e entregas">
               <Pencil size={13} /> Editar cadastro

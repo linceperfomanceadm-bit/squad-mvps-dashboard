@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck, ShoppingBag } from 'lucide-react';
 import {
   SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS,
-  stageOf, naCarteira, contractState,
+  stageOf, naCarteira, contractState, temTiktokShop,
 } from '../../lib/firebase';
+import { SeloTiktokShop } from '../shared/ui';
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
 import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
@@ -54,6 +55,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
   const [csFilter, setCsFilter] = useState(csInicial);
   const [statusFilter, setStatusFilter] = useState('all');
   const [busca, setBusca] = useState('');
+  // Soma aos outros filtros (CS, etapa e busca): só quem tem TikTok Shop.
+  const [soTiktok, setSoTiktok] = useState(false);
 
   const carteira = useMemo(() => clients.filter(naCarteira), [clients]);
 
@@ -121,11 +124,12 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         if (statusFilter === 'incompleto') return it.pendencias.length > 0;
         return true;
       })
+      .filter(({ client }) => !soTiktok || temTiktokShop(client))
       .filter(({ client }) => !q || (client.name || '').toLowerCase().includes(q))
       // Mais atrasadas primeiro; empate por nome.
       .sort((a, b) => (b.atrasadas.length - a.atrasadas.length)
         || (a.client.name || '').localeCompare(b.client.name || '', 'pt-BR'));
-  }, [itens, csFilter, statusFilter, busca, me]);
+  }, [itens, csFilter, statusFilter, soTiktok, busca, me]);
 
   const resumo = useMemo(() => ({
     clientes: filtrados.length,
@@ -163,6 +167,15 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
             style={{ ...S.input, width: '100%', paddingLeft: 32 }}
           />
         </div>
+
+        <button
+          type="button"
+          className={`ui-btn small ${soTiktok ? 'on' : ''}`}
+          onClick={() => setSoTiktok(v => !v)}
+          title="Mostrar só os clientes com TikTok Shop contratado"
+        >
+          <ShoppingBag size={13} /> TikTok Shop
+        </button>
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
@@ -237,6 +250,7 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
             <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
           )}
         </div>
+        {temTiktokShop(client) && <SeloTiktokShop style={{ marginTop: 6 }} />}
         {contato && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>👤 {contato}</p>}
         {mostraCs && (
           <p style={{ fontSize: 11, color: COLOR, fontFamily: 'var(--fm)', marginTop: 5 }}>

@@ -336,6 +336,8 @@ export const SERVICE_SECTOR_MAP = {
   webdesign:      'webdesign',
   video:          'videomaker',
   design:         'design',
+  // TikTok Shop roda pelo GMV Max (anúncio) — sugere Tráfego.
+  tiktok_shop:    'trafego',
 };
 
 // ─── Pasta do cliente no Drive ────────────────────────────────
@@ -502,10 +504,23 @@ export const SALE_SERVICES = [
   { id: 'webdesign',      label: 'Site / WebDesign' },
   { id: 'video',          label: 'Vídeo / Audiovisual' },
   { id: 'design',         label: 'Design / Criativos' },
+  { id: 'tiktok_shop',    label: 'TikTok Shop' },
   { id: 'seo',            label: 'SEO' },
   { id: 'consultoria',    label: 'Consultoria' },
   { id: 'outro',          label: 'Outro' },
 ];
+
+// ─── TikTok Shop ──────────────────────────────────────────────
+// Não é setor nem flag à parte: é um serviço contratado como os outros
+// (contrato.servicos). Assim a CS marca no cadastro, corrige pela
+// edição (marcar em cliente antigo ou desmarcar cadastro errado) e o
+// app inteiro lê do mesmo lugar. `services` é o espelho legado no topo
+// do doc; cliente antigo pode ter só ele, e em formato não-array.
+export const TIKTOK_SHOP = 'tiktok_shop';
+export const temTiktokShop = (c) => {
+  const lista = c?.contrato?.servicos || c?.services;
+  return (Array.isArray(lista) ? lista : lista ? [lista] : []).some(sv => sv?.id === TIKTOK_SHOP);
+};
 
 // ─── Entregas do contrato (escopo mensal) ─────────────────────
 // O contrato diz o que o cliente recebe todo mês (ex.: 16 artes de

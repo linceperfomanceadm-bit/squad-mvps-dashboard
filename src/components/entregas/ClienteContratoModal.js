@@ -1,9 +1,9 @@
 import React from 'react';
 import { ClipboardEdit } from 'lucide-react';
-import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState, driveDoCliente, isInativo } from '../../lib/firebase';
+import { CADASTRO_PENDENCIAS, CONTRACT_STATUS, contractState, driveDoCliente, isInativo, temTiktokShop } from '../../lib/firebase';
 import { cadastroPendencias } from '../../lib/entregas';
 import { Overlay, ModalHeader, MODAL, fmtDate, LinkDrive } from '../commercial/ui';
-import { Tag } from '../shared/ui';
+import { Tag, SeloTiktokShop } from '../shared/ui';
 import EntregasCliente from './EntregasCliente';
 
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -31,6 +31,7 @@ export default function ClienteContratoModal({ client, onClose, onEditar, onMarc
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
               {isInativo(client) && <Tag tone="bad">Inativo desde {fmtDate(client.inativo.at)}</Tag>}
               <Tag tone={TOM_CONTRATO[ct.status]}>{cfg.label}</Tag>
+              {temTiktokShop(client) && <SeloTiktokShop />}
               {ct.endAt && ct.status !== 'closed' && (
                 <span style={S.nota}>até {fmtDate(ct.endAt)}{ct.months ? ` · ${ct.months} meses` : ''}</span>
               )}

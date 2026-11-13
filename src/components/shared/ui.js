@@ -1,4 +1,5 @@
 import React from 'react';
+import { ShoppingBag } from 'lucide-react';
 
 // ─── Kit visual do Layout 01 ──────────────────────────────────
 // Peças usadas pelas visões gerais. Tudo neutro; a cor do painel
@@ -153,6 +154,17 @@ export function Tag({ tone, children, style }) {
   };
   const [bg, fg] = map[tone] || ['var(--soft)', 'var(--muted)'];
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 99, fontSize: 11, fontWeight: 500, background: bg, color: fg, ...style }}>{children}</span>;
+}
+
+// Selo de cliente com TikTok Shop contratado. Neutro de propósito:
+// não é estado (bom/ruim), é só identificação — quem decide se mostra
+// é `temTiktokShop(c)` no firebase.js.
+export function SeloTiktokShop({ style }) {
+  return (
+    <Tag style={{ border: '1px solid var(--border)', color: 'var(--text)', whiteSpace: 'nowrap', ...style }}>
+      <ShoppingBag size={11} strokeWidth={2} /> TikTok Shop
+    </Tag>
+  );
 }
 
 // Linha de lista (título + subtítulo + lado direito).
