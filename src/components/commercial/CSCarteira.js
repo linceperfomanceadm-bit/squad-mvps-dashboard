@@ -4,7 +4,7 @@ import {
   SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS,
   stageOf, naCarteira, contractState, temTiktokShop,
 } from '../../lib/firebase';
-import { SeloTiktokShop } from '../shared/ui';
+import { SeloTiktokShop, bordaTiktok } from '../shared/ui';
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
 import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
@@ -240,9 +240,12 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
   const time = Object.entries(client.responsibles || {})
     .filter(([sid, v]) => sid !== 'cs' && asArray(v).length);
   const contato = client.contrato?.contactName || client.contactName;
+  const tiktok = temTiktokShop(client);
 
   return (
-    <div style={{ ...CARD, border: `1px solid ${atrasadas.length ? `color-mix(in srgb, ${opsLv.color} 30%, transparent)` : 'var(--border)'}` }}>
+    // TikTok Shop ganha o contorno da marca; o atraso continua visível
+    // no farol de Operação e no contador de Atrasadas.
+    <div style={{ ...CARD, ...(tiktok ? bordaTiktok('var(--bg2)') : { border: `1px solid ${atrasadas.length ? `color-mix(in srgb, ${opsLv.color} 30%, transparent)` : 'var(--border)'}` }) }}>
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
@@ -250,7 +253,7 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
             <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
           )}
         </div>
-        {temTiktokShop(client) && <SeloTiktokShop style={{ marginTop: 6 }} />}
+        {tiktok && <SeloTiktokShop altura={16} style={{ marginTop: 8 }} />}
         {contato && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>👤 {contato}</p>}
         {mostraCs && (
           <p style={{ fontSize: 11, color: COLOR, fontFamily: 'var(--fm)', marginTop: 5 }}>

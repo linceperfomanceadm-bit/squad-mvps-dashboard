@@ -521,6 +521,11 @@ export const temTiktokShop = (c) => {
   const lista = c?.contrato?.servicos || c?.services;
   return (Array.isArray(lista) ? lista : lista ? [lista] : []).some(sv => sv?.id === TIKTOK_SHOP);
 };
+// Cores da marca TikTok, só nos clientes com TikTok Shop (contorno de
+// card e modal, via `bordaTiktok` no kit). Exceção pedida pela agência
+// à regra de superfície neutra: aqui a cor É a informação — "este
+// cliente é de TikTok Shop".
+export const TIKTOK_SHOP_CORES = { ciano: '#02EEEA', rosa: '#F50645' };
 
 // ─── Entregas do contrato (escopo mensal) ─────────────────────
 // O contrato diz o que o cliente recebe todo mês (ex.: 16 artes de

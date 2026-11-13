@@ -218,7 +218,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                 <tr key={c.id} style={{ borderBottom: '1px solid rgba(255,255,255,.04)' }}>
                   <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>
                     {c.name}
-                    {temTiktokShop(c) && <SeloTiktokShop style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
+                    {temTiktokShop(c) && <SeloTiktokShop altura={14} style={{ marginLeft: 8, verticalAlign: 'middle' }} />}
                     {isStaffing(c) && (
                       <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--amber-dim)', color: 'var(--amber)', border: '1px solid var(--amber-b)', fontFamily: 'var(--fm)', verticalAlign: 'middle' }}>
                         AGUARDANDO RESPONSÁVEIS

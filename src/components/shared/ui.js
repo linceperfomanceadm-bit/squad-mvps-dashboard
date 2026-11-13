@@ -1,5 +1,7 @@
 import React from 'react';
-import { ShoppingBag } from 'lucide-react';
+import { TIKTOK_SHOP_CORES } from '../../lib/firebase';
+import { useTheme } from '../../contexts/ThemeContext';
+import { TIKTOK_SHOP_LOGO_CLARO, TIKTOK_SHOP_LOGO_ESCURO } from '../../assets/tiktokShopLogo';
 
 // ─── Kit visual do Layout 01 ──────────────────────────────────
 // Peças usadas pelas visões gerais. Tudo neutro; a cor do painel
@@ -156,15 +158,36 @@ export function Tag({ tone, children, style }) {
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 99, fontSize: 11, fontWeight: 500, background: bg, color: fg, ...style }}>{children}</span>;
 }
 
-// Selo de cliente com TikTok Shop contratado. Neutro de propósito:
-// não é estado (bom/ruim), é só identificação — quem decide se mostra
-// é `temTiktokShop(c)` no firebase.js.
-export function SeloTiktokShop({ style }) {
+// ─── Clientes com TikTok Shop ─────────────────────────────────
+// Quem decide se o cliente é de TikTok Shop é `temTiktokShop(c)` no
+// firebase.js; estas peças só desenham.
+
+// Logo do TikTok Shop. A versão muda com o tema: letras pretas somem
+// no escuro, então lá entra a versão de letras claras.
+export function SeloTiktokShop({ altura = 16, style }) {
+  const { theme } = useTheme();
   return (
-    <Tag style={{ border: '1px solid var(--border)', color: 'var(--text)', whiteSpace: 'nowrap', ...style }}>
-      <ShoppingBag size={11} strokeWidth={2} /> TikTok Shop
-    </Tag>
+    <img
+      src={theme === 'light' ? TIKTOK_SHOP_LOGO_CLARO : TIKTOK_SHOP_LOGO_ESCURO}
+      alt="TikTok Shop"
+      title="Cliente com TikTok Shop"
+      style={{ height: altura, width: 'auto', display: 'inline-block', flexShrink: 0, ...style }}
+    />
   );
+}
+
+// Contorno em degradê ciano → rosa para card e modal do cliente com
+// TikTok Shop. Borda "transparente" + duas camadas de fundo: a de dentro
+// pinta a superfície, a de fora (border-box) vira a borda. Por isso o
+// fundo do elemento precisa vir por aqui — `fundo` é o mesmo token que
+// o card/modal já usava.
+export function bordaTiktok(fundo = 'var(--bg2)', { brilho = false } = {}) {
+  const { ciano, rosa } = TIKTOK_SHOP_CORES;
+  return {
+    border: '1px solid transparent',
+    background: `linear-gradient(${fundo}, ${fundo}) padding-box, linear-gradient(135deg, ${ciano}, ${rosa}) border-box`,
+    ...(brilho ? { boxShadow: `-10px -6px 40px -24px ${ciano}, 10px 6px 40px -24px ${rosa}` } : {}),
+  };
 }
 
 // Linha de lista (título + subtítulo + lado direito).
