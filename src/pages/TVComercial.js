@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Trophy, Target, Flame, Users, CalendarClock, HeartCrack, TrendingUp, TrendingDown,
-  Volume2, PauseCircle, Check, UserX, BadgeDollarSign, AlarmClock, ChevronRight,
+  Volume2, VolumeX, PauseCircle, Check, UserX, BadgeDollarSign, AlarmClock, ChevronRight,
 } from 'lucide-react';
 import { useComercialTVData } from '../hooks/useComercialTVData';
+import { useTVRadio } from '../hooks/useTVRadio';
 import { COMERCIAL_TEAM, SDR_PONTOS } from '../lib/firebase';
 import { chaveSdr } from '../lib/comercial';
 
@@ -220,6 +221,7 @@ const CSS = `
   mask-image:linear-gradient(180deg,#000 55%,transparent 98%),linear-gradient(90deg,transparent 0,#000 22%,#000 78%,transparent 100%);mask-composite:intersect}
 .hc-standby{position:absolute;inset:0;z-index:60;background:#08090b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3cqh}
 .hc-sound{position:absolute;right:2cqw;bottom:2cqw;z-index:40;display:flex;align-items:center;gap:.6cqw;background:#fff;color:#111;border:none;border-radius:.8cqw;padding:.9cqw 1.4cqw;font-family:'Lexend',sans-serif;font-size:1cqw;font-weight:500;cursor:pointer}
+.hc-sound.off{background:rgba(255,255,255,.08);color:#8b919c;border:1px solid rgba(255,255,255,.12);font-size:.85cqw;cursor:default}
 `;
 
 // ─── Gráfico: acumulado do mês contra o ritmo da meta ─────────
@@ -727,8 +729,6 @@ export default function TVComercial() {
   const [sceneIndex, setSceneIndex] = useState(0);
   const [now, setNow] = useState(new Date());
   const [scale, setScale] = useState(1);
-  const [audioBlocked, setAudioBlocked] = useState(false);
-  const audioRef = useRef(null);
 
   // Prioridade: pausa > modo visita > cena travada > rotação.
   const visita = cfg.tvVisitMode === true;
@@ -770,22 +770,8 @@ export default function TVComercial() {
   }, []);
 
   // ── Rádio ────────────────────────────────────────────────────
-  useEffect(() => {
-    const el = audioRef.current; if (!el) return;
-    const v = Number(cfg.tvRadioVolume);
-    el.volume = Math.min(1, Math.max(0, (Number.isFinite(v) ? v : 50) / 100));
-  }, [cfg.tvRadioVolume, cfg.tvRadioUrl]);
-
-  useEffect(() => {
-    const el = audioRef.current; if (!el) return;
-    if (!cfg.tvRadioUrl || !cfg.tvRadioPlaying) { el.pause(); setAudioBlocked(false); return; }
-    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
-  }, [cfg.tvRadioUrl, cfg.tvRadioPlaying]);
-
-  const liberarSom = () => {
-    const el = audioRef.current; if (!el) return;
-    el.play().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
-  };
+  // Qualquer botão do controle libera o som — ver useTVRadio.
+  const radio = useTVRadio({ url: cfg.tvRadioUrl, playing: cfg.tvRadioPlaying, volume: cfg.tvRadioVolume });
 
   const dateLabel = cap(now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }));
   const timeLabel = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
@@ -793,7 +779,7 @@ export default function TVComercial() {
   return (
     <div className="hc-root">
       <style>{CSS}</style>
-      {cfg.tvRadioUrl && <audio key={cfg.tvRadioUrl} ref={audioRef} src={cfg.tvRadioUrl} preload="none" />}
+      {cfg.tvRadioUrl && <audio key={cfg.tvRadioUrl} ref={radio.audioRef} src={cfg.tvRadioUrl} preload="none" />}
 
       <div className="hc-stage" style={{ transform: `translate(-50%,-50%) scale(${scale})` }}>
         <div className="hc-prog">
@@ -821,7 +807,7 @@ export default function TVComercial() {
                 )}
               </div>
               <div className="hc-right">
-                {cfg.tvRadioPlaying && !audioBlocked && <Volume2 size={22} color="#c3c9d2" />}
+                {radio.status === 'tocando' && <Volume2 size={22} color="#c3c9d2" />}
                 <img src="/agencia.png" alt="Lince Performance" style={{ height: '1.9cqw', opacity: 0.9 }} />
                 <div className="hc-pill">{dateLabel}</div>
                 <div className="hc-clock">{timeLabel}</div>
@@ -844,8 +830,12 @@ export default function TVComercial() {
 
         {d.celebration && <Celebration data={d.celebration} visita={visita} fotos={d.fotos} key={d.celebration.key} />}
 
-        {audioBlocked && (
-          <button className="hc-sound" onClick={liberarSom}><Volume2 size={22} strokeWidth={2.2} /> Ligar som</button>
+        {radio.status === 'bloqueado' && (
+          // autoFocus: o OK do controle remoto aperta o botão focado.
+          <button className="hc-sound" autoFocus onClick={radio.liberarSom}><Volume2 size={22} strokeWidth={2.2} /> Aperte qualquer botão do controle para ligar o som</button>
+        )}
+        {radio.status === 'sem-sinal' && (
+          <div className="hc-sound off"><VolumeX size={18} strokeWidth={2} /> Rádio sem sinal · tentando reconectar</div>
         )}
 
         {cfg.tvPaused && (
