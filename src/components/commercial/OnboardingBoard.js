@@ -5,7 +5,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useClients } from '../../hooks/useClients';
 import { useCollaborators } from '../../hooks/useCollaborators';
 import { useToast } from '../shared/Toast';
-import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES, onboardingAgendado } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, stageOf, CLIENT_STAGES, onboardingAgendado, temTiktokShop } from '../../lib/firebase';
+import { SeloTiktokShop } from '../shared/ui';
 import { vagasAbertas } from '../../lib/responsaveis';
 import StaffingModal from './StaffingModal';
 import ClientOnboardingModal from './ClientOnboardingModal';
@@ -20,6 +21,15 @@ const RECENT_DAYS = 30;
 // ser trocada pelo próprio líder.
 const EM_FLUXO = ['kickoff', 'staffing', 'onboarding'];
 const KICKOFF_COLOR = 'var(--purple)';
+
+// Logo do TikTok Shop abaixo do nome, em todos os cards: o líder
+// bate o olho e já sabe que o projeto envolve TikTok Shop na hora de
+// indicar o time. A borda do card continua com a cor do estado (atraso,
+// aguardando, agendado) — aqui ela é a informação principal.
+function LogoTiktok({ client }) {
+  if (!temTiktokShop(client)) return null;
+  return <SeloTiktokShop altura={16} style={{ display: 'block', marginTop: 8 }} />;
+}
 
 /*
  * ONBOARDING DE CLIENTES — a mesma tela para todo mundo, mudando só
@@ -381,6 +391,7 @@ function AdminKickoffCard({ client, onOpen, onSchedule, onCancel, onConfirm }) {
             ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : KICKOFF_COLOR} />
             : <Tag text="SEM AGENDA" color="var(--muted)" />}
         </div>
+        <LogoTiktok client={client} />
         {agendada && (
           <p style={{ fontSize: 13, fontWeight: 700, color: passou ? 'var(--amber)' : KICKOFF_COLOR, fontFamily: 'var(--fm)', marginTop: 10 }}>
             📅 {fmtDateTime(call.at)}
@@ -421,6 +432,7 @@ function VagaCard({ client, vagas, onOpen, onDispensar }) {
         <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</h3>
         <Tag text="SEM RESPONSÁVEL" color="var(--red)" />
       </div>
+      <LogoTiktok client={client} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
         {vagas.map(v => {
@@ -466,6 +478,7 @@ function IndicacaoCard({ client, setores, onOpen }) {
         <h3 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</h3>
         {estagioInfo && <Tag text={estagioInfo.label} color={estagioInfo.color} />}
       </div>
+      <LogoTiktok client={client} />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 10 }}>
         {setores.map(sid => {
@@ -506,6 +519,7 @@ function StaffingCard({ client, pendentes, todosPendentes, onOpen }) {
         <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
         <Tag text="AGUARDANDO VOCÊ" color="var(--amber)" />
       </div>
+      <LogoTiktok client={client} />
 
       {contrato.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>👤 {contrato.contactName}</p>}
 
@@ -574,6 +588,7 @@ function OnboardingCard({ client, color, onOpen }) {
           ? <Tag text={passou ? 'CALL PASSOU' : 'AGENDADO'} color={passou ? 'var(--amber)' : color} />
           : <Tag text="AGUARDANDO AGENDAMENTO" color="var(--muted)" />}
       </div>
+      <LogoTiktok client={client} />
 
       {at ? (
         <p style={{ fontSize: 13, fontWeight: 700, color: passou ? 'var(--amber)' : color, fontFamily: 'var(--fm)', marginTop: 10 }}>
@@ -614,6 +629,7 @@ function RecenteCard({ client, onOpen }) {
         <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>{client.name}</p>
         <Tag text="ATIVO" color="var(--green)" />
       </div>
+      <LogoTiktok client={client} />
       {contrato.contactName && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>👤 {contrato.contactName}</p>}
       {client.kickoff?.confirmedAt && (
         <p style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--fm)', marginTop: 8 }}>
