@@ -7,7 +7,7 @@ import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
 import { updateTaskResponsibles } from '../../hooks/useTasks';
 import {
   parseLocalDate, resolveTimeStats, taskTimeStats, deadlineState,
-  formatBusinessDuration, businessMsBetween, taskCreatedAt,
+  formatBusinessDuration, businessMsBetween, taskCreatedAt, isTaskOnTime,
 } from '../../lib/taskTime';
 
 // ─── Success popup ────────────────────────────────────────────
@@ -22,7 +22,9 @@ function CompletionPopup({ task, onClose }) {
   const stats = resolveTimeStats(task);
   const collabTimes = stats.byPerson || [];
   const totalTime = formatBusinessDuration(stats.totalMs);
-  const onTime = task.deliveredOnTime !== false;
+  // Primeira entrega decide o prazo; o carimbo dela é o que aparece.
+  const entregue = task.firstDeliveredAt || task.deliveredAt || null;
+  const onTime = isTaskOnTime(task);
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 99999, padding: 20 }}>
@@ -31,13 +33,14 @@ function CompletionPopup({ task, onClose }) {
         <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--green)', marginBottom: 6 }}>Task Concluída!</h2>
         <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 24 }}>{task.name}</p>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 16 }}>
           {[
             { label: 'Criada',    value: created?.at   ? format(new Date(created.at),   "dd/MM HH:mm") : '—' },
             { label: 'Iniciada',  value: started?.at   ? format(new Date(started.at),   "dd/MM HH:mm") : '—' },
+            { label: 'Entregue',  value: entregue      ? format(new Date(entregue),     "dd/MM HH:mm") : '—' },
             { label: 'Concluída', value: completed?.at ? format(new Date(completed.at), "dd/MM HH:mm") : '—' },
           ].map(item => (
-            <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 10, padding: '12px 8px' }}>
+            <div key={item.label} style={{ background: 'var(--surface)', border: '1px solid var(--border-h)', borderRadius: 10, padding: '12px 4px' }}>
               <p style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--fm)' }}>{item.label.toUpperCase()}</p>
               <p style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)' }}>{item.value}</p>
             </div>
@@ -64,7 +67,7 @@ function CompletionPopup({ task, onClose }) {
             {onTime ? '✓ ENTREGUE DENTRO DO PRAZO' : '⚠ ENTREGUE FORA DO PRAZO'}
           </p>
           <p style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4, lineHeight: 1.5 }}>
-            O que vale para o KPI é o momento do envio para aprovação — o tempo de espera do aprovador não conta contra quem executou.
+            O que vale para o KPI é a primeira entrega (envio para aprovação). A espera do aprovador e as rodadas de ajuste não contam como atraso.
           </p>
         </div>
 

@@ -10,7 +10,7 @@ import {
 } from './useClientHealth';
 import { entregadoresDe } from './useTasks';
 import {
-  resolveTimeStats, formatBusinessDuration, effectiveDeadlineAt,
+  resolveTimeStats, formatBusinessDuration, isTaskOnTime,
   businessMsBetween, BUSINESS_MS_PER_DAY,
 } from '../lib/taskTime';
 
@@ -114,14 +114,10 @@ const fmtDuracao = (ms) => {
   return `${d}d ${Math.round(horas - d * 24)}h`;
 };
 
-// Entrega no prazo = ENVIO para aprovação dentro do prazo (gravado em
-// deliveredOnTime). A demora do aprovador não pune quem entregou.
-// Task antiga sem o campo cai na comparação com o prazo efetivo.
-const entregueNoPrazo = (t) => {
-  if (typeof t.deliveredOnTime === 'boolean') return t.deliveredOnTime;
-  const limite = effectiveDeadlineAt(t);
-  return !limite || new Date(t.completedAt) <= limite;
-};
+// Entrega no prazo = a PRIMEIRA entrega (envio para aprovação) dentro
+// do prazo. Nem a demora do aprovador nem rodadas de ajuste punem quem
+// entregou. Regra única em isTaskOnTime (lib/taskTime.js).
+const entregueNoPrazo = isTaskOnTime;
 
 const setorDe = (t) => t.deliveredBySector || t.responsibleSector;
 const pessoaDe = (t) => t.deliveredBy || t.responsibleName;

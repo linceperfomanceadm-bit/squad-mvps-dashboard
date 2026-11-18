@@ -380,7 +380,8 @@ export function deadlineState(task, now = new Date()) {
   const deadline = effectiveDeadlineAt(task);
   if (!deadline) return null;
 
-  const onTime = task?.deliveredOnTime !== false;
+  // Primeira entrega decide — ver isTaskOnTime.
+  const onTime = isTaskOnTime(task);
 
   if (task?.status === 'done') {
     return {
@@ -399,7 +400,7 @@ export function deadlineState(task, now = new Date()) {
       frozen: true,
       color: '#a78bfa',
       badge: 'PRAZO CONGELADO',
-      label: task?.deliveredOnTime === false ? 'entregue com atraso' : 'entregue no prazo',
+      label: onTime ? 'entregue no prazo' : 'entregue com atraso',
       deadline,
     };
   }
@@ -445,6 +446,29 @@ export function isDeliveryOnTime(task, at = new Date()) {
   const deadline = effectiveDeadlineAt(task);
   if (!deadline) return true;
   return toDate(at) <= deadline;
+}
+
+/*
+ * A task foi entregue no prazo? — a resposta ÚNICA para KPI, badge,
+ * TV e relatórios.
+ *
+ * REGRA (nov/2026): quem decide é a PRIMEIRA entrega. Ela fica
+ * carimbada em firstDeliveredAt / firstDeliveredOnTime no instante do
+ * envio para aprovação e nenhuma rodada de ajuste muda isso. Ajuste é
+ * tempo de retrabalho (reworkMs em taskTimeStats), não atraso — e a
+ * demora do aprovador também não conta. `deliveredOnTime` (última
+ * rodada) continua gravado só como informação.
+ *
+ * Task antiga, sem nenhum carimbo, cai na comparação do que existir
+ * (entrega ou conclusão) com o prazo efetivo; sem prazo, está no prazo.
+ */
+export function isTaskOnTime(task) {
+  if (typeof task?.firstDeliveredOnTime === 'boolean') return task.firstDeliveredOnTime;
+  if (typeof task?.deliveredOnTime === 'boolean') return task.deliveredOnTime;
+  const deadline = effectiveDeadlineAt(task);
+  if (!deadline) return true;
+  const ref = toDate(task?.firstDeliveredAt || task?.deliveredAt || task?.completedAt);
+  return !ref || ref <= deadline;
 }
 
 // ─── Data de criação ──────────────────────────────────────────

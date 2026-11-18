@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { SECTORS } from '../../lib/firebase';
 import { entregadoresDe } from '../../hooks/useTasks';
+import { isTaskOnTime } from '../../lib/taskTime';
 
 /*
  * RELATÓRIOS — versão "vidro".
@@ -194,10 +195,10 @@ export default function AdminCharts({ clients, tasks = [], inicioJanela = null, 
     // anéis
     const dePrimeira = noPeriodo.filter(t => !t.reworkCount).length;
     const comPrazo = noPeriodo.filter(t => t.deadline && t.completedAt);
-    const noPrazo = comPrazo.filter(t => {
-      const dl = toDate(t.deadline); dl.setHours(23, 59, 59, 999);
-      return toDate(t.completedAt) <= dl;
-    }).length;
+    // Primeira entrega decide — a mesma regra da TV e do Extrato. Antes
+    // comparava a conclusão com o prazo, o que punia quem entregou no
+    // prazo e esperou o aprovador.
+    const noPrazo = comPrazo.filter(isTaskOnTime).length;
 
     // tempo médio de produção
     const durs = noPeriodo.map(t => {

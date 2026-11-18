@@ -6,7 +6,7 @@ import { SLA_DAYS, SM_COLUMNS, TASK_PRIORITIES, SECTORS } from '../../lib/fireba
 import TaskModal from '../kanban/TaskModal';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  resolveTimeStats, formatBusinessDuration, BUSINESS_MS_PER_DAY,
+  resolveTimeStats, formatBusinessDuration, BUSINESS_MS_PER_DAY, isTaskOnTime,
 } from '../../lib/taskTime';
 import { entregadoresDe } from '../../hooks/useTasks';
 
@@ -141,9 +141,11 @@ export default function AdminFeed({ clients, collaborators, tasks = [], onMoveTo
                       const deliveredBy = t.status === 'done'
                         ? entregadoresDe(t).join(', ')
                         : t.responsibleName;
-                      // null em task antiga, que nunca passou pelo
-                      // novo fluxo — não marca nem verde nem vermelho.
-                      const onTime = t.firstDeliveredOnTime ?? t.deliveredOnTime ?? null;
+                      // null em task que ainda não foi entregue (ou
+                      // antiga, sem carimbo) — não marca nem verde nem
+                      // vermelho. Com carimbo, a primeira entrega decide.
+                      const carimbada = typeof t.firstDeliveredOnTime === 'boolean' || typeof t.deliveredOnTime === 'boolean';
+                      const onTime = carimbada ? isTaskOnTime(t) : null;
 
                       return (
                         <tr

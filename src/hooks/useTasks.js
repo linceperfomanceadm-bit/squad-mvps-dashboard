@@ -38,19 +38,22 @@ export async function saveTaskOrder(userName, orderedIds, allTasks) {
 }
 
 // ─── Auto-reparo de tasks presas em aprovação ──────────────────
-// Bug histórico: ao enviar para aprovação sem escolher aprovador, a
-// task gravava o próprio executor como aprovador (deliveredBy ===
-// responsibleName) e ficava presa. Esta função detecta essas tasks e
-// as devolve para "Em Produção" com o responsável original, uma única
-// vez. É idempotente: se não há nada corrompido, não faz nada.
+// Bug histórico (set/2026): ao enviar para aprovação sem escolher
+// aprovador, a task ficava em "approval" sem ninguém responsável e
+// sumia de todos os quadros. A guarda em moveToApproval já impede isso
+// desde então; o reparo fica só para documento antigo, e só para o
+// caso em que NÃO HÁ aprovador. É idempotente: sem nada corrompido,
+// não faz nada.
+//
+// Até nov/2026 o reparo também devolvia qualquer task em que executor
+// e aprovador fossem a mesma pessoa (deliveredBy === responsibleName).
+// Isso quebrou um caso legítimo: quem cria uma task para si mesmo e
+// manda para a própria aprovação via a task voltar sozinha para
+// produção toda vez que alguém abria o app — e voltar com o relógio
+// do prazo correndo, como atraso. Aprovar a própria task é permitido;
+// esse critério saiu.
 function isStuckApproval(t) {
-  if (t.status !== 'approval') return false;
-  const tl = Array.isArray(t.timeline) ? t.timeline : [];
-  const lastApproval = [...tl].reverse().find(e => e && e.action === 'sent_for_approval');
-  const selfDeliver = t.deliveredBy && t.deliveredBy === t.responsibleName;
-  const selfHandoff = lastApproval && lastApproval.by && lastApproval.to && lastApproval.by === lastApproval.to;
-  const noApprover  = !t.responsibleName;
-  return selfDeliver || selfHandoff || noApprover;
+  return t.status === 'approval' && !t.responsibleName;
 }
 
 // Detecta o desalinhamento singular/plural: responsibleName foi
@@ -294,13 +297,18 @@ export function useTasks() {
       if (!repairedRef.current) {
         repairedRef.current = true;
 
-        // (a) Tasks presas em aprovação com executor = aprovador.
+        // (a) Tasks presas em aprovação SEM aprovador (legado).
         const stuck = list.filter(isStuckApproval);
         stuck.forEach(t => {
           const tl = Array.isArray(t.timeline) ? t.timeline : [];
           const lastApproval = [...tl].reverse().find(e => e && e.action === 'sent_for_approval');
-          const restoreName   = t.deliveredBy || (lastApproval && lastApproval.by) || t.responsibleName || null;
-          const restoreSector = t.deliveredBySector || (lastApproval && lastApproval.sector) || t.responsibleSector || null;
+          const restoreName   = t.deliveredBy || (lastApproval && lastApproval.by) || null;
+          const restoreSector = t.deliveredBySector || (lastApproval && lastApproval.sector) || null;
+          // O tempo parado em aprovação volta para o prazo, igual ao
+          // rejectTask — senão a task reaparece em produção já atrasada.
+          const pausedMs = (Number(t.pausedMs) || 0) + (
+            t.approvalStartedAt ? businessMsBetween(t.approvalStartedAt, new Date()) : 0
+          );
           updateDoc(doc(db, 'tasks', t.id), {
             status: 'doing',
             responsibleName: restoreName,
@@ -312,6 +320,7 @@ export function useTasks() {
             // Sai do congelamento junto — senão a task volta para
             // produção com o relógio de prazo ainda parado.
             approvalStartedAt: null,
+            pausedMs,
           }).catch(() => {});
         });
 

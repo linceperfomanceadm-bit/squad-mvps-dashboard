@@ -155,6 +155,8 @@ As guardas do front são só UX — a barreira real são as regras do Firestore.
 
 `src/lib/taskTime.js` calcula tudo em **tempo útil** (seg–sex, 09:00–18:48, `BUSINESS_DAY`): tempo de cada pessoa na tarefa, execução × refação × aprovação, e um relógio de prazo que *congela* enquanto a tarefa está em aprovação e devolve `pausedMs` se ela voltar. Nunca calcule duração com subtração crua de datas — use `taskTimeStats` / `deadlineState` / `businessMsBetween`.
 
+**"No prazo" tem uma resposta só: `isTaskOnTime(task)`.** Quem decide é a *primeira* entrega (envio para aprovação), carimbada em `firstDeliveredAt` / `firstDeliveredOnTime`; a espera do aprovador e as rodadas de ajuste nunca viram atraso — ajuste é `reworkMs`. `deliveredOnTime` (última rodada) é só informação. TV, Relatórios, Extrato, badge e tela de conclusão leem essa função; não recrie a regra comparando `completedAt` com `deadline`.
+
 O mesmo relógio mede o SLA do Reporte da CS (`REQUEST_SLA_HOURS`, de 4h urgente a 72h baixa). Ele ordena a fila e sinaliza estouro; não bloqueia nada. O SLA de produção de Design/Vídeo (`SLA_DAYS`) é visível só no admin, nunca para o colaborador.
 
 ### Ciclo de vida do cliente
@@ -177,7 +179,7 @@ Leia o estágio sempre por `stageOf(client)`: ele deriva o estágio efetivo e en
 
 Ou seja, `kickoff.pending` se refere à call de *onboarding*. O nome é legado e foi mantido de propósito — renomear exigiria migrar a base inteira sem ganho. As duas calls geram link do Google Agenda por `src/lib/calendarLink.js` (`googleCalendarUrl`, `clientCallCalendarUrl`).
 
-O código tolera formatos legados em vez de migrar: nunca use `c.active` (use `c.active !== false`), `responsibles` pode ser string ou array (use `asArray`), e `useTasks.js` repara sozinho tarefas presas em aprovação. Campo novo precisa funcionar com documentos antigos que não o têm.
+O código tolera formatos legados em vez de migrar: nunca use `c.active` (use `c.active !== false`), `responsibles` pode ser string ou array (use `asArray`), e `useTasks.js` repara sozinho tarefas presas em aprovação **sem aprovador** (`responsibleName` vazio) — e só essas: executor e aprovador serem a mesma pessoa é um caso legítimo (task criada para si mesmo), não corrupção. Campo novo precisa funcionar com documentos antigos que não o têm.
 
 ### Saúde do cliente — duas luzes independentes
 
