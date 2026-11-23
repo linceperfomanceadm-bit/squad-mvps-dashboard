@@ -50,7 +50,7 @@ const HEALTH = {
   red:    { label: 'Crítico', desc: '3 ou mais atrasadas',      color: '#ff5c6c' },
 };
 
-const METRIC_ICON = { entregas: Layers, primeira: BadgeCheck, prazo: Target, velocidade: Zap, cobertura: Users, constancia: Calendar, mesSM: Gem };
+const METRIC_ICON = { entregas: Layers, primeira: BadgeCheck, prazo: Target, velocidade: Zap, cobertura: Users, constancia: Calendar, mesSM: Gem, pontosWD: Trophy };
 const DIAS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 const CONFETTI = ['#EE3363', '#4ade80', '#5cc8ff', '#ffc257', '#b79cff', '#5CFFFF'];
 

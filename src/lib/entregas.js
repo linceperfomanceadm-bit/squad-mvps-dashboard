@@ -3,7 +3,7 @@ import {
   SETORES_ENTREGA_UNICA, TERMOS_ENTREGA_UNICA,
 } from './firebase';
 import { businessMsBetween } from './taskTime';
-import { wdJobsOf, asArray, WD_ACTIVE_STATUSES } from './wdJobs';
+import { wdJobsOf, asArray, WD_ACTIVE_STATUSES, wdRelogio } from './wdJobs';
 
 /*
  * ENTREGAS DO CONTRATO — funções puras, sem Firestore.
@@ -329,21 +329,21 @@ export function entregasUnicas(c) {
   const lista = wdJobsOf(c).map(job => {
     const cfg = WD_SERVICE_CONFIG[job.service] || {};
     const check = Array.isArray(job.checklist) ? job.checklist : [];
-    const inicio = job.status === 'onboarding'
-      ? (c.kickoff?.at || job.onboardingStartedAt)
-      : job.productionStartedAt;
-    const prazo = CONCLUIDO.includes(job.status) ? null
-      : prazoDe(job.status, inicio, job.status === 'onboarding' ? 7 : (cfg.days || 30));
+    // Mesmo relógio do painel de Web: contagem zerada em nov/2026 e
+    // pausa aprovada pelo líder empurrando o prazo (lib/wdJobs).
+    const relogio = CONCLUIDO.includes(job.status) ? null : wdRelogio(c, job);
+    const prazo = relogio && !relogio.aguardandoCall ? relogio.prazo : null;
+    const fase = WD_FASE[job.status] || job.status || '—';
     return {
       id: `wd_${job.id}`,
       sector: 'webdesign',
       label: cfg.label || job.service || 'Site',
       status: job.status,
-      fase: WD_FASE[job.status] || job.status || '—',
+      fase: relogio?.pausado ? `${fase} · pausado` : fase,
       concluido: CONCLUIDO.includes(job.status),
       checklist: { feito: check.filter(i => i?.checked).length, total: check.length },
       prazo,
-      atrasado: !!prazo && prazo < new Date(),
+      atrasado: !!relogio?.atrasado,
       concluidoEm: job.finishedAt || null,
       responsaveis: asArray(job.responsibles),
     };

@@ -3,8 +3,8 @@ import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, where, ge
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { addDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from '../lib/gravacoes';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
-import { wdJobsOf, WD_ACTIVE_STATUSES } from '../lib/wdJobs';
+import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, WD_WEB_SERVICES, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
+import { wdJobsOf, WD_ACTIVE_STATUSES, wdConclusao } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
 import { linhaEndereco } from '../lib/cadastro';
 import { planoSemNomes } from '../lib/responsaveis';
@@ -235,19 +235,62 @@ export function useClients() {
   // Aceita chaves no formato antigo ('wd.status') ou simples ('status').
   const stripWd = (extra) => Object.fromEntries(Object.entries(extra || {}).map(([k, v]) => [k.replace(/^wd\./, ''), v]));
 
-  const wdMoveToProduction = async (clientId, jobId = 'main') => {
+  // Variante transacional do wdPatch para o que precisa LER o serviço
+  // antes de gravar (pausa, troca, conclusão). `montar(job, data)`
+  // recebe o serviço normalizado (wdJobsOf) e o doc cru, e devolve
+  // `{ campos, extra }`: `campos` vão para o serviço, `extra` são
+  // caminhos do topo do doc (ex.: 'responsibles.webdesign').
+  const wdTx = async (clientId, jobId, montar) => {
+    const ref = doc(db, 'clients', clientId);
+    const id = jobId || 'main';
+    await runTransaction(db, async (tx) => {
+      const snap = await tx.get(ref);
+      if (!snap.exists()) throw new Error('Cliente não encontrado');
+      const data = snap.data();
+      const job = wdJobsOf({ id: clientId, ...data }).find(j => j.id === id);
+      if (!job) throw new Error('Serviço não encontrado');
+      const { campos = {}, extra = {} } = montar(job, data) || {};
+      const upd = { ...extra };
+      if (id === 'main') {
+        Object.entries(campos).forEach(([k, v]) => { upd[`wd.${k}`] = v; });
+      } else {
+        upd.wdJobs = (data.wdJobs || []).map(j => (j.id === id ? { ...j, ...campos } : j));
+      }
+      tx.update(ref, upd);
+    });
+  };
+
+  // Fecha a pausa corrente indo para o histórico: a ativa vira
+  // 'encerrada' (com `ate`, conta como tempo pausado); a pendente vira
+  // 'cancelada' (nunca descontou nada). Usada ao retomar, ao cancelar
+  // o pedido e quando o serviço muda de fase.
+  const fecharPausa = (job, quem, agora) => {
+    const p = job?.pausa;
+    if (!p) return {};
+    const reg = p.estado === 'ativa'
+      ? { ...p, estado: 'encerrada', ate: agora, retomadoPor: quem || null }
+      : { ...p, estado: 'cancelada', canceladoPor: quem || null, canceladoEm: agora };
+    return { pausa: null, pausas: [...asArray(job.pausas), reg] };
+  };
+
+  // Entrar em produção encerra a pausa do onboarding: se o trabalho
+  // começou, o projeto não está mais parado.
+  const wdMoveToProduction = async (clientId, jobId = 'main', byName = null) => {
     try {
-      const client = clients.find(c => c.id === clientId);
-      if (!client) throw new Error('Cliente não encontrado');
-      const job = wdJobsOf(client).find(j => j.id === jobId);
-      const cfg = WD_SERVICE_CONFIG[job?.service];
-      if (!cfg) throw new Error('Serviço sem configuração de checklist');
-      const checklist = cfg.checklist.map((label, i) => ({ id: `item_${i}`, label, checked: false, checkedAt: null }));
-      await wdPatch(clientId, jobId, {
-        status: 'production',
-        onboardingCompletedAt: new Date().toISOString(),
-        productionStartedAt: new Date().toISOString(),
-        checklist,
+      await wdTx(clientId, jobId, (job) => {
+        const cfg = WD_SERVICE_CONFIG[job.service];
+        if (!cfg) throw new Error('Serviço sem configuração de checklist');
+        const agora = new Date().toISOString();
+        const checklist = cfg.checklist.map((label, i) => ({ id: `item_${i}`, label, checked: false, checkedAt: null, checkedBy: null }));
+        return {
+          campos: {
+            ...fecharPausa(job, byName, agora),
+            status: 'production',
+            onboardingCompletedAt: agora,
+            productionStartedAt: agora,
+            checklist,
+          },
+        };
       });
       return { success: true };
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
@@ -281,17 +324,171 @@ export function useClients() {
   // o card de entregas únicas e o histórico do cliente usam para dizer
   // quando o site foi entregue. Recorrência mantém a data da conclusão
   // original; site que já nasceu sem a data ganha a do momento.
-  const wdMoveStatus = async (clientId, newStatus, extra = {}, jobId = 'main') => {
+  //
+  // Pontuação (nov/2026): sair da PRODUÇÃO para finalizado ou
+  // recorrência carimba `conclusao` (no prazo ou não, pontos e quem
+  // recebe — wdConclusao). Reativar arquiva o ciclo anterior em
+  // `ciclos[]` antes de zerar o checklist, para os pontos já ganhos
+  // não sumirem. Qualquer saída de onboarding/produção fecha a pausa.
+  const wdMoveStatus = async (clientId, newStatus, extra = {}, jobId = 'main', byName = null) => {
     try {
-      const fields = { ...stripWd(extra), status: newStatus };
-      if (!fields.finishedAt) {
-        const client = clients.find(c => c.id === clientId);
-        const job = client ? wdJobsOf(client).find(j => j.id === jobId) : null;
-        if (newStatus === 'finished' || (newStatus === 'recurrence' && !job?.finishedAt)) {
-          fields.finishedAt = new Date().toISOString();
+      await wdTx(clientId, jobId, (job) => {
+        const agora = new Date().toISOString();
+        const campos = { ...stripWd(extra), status: newStatus };
+        if (!campos.finishedAt && (newStatus === 'finished' || (newStatus === 'recurrence' && !job.finishedAt))) {
+          campos.finishedAt = agora;
         }
-      }
-      await wdPatch(clientId, jobId, fields);
+        if (job.status === 'production' && ['finished', 'recurrence'].includes(newStatus)) {
+          campos.conclusao = wdConclusao(job, byName);
+        }
+        if (newStatus === 'onboarding' && job.status !== 'onboarding') {
+          const ganhou = asArray(job.checklist).some(i => i?.checked) || job.conclusao;
+          if (ganhou) {
+            campos.ciclos = [...asArray(job.ciclos), {
+              checklist: asArray(job.checklist),
+              conclusao: job.conclusao || null,
+              arquivadoEm: agora,
+            }];
+          }
+          campos.conclusao = null;
+        }
+        if (!WD_ACTIVE_STATUSES.includes(newStatus)) Object.assign(campos, fecharPausa(job, byName, agora));
+        return { campos };
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // ── WebDesign · líder do setor ─────────────────────────────
+  // Troca de responsável de UM serviço. Os outros serviços do cliente
+  // que ainda herdavam o responsável do cliente passam a guardar os
+  // próprios (senão ganhariam a pessoa nova junto). Quem sai deixa o
+  // `responsibles.webdesign` do cliente só se não estiver em nenhum
+  // outro serviço de Web dele. Cada troca fica registrada em `trocas[]`.
+  const wdTrocarResponsaveis = async (clientId, jobId, nomes, byName = null) => {
+    try {
+      const novos = [...new Set(asArray(nomes))];
+      if (!novos.length) throw new Error('Selecione ao menos um responsável.');
+      const ref = doc(db, 'clients', clientId);
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error('Cliente não encontrado');
+        const data = snap.data();
+        const doCliente = asArray(data.responsibles?.webdesign);
+        const jobs = wdJobsOf({ id: clientId, ...data });
+        const alvo = jobs.find(j => j.id === jobId);
+        if (!alvo) throw new Error('Serviço não encontrado');
+        const antes = alvo.responsibles;
+        const registro = { de: antes, para: novos, por: byName || null, em: new Date().toISOString() };
+        const upd = {};
+        if (data.wd?.status) {
+          if (jobId === 'main') {
+            upd['wd.responsibles'] = novos;
+            upd['wd.trocas'] = [...asArray(data.wd.trocas), registro];
+          } else if (!asArray(data.wd.responsibles).length) {
+            upd['wd.responsibles'] = doCliente;
+          }
+        }
+        if (Array.isArray(data.wdJobs) && data.wdJobs.length) {
+          upd.wdJobs = data.wdJobs.map(j => {
+            if (j.id === jobId) return { ...j, responsibles: novos, trocas: [...asArray(j.trocas), registro] };
+            return asArray(j.responsibles).length ? j : { ...j, responsibles: doCliente };
+          });
+        }
+        const emOutros = jobs.filter(j => j.id !== jobId).flatMap(j => j.responsibles);
+        const saem = antes.filter(n => !novos.includes(n) && !emOutros.includes(n));
+        upd['responsibles.webdesign'] = [...new Set([...doCliente.filter(n => !saem.includes(n)), ...novos])];
+        tx.update(ref, upd);
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // Troca do tipo do projeto (ex.: E-commerce → Landing Page). Em
+  // produção o checklist é refeito pelo tipo novo, mantendo marcado o
+  // que existe nos dois (MVP, Domínio, Publicação...). O prazo de
+  // produção passa a ser o do tipo novo, contado do mesmo início. O
+  // serviço principal espelha o tipo em `contrato.wdService`.
+  const wdTrocarServico = async (clientId, jobId, service, byName = null) => {
+    try {
+      if (!WD_WEB_SERVICES.includes(service)) throw new Error('Selecione o tipo do projeto.');
+      await wdTx(clientId, jobId, (job, data) => {
+        if (job.service === service) throw new Error('O projeto já é desse tipo.');
+        const cfg = WD_SERVICE_CONFIG[service];
+        const outros = wdJobsOf({ id: clientId, ...data }).filter(j => j.id !== job.id);
+        if (WD_ACTIVE_STATUSES.includes(job.status) && outros.some(j => j.service === service && WD_ACTIVE_STATUSES.includes(j.status))) {
+          throw new Error(`${data.name} já tem ${cfg.label} em andamento.`);
+        }
+        const campos = {
+          service,
+          trocasServico: [...asArray(job.trocasServico), { de: job.service || null, para: service, por: byName || null, em: new Date().toISOString() }],
+        };
+        if (job.status === 'production') {
+          const velhos = asArray(job.checklist);
+          campos.checklist = cfg.checklist.map((label, i) => {
+            const igual = velhos.find(v => v?.label === label);
+            return igual
+              ? { id: `item_${i}`, label, checked: !!igual.checked, checkedAt: igual.checkedAt || null, checkedBy: igual.checkedBy || null }
+              : { id: `item_${i}`, label, checked: false, checkedAt: null, checkedBy: null };
+          });
+        }
+        const extra = {};
+        if (job.id === 'main' && data.contrato) extra['contrato.wdService'] = service;
+        return { campos, extra };
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // ── WebDesign · pausa do projeto ───────────────────────────
+  // Quem é responsável pede com justificativa; vale só depois que o
+  // líder aceita (ver o bloco de pausa em lib/wdJobs). Pedido do
+  // próprio líder (`direto`) já nasce ativo.
+  const wdPedirPausa = async (clientId, jobId, motivo, byName = null, direto = false) => {
+    try {
+      const texto = String(motivo || '').trim();
+      if (!texto) throw new Error('Escreva a justificativa da pausa.');
+      await wdTx(clientId, jobId, (job) => {
+        if (!WD_ACTIVE_STATUSES.includes(job.status)) throw new Error('Só projeto em onboarding ou produção pode ser pausado.');
+        if (job.pausa) throw new Error(job.pausa.estado === 'ativa' ? 'O projeto já está pausado.' : 'Já existe um pedido de pausa aguardando o líder.');
+        const agora = new Date().toISOString();
+        const pausa = direto
+          ? { estado: 'ativa', motivo: texto, pedidoPor: byName || null, pedidoEm: agora, aprovadoPor: byName || null, aprovadoEm: agora, desde: agora }
+          : { estado: 'pendente', motivo: texto, pedidoPor: byName || null, pedidoEm: agora };
+        return { campos: { pausa } };
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // Resposta do líder. Aprovada, a pausa vale desde o PEDIDO.
+  const wdDecidirPausa = async (clientId, jobId, aprovar, byName = null, motivoRecusa = '') => {
+    try {
+      await wdTx(clientId, jobId, (job) => {
+        const p = job.pausa;
+        if (!p || p.estado !== 'pendente') throw new Error('Esse pedido de pausa já foi respondido.');
+        const agora = new Date().toISOString();
+        if (aprovar) {
+          return { campos: { pausa: { ...p, estado: 'ativa', aprovadoPor: byName || null, aprovadoEm: agora, desde: p.pedidoEm || agora } } };
+        }
+        return {
+          campos: {
+            pausa: null,
+            pausas: [...asArray(job.pausas), { ...p, estado: 'recusada', recusadoPor: byName || null, recusadoEm: agora, motivoRecusa: String(motivoRecusa || '').trim() }],
+          },
+        };
+      });
+      return { success: true };
+    } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+  };
+
+  // Retomar a pausa ativa ou cancelar o pedido pendente.
+  const wdRetomar = async (clientId, jobId, byName = null) => {
+    try {
+      await wdTx(clientId, jobId, (job) => {
+        if (!job.pausa) throw new Error('O projeto não está pausado.');
+        return { campos: fecharPausa(job, byName, new Date().toISOString()) };
+      });
       return { success: true };
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
@@ -1531,6 +1728,7 @@ export function useClients() {
     confirmKickoff, setClientHealth,
     wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus,
     wdAddService, wdRemoveService,
+    wdTrocarResponsaveis, wdTrocarServico, wdPedirPausa, wdDecidirPausa, wdRetomar,
     idvMoveToProduction, idvMoveBackToOnboarding, idvUpdateChecklist, idvUpdateNotes, idvMoveStatus, idvAddService, idvRemover,
     addDelivery, updateBrandbook,
     addBrandMaterial, removeBrandMaterial,

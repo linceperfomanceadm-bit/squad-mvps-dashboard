@@ -410,6 +410,24 @@ export const WD_SERVICE_CONFIG = {
 // clientes antigos, que seguem funcionando como sempre.
 export const WD_WEB_SERVICES = ['ecommerce', 'landing_page', 'lp_catalogo'];
 
+// Prazo do onboarding do Web, em dias corridos, contado da call de
+// onboarding agendada pela CS (ver wdOnboardingStart em lib/wdJobs).
+export const WD_ONBOARDING_DIAS = 7;
+
+// Relógio do Web zerado (nov/2026). Até aqui o temporizador era só um
+// lembrete; com a pontuação ele passou a valer ponto, então toda
+// contagem anterior foi descartada: nenhum prazo de Web começa antes
+// desta data, e nenhum ponto conta antes dela. É uma data, e não uma
+// migração na base, para não gravar em centenas de clientes de uma vez
+// e poder ser conferida/revertida sem mexer em dado.
+export const WD_PRAZO_ZERADO_EM = '2026-11-23T00:00:00-03:00';
+
+// Pontuação do time de Web (decisão nov/2026). Cada item do checklist
+// marcado vale ponto para quem marcou; o projeto concluído vale para
+// cada responsável dele, conforme terminou dentro ou fora do prazo de
+// produção (descontadas as pausas aprovadas pelo líder).
+export const WD_PONTOS = { check: 1, noPrazo: 5, foraDoPrazo: 2 };
+
 // ─── ID Visual (bloco `idv` do cliente) ───────────────────────
 // Mesmas fases do WebDesign (onboarding → produção → finalizado),
 // mas com dono próprio: só o designer responsável enxerga.

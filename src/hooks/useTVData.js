@@ -4,7 +4,7 @@ import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { isSameDay, startOfWeek, subWeeks, startOfMonth, isAfter } from 'date-fns';
 import { db, auth, stageOf } from '../lib/firebase';
 import { mesChave, entregasDoSetor, resumoMes, marcosDoMes, acompanhaEntregas } from '../lib/entregas';
-import { asArray } from '../lib/wdJobs';
+import { asArray, wdRanking } from '../lib/wdJobs';
 import {
   computeOpsHealth, resolveClientHealth, HEALTH_ORDER_4, isTaskOverdue, overdueDays,
 } from './useClientHealth';
@@ -43,6 +43,10 @@ import {
  *    ela marca no app: planejamento aprovado, relatório criado, posts
  *    publicados e clientes em operação. A TV mostra só a destaque, nunca
  *    uma lista ordenada — e só números absolutos, sem porcentagem.
+ *
+ * 6. WEBDESIGN TEM MÉTRICA FIXA (decisão de nov/2026): pontos do mês,
+ *    tirados do checklist e das conclusões de projeto no painel de Web.
+ *    Mesma regra da 5: só o destaque, números absolutos.
  */
 
 // Setores que entram na produção. CS e Comercial ficam fora.
@@ -72,6 +76,11 @@ export const FIXED_HONOR_METRICS = {
     id: 'mesSM',
     label: 'Média do mês',
     desc: 'Melhor média entre planejamento aprovado, relatório criado, posts publicados e clientes em operação, cada um medido sobre a carteira da própria pessoa.',
+  },
+  webdesign: {
+    id: 'pontosWD',
+    label: 'Pontos do mês',
+    desc: 'Quem mais pontuou no mês: 1 ponto por item do checklist marcado, 5 por projeto finalizado no prazo e 2 por projeto finalizado fora do prazo. Pausas aprovadas pelo líder não contam como atraso.',
   },
 };
 
@@ -261,6 +270,30 @@ function destaqueSocialMedia(clients, mes) {
       { v: pad2(lider.planejamento), l: lider.planejamento === 1 ? 'planejamento' : 'planejamentos' },
       { v: pad2(lider.relatorio), l: lider.relatorio === 1 ? 'relatório' : 'relatórios' },
       { v: pad2(lider.operacao), l: lider.operacao === 1 ? 'cliente em operação' : 'clientes em operação' },
+    ] : null,
+  };
+}
+
+/*
+ * Destaque do WebDesign no mês (decisão 6, nov/2026): quem mais
+ * pontuou. Pontos vêm do próprio painel de Web — checklist marcado e
+ * projetos concluídos, no prazo ou não (regras em lib/wdJobs,
+ * wdPlacarDoMes). Mostra só o destaque, com os números absolutos.
+ */
+function destaqueWebDesign(clients, mes) {
+  const lider = wdRanking(clients, mes)[0] || null;
+  const fixa = FIXED_HONOR_METRICS.webdesign;
+  return {
+    sector: 'webdesign',
+    metricId: fixa.id,
+    metricLabel: fixa.label,
+    name: lider ? lider.name : null,
+    value: lider ? pad2(lider.pontos) : '—',
+    caption: lider ? (lider.pontos === 1 ? 'ponto no mês' : 'pontos no mês') : 'sem pontos no mês ainda',
+    stats: lider ? [
+      { v: pad2(lider.checks), l: lider.checks === 1 ? 'etapa concluída' : 'etapas concluídas' },
+      { v: pad2(lider.noPrazo), l: 'no prazo' },
+      { v: pad2(lider.foraDoPrazo), l: 'fora do prazo' },
     ] : null,
   };
 }
@@ -558,6 +591,7 @@ export function useTVData() {
     const mesAtual = mesChave(now);
     const highlights = PRODUCTION_SECTORS.map(id => {
       if (id === 'socialmedia') return destaqueSocialMedia(clients, mesAtual);
+      if (id === 'webdesign') return destaqueWebDesign(clients, mesAtual);
       const metricId = METRICS[config.tvHonorMetrics[id]] ? config.tvHonorMetrics[id] : DEFAULT_HONOR_METRICS[id];
       const metric = METRICS[metricId];
       const opt = HONOR_METRIC_OPTIONS.find(o => o.id === metricId);

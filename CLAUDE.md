@@ -67,6 +67,13 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 
 `src/lib/wdJobs.js`. O bloco `wd` do cliente é o serviço principal (legado, id `'main'`); serviços contratados depois ficam em `wdJobs[]` no mesmo documento — nunca cliente duplicado. Use `wdJobsOf(client)` para a lista normalizada e `WD_ACTIVE_STATUSES` para saber o que está em andamento. O mesmo arquivo exporta `asArray`, o normalizador de campos que podem ser string ou array.
 
+**Relógio, pausa e pontuação (nov/2026).** O temporizador do Web deixou de ser lembrete: vale ponto. Tudo passa por `wdRelogio(client, job)` em `wdJobs.js` — card, visão geral, Entregas únicas da CS e conclusão. Não recalcule prazo de Web com data crua.
+- Prazos em dias **corridos** (prazo combinado com o cliente): `WD_ONBOARDING_DIAS` a partir da call de onboarding, `WD_SERVICE_CONFIG[service].days` a partir de `productionStartedAt`.
+- `WD_PRAZO_ZERADO_EM` (firebase.js): nenhum prazo começa e nenhum ponto conta antes dessa data. É o "zerar contagens" — data, não migração na base.
+- **Pausa**: `job.pausa` (`pendente` → `ativa`) + histórico em `job.pausas[]` (`encerrada`, `recusada`, `cancelada`). O colaborador pede com justificativa; só vale depois que o líder do setor (`leaderOf` com `'webdesign'`) aprova, e aí conta desde o pedido. Pausa do líder já nasce ativa. Mudar de fase fecha a pausa. Ações em `useClients`: `wdPedirPausa`, `wdDecidirPausa`, `wdRetomar`.
+- **Pontos** (`WD_PONTOS`): 1 por item do checklist para quem marcou (`checkedBy`); 5 no prazo / 2 fora para cada responsável quando o serviço sai da produção para finalizado ou recorrência — carimbado em `job.conclusao` por `wdConclusao` e nunca recalculado. Pontos são derivados do estado (`wdPlacarDoMes`, `wdRanking`), então "Reativar" arquiva o ciclo em `job.ciclos[]` antes de zerar o checklist. O placar aparece na Visão Geral do Web e o primeiro colocado no destaque do Web na TV.
+- **Líder** troca tipo (`wdTrocarServico`, refaz o checklist mantendo itens de mesmo nome; espelha `contrato.wdService` no principal) e responsáveis (`wdTrocarResponsaveis`, sincroniza `responsibles.webdesign`) pelo lápis do card. Trocas ficam em `trocas[]` / `trocasServico[]`.
+
 ### Camada de dados = hooks com listeners ao vivo
 
 `src/hooks/use*.js` são a camada de dados de tudo que uma tela renderiza. Cada hook abre um `onSnapshot`, mapeia `{ id, ...data }` para o estado e expõe funções de CRUD. Sem cache, sem normalização, sem store global — o componente assina chamando o hook e toda aba aberta atualiza em tempo real.
@@ -196,7 +203,7 @@ Use a API de **4 níveis** — `HEALTH_LEVELS_4`, `HEALTH_ORDER_4`, `computeOpsH
 
 `/tv` é um segundo produto dentro do app: painel público para a parede do escritório, visível para clientes e visitantes. **Mostra só dado operacional** — nunca faturamento, metas comerciais ou valores.
 
-- **`app_config/general` é o controle remoto ao vivo** (`useAppConfig.js`): `tvPaused` + `tvPauseMessage` (tela de standby), `tvLockScene` (trava uma cena), `tvCelebrations` (confete em entrega), `tvReloadToken` (incrementar recarrega todas as TVs), `tvRadioUrl`/`tvRadioPlaying`/`tvRadioVolume`, `tvVisitMode` (trava na cena segura para visitas) e `tvHonorMetrics` (métrica por squad na cena de destaques — cada squad comparado só consigo mesmo). Controlado por `AdminTVControl.js`.
+- **`app_config/general` é o controle remoto ao vivo** (`useAppConfig.js`): `tvPaused` + `tvPauseMessage` (tela de standby), `tvLockScene` (trava uma cena), `tvCelebrations` (confete em entrega), `tvReloadToken` (incrementar recarrega todas as TVs), `tvRadioUrl`/`tvRadioPlaying`/`tvRadioVolume`, `tvVisitMode` (trava na cena segura para visitas) e `tvHonorMetrics` (métrica por squad na cena de destaques — cada squad comparado só consigo mesmo; Social Media e WebDesign têm métrica fixa em `FIXED_HONOR_METRICS`: média do mês e pontos do mês). Controlado por `AdminTVControl.js`.
 - **Dados vêm de `useTVData.js`**, que entra anonimamente e só lê. Os dois listeners de `tasks` são estreitos de propósito e **não têm `orderBy`** — status abertos e concluídas desde o início do mês — para nunca exigir índice composto.
 - O rádio usa um `<audio>` HTML para sobreviver à suspensão de aba das Smart TVs.
 - No modo visita, métricas em porcentagem ficam de fora: qualquer valor abaixo de 100% expõe um complemento negativo.

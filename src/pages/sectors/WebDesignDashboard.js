@@ -17,7 +17,7 @@ import RequestsInbox from '../../components/shared/RequestsInbox';
 import OnboardingBoard from '../../components/commercial/OnboardingBoard';
 import EntregasSetor from '../../components/entregas/EntregasSetor';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
-import { wdCardsOf, wdOnboardingLate } from '../../lib/wdJobs';
+import { wdCardsOf, wdOnboardingLate, wdPausaPendente, asArray } from '../../lib/wdJobs';
 import { WD_SERVICE_CONFIG } from '../../lib/firebase';
 
 const NAV = [
@@ -38,7 +38,10 @@ const NAV = [
 export default function WebDesignDashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { clients, loading, wdAddService, wdRemoveService, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, marcarEntrega } = useClients();
+  const {
+    clients, loading, wdAddService, wdRemoveService, wdMoveToProduction, wdMoveBackToOnboarding, wdUpdateChecklist, wdUpdateNotes, wdMoveStatus, marcarEntrega,
+    wdTrocarResponsaveis, wdTrocarServico, wdPedirPausa, wdDecidirPausa, wdRetomar,
+  } = useClients();
   const { collaborators } = useCollaborators();
   const { tasks, loading: loadingTasks, createTask, moveToProduction, moveToApproval, approveTask, rejectTask, addComment, updateLinks, deleteTask, changeDeadline } = useTasks();
   const { requests, markSeen, addReply } = useRequests();
@@ -68,6 +71,11 @@ export default function WebDesignDashboard() {
   // Prazo do onboarding conta da call agendada pela CS, não do cadastro.
   const overdueOnboarding = wdCards.filter(({ client, job }) => wdOnboardingLate(client, job)).length;
 
+  // Líder do WebDesign: troca tipo e responsável dos projetos e responde
+  // os pedidos de pausa.
+  const souLider = asArray(user?.leaderOf).includes('webdesign') || !!user?.isAdmin;
+  const pausasPendentes = souLider ? wdCards.filter(k => wdPausaPendente(k.job)).length : 0;
+
   const myTasks = tasks.filter(t => t.responsibleName === user?.name || t.requestedBy === user?.name);
   const pendingApproval = myTasks.filter(t => t.status === 'approval' && t.responsibleName === user?.name).length;
 
@@ -76,10 +84,12 @@ export default function WebDesignDashboard() {
 
   const navItems = NAV.map(n => ({
     ...n,
-    badge: n.key === 'kanban' ? pendingApproval
+    badge: n.key === 'overview' ? pausasPendentes
+      : n.key === 'kanban' ? pendingApproval
       : n.key === 'requests' ? openRequests
       : (counts[n.key] || 0),
-    badgeDanger: (n.key === 'onboarding' && overdueOnboarding > 0)
+    badgeDanger: (n.key === 'overview' && pausasPendentes > 0)
+      || (n.key === 'onboarding' && overdueOnboarding > 0)
       || (n.key === 'kanban' && pendingApproval > 0)
       || (n.key === 'requests' && openRequests > 0),
   }));
@@ -104,6 +114,20 @@ export default function WebDesignDashboard() {
     return res;
   };
 
+  // Ações do card que levam o nome de quem fez (histórico do serviço).
+  const acoesWD = {
+    trocarResponsaveis: wrap((clientId, jobId, nomes) => wdTrocarResponsaveis(clientId, jobId, nomes, user?.name), 'Responsável atualizado.'),
+    trocarServico: wrap((clientId, jobId, service) => wdTrocarServico(clientId, jobId, service, user?.name), 'Tipo do projeto atualizado.'),
+    pedirPausa: wrap((clientId, jobId, motivo) => wdPedirPausa(clientId, jobId, motivo, user?.name, souLider), souLider ? 'Projeto pausado.' : 'Pedido de pausa enviado ao líder.'),
+    decidirPausa: async (clientId, jobId, aprovar, motivoRecusa) => {
+      const res = await wdDecidirPausa(clientId, jobId, aprovar, user?.name, motivoRecusa);
+      if (res.success) toast(aprovar ? 'Pausa aprovada.' : 'Pausa recusada.');
+      else toast(res.error, 'e');
+      return res;
+    },
+    retomar: wrap((clientId, jobId) => wdRetomar(clientId, jobId, user?.name), 'Projeto atualizado.'),
+  };
+
   return (
     <AppShell sectorId="webdesign" navItems={navItems} activeKey={page} onNav={setPage} onAddClient={() => setShowAddModal(true)} addClientLabel="Adicionar Serviço">
         {loading || loadingTasks ? (
@@ -111,7 +135,14 @@ export default function WebDesignDashboard() {
             <div className="spinner" style={{ width: 36, height: 36 }} />
           </div>
         ) : page === 'overview' ? (
-          <WDOverview clients={wdClients} collaborators={collaborators.filter(c => c.sector === 'webdesign')} onNavigate={setPage} />
+          <WDOverview
+            clients={wdClients}
+            todosClientes={clients}
+            collaborators={collaborators.filter(c => c.sector === 'webdesign')}
+            onNavigate={setPage}
+            souLider={souLider}
+            onDecidirPausa={acoesWD.decidirPausa}
+          />
         ) : page === 'kanban' ? (
           <TaskKanban
             tasks={tasks}
@@ -155,6 +186,9 @@ export default function WebDesignDashboard() {
             page={page}
             prodSubTab={prodSubTab}
             setProdSubTab={setProdSubTab}
+            me={user?.name}
+            souLider={souLider}
+            acoes={acoesWD}
             onMoveToProduction={wrap(wdMoveToProduction)}
             onMoveBackToOnboarding={wrap(wdMoveBackToOnboarding)}
             onUpdateChecklist={wdUpdateChecklist}
