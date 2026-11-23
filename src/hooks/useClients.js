@@ -3,7 +3,7 @@ import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, where, ge
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { addDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from '../lib/gravacoes';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, WD_WEB_SERVICES, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo } from '../lib/firebase';
+import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, WD_WEB_SERVICES, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo, SETORES_INDICADOS_PELA_CS } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES, wdConclusao } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
 import { linhaEndereco } from '../lib/cadastro';
@@ -915,8 +915,12 @@ export function useClients() {
   };
 
   // Kick Off realizado: abre o staffing e, junto, libera a CS para
-  // agendar a call de onboarding. Só os líderes de cada setor
-  // conseguem indicar quem fica com o cliente.
+  // agendar a call de onboarding. Os líderes de cada setor indicam
+  // quem fica com o cliente (o TikTok Shop, sem líder, a CS já indicou
+  // no cadastro). Se não falta ninguém — cliente só de TikTok Shop com
+  // a pessoa escolhida —, o quadro fecha aqui mesmo e o cliente vai
+  // direto para o onboarding, sem passar um instante "aguardando
+  // líderes" que não existem.
   const confirmKickoffCall = async (clientId, byName) => {
     try {
       const client = clients.find(c => c.id === clientId);
@@ -925,15 +929,18 @@ export function useClients() {
         return { success: false, error: 'Agende a call antes de marcá-la como realizada.' };
       }
       const now = new Date().toISOString();
-      await updateDoc(doc(db, 'clients', clientId), {
+      const patch = {
         stage: 'staffing',
         active: false,
         'kickoffCall.pending': false,
         'kickoffCall.confirmedAt': now,
         'kickoffCall.confirmedBy': byName || null,
         'staffing.startedAt': now,
-      });
-      return { success: true };
+      };
+      const fechou = asArray(client.staffing?.sectors).length > 0 && pendingSectorsOf(client).length === 0;
+      if (fechou) Object.assign(patch, fechamentoDoQuadro(client, now));
+      await updateDoc(doc(db, 'clients', clientId), patch);
+      return { success: true, fechou };
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
@@ -1009,10 +1016,12 @@ export function useClients() {
       }
       // O CS Operacional já vem preenchido do cadastro, então ele NÃO
       // pode entrar nesta conta — senão nenhum cadastro seria mais
-      // cancelável. O que trava o cancelamento é um líder de setor de
+      // cancelável. Pelo mesmo motivo, a pessoa dos setores sem líder
+      // (TikTok Shop), que a própria CS escolhe no cadastro, também não
+      // conta. O que trava o cancelamento é um líder de setor de
       // produção já ter indicado alguém.
       const indicados = Object.entries(client.responsibles || {})
-        .filter(([sid, v]) => sid !== 'cs' && asArray(v).length);
+        .filter(([sid, v]) => sid !== 'cs' && !SETORES_INDICADOS_PELA_CS.includes(sid) && asArray(v).length);
       if (indicados.length) {
         return { success: false, error: 'Já existe setor com responsável indicado — não dá para cancelar.' };
       }
@@ -1043,6 +1052,11 @@ export function useClients() {
   //                   Tirar ID Visual continua no `idvRemover` (motivo
   //                   obrigatório).
   //   cs            → { de, para }: troca da CS responsável.
+  //   diretos       → { [setor]: [nomes] }: pessoa escolhida pela CS
+  //                   nos setores sem líder (`SETORES_INDICADOS_PELA_CS`,
+  //                   hoje o TikTok Shop). Só vale para setor que está
+  //                   entre os envolvidos; grava o mesmo `staffing.log`
+  //                   da indicação do líder.
   //
   // Mesmo sem `dados`, o estágio é recalculado — é o que o admin usa
   // depois de mexer na equipe pela aba Equipe. Tirar o último setor
@@ -1141,6 +1155,19 @@ export function useClients() {
           upd['responsibles.cs'] = lista;
           upd.csLog = [...asArray(data.csLog), { de: de || null, para, by: byName || null, at: agora }];
           campos.push('cs');
+        }
+
+        if (dados.diretos && typeof dados.diretos === 'object') {
+          Object.entries(dados.diretos).forEach(([sid, nomes]) => {
+            const lista = asArray(nomes).filter(Boolean);
+            if (!SETORES_INDICADOS_PELA_CS.includes(sid) || !setores.includes(sid) || !lista.length) return;
+            const anteriores = resp[sid] || [];
+            resp[sid] = lista;
+            upd[`responsibles.${sid}`] = lista;
+            upd[`staffing.log.${sid}`] = { by: byName || null, at: agora, ...(anteriores.length ? { anteriores } : {}) };
+            upd[`vagas.${sid}`] = deleteField();
+            campos.push(`responsibles.${sid}`);
+          });
         }
 
         // Estágio com o quadro novo. No Kick Off ninguém foi indicado

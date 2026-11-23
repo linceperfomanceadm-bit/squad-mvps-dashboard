@@ -1,5 +1,5 @@
 import {
-  SALE_SERVICES, normalizaLink, linkValido, contractState,
+  SALE_SERVICES, normalizaLink, linkValido, contractState, SECTORS, SETORES_INDICADOS_PELA_CS,
   BRIEFING_MIN_PALAVRAS, BRIEFING_MIN_DISTINTAS, BRIEFING_ROTEIRO,
 } from './firebase';
 import { escopoParaEditar, ehEntregaUnica, mesChave } from './entregas';
@@ -91,8 +91,32 @@ export function formVazio() {
     observations: '',
     itens: [],             // escopo: [{ id, sector, label, qtd, unica }]
     semRecorrencia: false,
-    responsibles: {},      // equipe (só admin)
+    responsibles: {},      // equipe (admin) e setores que a CS indica direto (TikTok Shop)
   };
+}
+
+// ─── Setores que a CS indica direto ───────────────────────────
+// Setor sem líder (TikTok Shop): a CS escolhe a pessoa no próprio
+// cadastro. Aqui só os que estão entre os setores envolvidos.
+export const diretosDoForm = (f) => SETORES_INDICADOS_PELA_CS.filter(sid => (f.sectors || []).includes(sid));
+
+// Primeiro setor indicado pela CS que está marcado, tem gente para
+// escolher e ficou sem ninguém.
+const semIndicacao = (f, comPessoa) =>
+  diretosDoForm(f).find(sid => comPessoa.includes(sid) && !asArray(f.responsibles?.[sid]).length) || null;
+
+// Indicação direta que mudou em relação ao formulário inicial:
+// { [setor]: [nomes] }. Lista vazia não entra — tirar a pessoa sem pôr
+// outra deixaria o cliente sem ninguém; quem não faz parte sai tirando
+// o setor. `setores`: por padrão, os envolvidos; cliente que já está na
+// base passa a lista que o formulário mostrou.
+export function diretosAlterados(f, ini, setores = diretosDoForm(f)) {
+  const d = {};
+  setores.forEach(sid => {
+    const agora = asArray(f.responsibles?.[sid]);
+    if (agora.length && [...agora].sort().join('|') !== [...asArray(ini.responsibles?.[sid])].sort().join('|')) d[sid] = agora;
+  });
+  return d;
 }
 
 // Cliente existente → formulário. Campos sensíveis voltam vazios; o
@@ -146,6 +170,12 @@ export function fluxoAlterado(f, ini, { comEquipe, idvAgora }) {
   // Com a aba Equipe (admin), a CS se troca por lá.
   if (!comEquipe && f.csResponsible && f.csResponsible !== ini.csResponsible) {
     d.cs = { de: ini.csResponsible || null, para: f.csResponsible };
+  }
+  // Pessoa do TikTok Shop escolhida pela CS. Com a aba Equipe (admin),
+  // ela é definida por lá.
+  if (!comEquipe) {
+    const diretos = diretosAlterados(f, ini);
+    if (Object.keys(diretos).length) d.diretos = diretos;
   }
   return d;
 }
@@ -242,7 +272,10 @@ export const briefingExigido = (f, { novo, briefingInicial }) =>
 // Na edição só valem as regras de formato, para não travar o
 // cliente antigo que ainda está incompleto — exceto o briefing, que
 // trava sempre que é alterado (`briefingExigido`).
-export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicial = '', fluxo = null }) {
+// `comPessoa`: setores indicados pela CS que têm alguém ativo para
+// escolher. Sem ninguém cadastrado no setor, o cadastro não trava — a
+// vaga fica pendente no quadro e a CS indica depois.
+export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicial = '', fluxo = null, comPessoa = [] }) {
   const e = { cliente: '', servicos: '', contrato: '', entregas: '', equipe: '' };
   const pj = f.personType === 'pj';
   const end = f.endereco;
@@ -266,6 +299,7 @@ export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicia
     else if (!admin && !f.csResponsible) e.servicos = 'Escolha a CS responsável pelo cliente.';
     else if (f.wdService && !f.sectors.includes('webdesign')) e.servicos = 'O serviço de WebDesign exige o setor WebDesign marcado.';
     else if (f.hasIdVisual && !f.sectors.includes('design')) e.servicos = 'O ID Visual exige o setor Design marcado.';
+    else if (!admin && semIndicacao(f, comPessoa)) e.servicos = `Escolha quem cuida de ${SECTORS[semIndicacao(f, comPessoa)]?.label || 'o setor'}.`;
   } else if (fluxo) {
     // Cliente em fluxo: mesmas amarras do cadastro novo para setores,
     // site e ID Visual. `fluxo.idvAgora`: o cliente tem ID Visual.
@@ -273,6 +307,7 @@ export function errosPorEtapa(f, { novo, admin, financeiroAberto, briefingInicia
     else if (!fluxo.comEquipe && !f.csResponsible) e.servicos = 'Escolha a CS responsável pelo cliente.';
     else if (f.wdService && !f.sectors.includes('webdesign')) e.servicos = 'O serviço de WebDesign exige o setor WebDesign marcado.';
     else if ((fluxo.idvAgora || f.addIdv) && !f.sectors.includes('design')) e.servicos = 'O ID Visual exige o setor Design marcado.';
+    else if (!fluxo.comEquipe && semIndicacao(f, comPessoa)) e.servicos = `Escolha quem cuida de ${SECTORS[semIndicacao(f, comPessoa)]?.label || 'o setor'}.`;
   }
 
   const briefing = briefingExigido(f, { novo, briefingInicial }) ? avaliarBriefing(f.briefing) : null;
@@ -317,18 +352,25 @@ export function montarClienteNovo(f, { admin, anexoContrato, me }) {
   }));
   const callVazia = { pending: false, at: null, meetLink: '', scheduledBy: null, scheduledAt: null, confirmedAt: null, confirmedBy: null };
 
-  // CS: só a CS entra definida; os líderes indicam o resto depois do
-  // Kick Off. Admin: o quadro inteiro já vem preenchido.
+  // CS: a CS entra definida, e também quem ela escolheu nos setores sem
+  // líder (TikTok Shop); os líderes indicam o resto depois do Kick Off.
+  // Admin: o quadro inteiro já vem preenchido.
+  const diretos = admin ? {} : Object.fromEntries(
+    diretosDoForm(f).map(sid => [sid, asArray(f.responsibles?.[sid])]).filter(([, v]) => v.length)
+  );
   const responsibles = admin
     ? Object.fromEntries(Object.entries(f.responsibles || {}).map(([k, v]) => [k, asArray(v)]).filter(([, v]) => v.length))
-    : { cs: [f.csResponsible] };
+    : { cs: [f.csResponsible], ...diretos };
   const inicio = admin ? dataDoInput(f.contractStart) : null;
+  // Mesmo registro da indicação do líder (`staffing.log`), para o card
+  // mostrar quem indicou e quando.
+  const log = Object.fromEntries(Object.keys(diretos).map(sid => [sid, { by: me || null, at: agora }]));
 
   return {
     name: txt(f.name),
     stage: admin ? 'live' : 'kickoff',
     responsibles,
-    staffing: { sectors: f.sectors, startedAt: agora, by: me || null },
+    staffing: { sectors: f.sectors, startedAt: agora, by: me || null, ...(Object.keys(log).length ? { log } : {}) },
     wdService: f.wdService || null,
     // ID Visual pelo admin já nasce com o designer escolhido na equipe;
     // pela CS, o bloco `idv` nasce quando o líder de Design indicar.

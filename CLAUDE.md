@@ -41,10 +41,10 @@ Create React App (JavaScript, sem TypeScript, sem biblioteca de estado, sem fram
 
 - **SDK** — `db`, `auth`, `storage`, `functions`
 - **Login** — `AUTH_EMAIL_DOMAIN`, `loginIdToEmail`
-- **Identidade** — `SECTORS`, `ADMIN_CONFIG`, `sectorTheme`, `CS_ROLES`
+- **Identidade** — `SECTORS`, `ADMIN_CONFIG`, `sectorTheme`, `CS_ROLES`, `SETORES_COM_PAINEL`, `SETORES_INDICADOS_PELA_CS`
 - **Ciclo de vida do cliente** — `CLIENT_STAGES`, `stageOf`, `isStaffing`, `onboardingAgendado`, `naCarteira`, `STAFFING_ALERT_DAYS`
 - **Contrato** — `CONTRACT_ALERT_DAYS`, `CONTRACT_STATUS`, `addMonths`, `contractState`, `contractNeedsAttention`
-- **Cadastro / venda** — `SERVICE_SECTOR_MAP`, `SALE_SERVICES`, `PAYMENT_METHODS`, `RECURRENCE_SERVICES`, `REQUESTING_SECTORS`
+- **Cadastro / venda** — `SERVICE_SECTOR_MAP`, `SALE_SERVICES`, `PAYMENT_METHODS`, `RECURRENCE_SERVICES`, `REQUESTING_SECTORS`, `TIKTOK_SHOP`, `temTiktokShop`, `TIKTOK_SHOP_CORES`
 - **WebDesign e ID Visual** — `WD_SERVICE_CONFIG`, `WD_WEB_SERVICES`, `ID_VISUAL_CONFIG`
 - **Reporte da CS** — `REQUEST_STATUS`, `REQUEST_SECTORS`, `REQUEST_SLA_HOURS`
 - **Quadros** — `SM_COLUMNS`, `TASK_COLUMNS`, `TASK_PRIORITIES`, `APPROVAL_STATUS`, `SLA_DAYS`
@@ -62,6 +62,19 @@ Armadilha: **ID Visual saiu do WebDesign e foi para o Design.** É um bloco pró
 - havendo um anterior em `idvHistory[]`, ele volta a ser o `idv` (e `hasIdVisual` continua `true`);
 - nada é apagado de vez: o bloco removido vai para `idvRemovidos[]` com `removedAt`, `removedBy` e `motivo` (obrigatório), e aparece na ficha do cliente, em Entregas únicas (`EntregasCliente`);
 - `responsibles.design` não é mexido — se o designer estava no cliente só pelo ID Visual, o admin tira pela aba Equipe.
+
+### Setor TikTok Shop — sem painel, indicado pela CS
+
+Desde nov/2026 o TikTok Shop tem setor próprio (`SECTORS.tiktokshop`), porque uma pessoa só cuida dessa frente. O serviço `tiktok_shop` sugere esse setor (`SERVICE_SECTOR_MAP`), então o cliente só de TikTok não precisa de Tráfego, Social ou Web marcados. Duas marcas no setor mudam o comportamento:
+
+- `semPainel` — não tem rota, painel nem cartão na tela inicial (a `HomePage` tem a lista própria). Fica fora da criação e da atribuição de tasks: os seletores do Kanban usam `SETORES_COM_PAINEL`, não `SECTORS`. Continua em tudo que mostra a equipe do cliente (colunas do admin, quadro de responsáveis, Carteira) e no cadastro de colaborador.
+- `indicadoPelaCs` (`SETORES_INDICADOS_PELA_CS`) — não tem líder. A CS escolhe a pessoa na aba Serviços do `ClienteForm` (bloco "Quem cuida do TikTok Shop", já marcada quando o setor tem uma pessoa só):
+  - cadastro novo → entra em `responsibles` com `staffing.log` (`montarClienteNovo`); obrigatório só se houver alguém ativo no setor, senão a vaga fica pendente;
+  - cliente em fluxo → vai em `corrigirFluxo` como `dados.diretos`;
+  - cliente na base → `acoes.indicarDireto` (`setSectorResponsibles`, a mesma indicação do líder).
+  No quadro de responsáveis da CS o setor entra em "Indicar responsáveis" e nunca em "Cobrar". Não conta como "líder já indicou" no `cancelStaffing`. Se nada falta quando o Kick Off é realizado (cliente só de TikTok Shop), o `confirmKickoffCall` já fecha o quadro (`fechamentoDoQuadro`). O admin define pela aba Equipe, como os outros setores.
+
+Setor novo com as mesmas características só precisa das duas marcas em `SECTORS`.
 
 ### Serviços de WebDesign por cliente
 

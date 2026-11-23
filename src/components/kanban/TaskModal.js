@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import { X, Send, Plus, Trash2, ExternalLink, Star } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS } from '../../lib/firebase';
+import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS, SETORES_COM_PAINEL } from '../../lib/firebase';
 import { updateTaskResponsibles } from '../../hooks/useTasks';
 import {
   parseLocalDate, resolveTimeStats, taskTimeStats, deadlineState,
@@ -426,7 +426,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                     onChange={e => setRespPick({ sector: e.target.value, name: '' })}
                   >
                     <option value="">Selecionar setor</option>
-                    {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                    {SETORES_COM_PAINEL.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
                   </select>
                   {respPick.sector && (
                     <select
@@ -559,7 +559,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <select style={S.select} value={approver.sector} onChange={e => setApprover({ sector: e.target.value, name: '' })}>
                         <option value="">Selecionar setor</option>
-                        {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                        {SETORES_COM_PAINEL.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
                       </select>
                       {approver.sector && (
                         <select style={S.select} value={approver.name} onChange={e => setApprover(a => ({ ...a, name: e.target.value }))}>
@@ -592,7 +592,7 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                     <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 8 }}>Quem vai fazer o ajuste?</p>
                     <select style={{ ...S.select, marginBottom: 8 }} value={newResponsible.sector} onChange={e => setNewResponsible({ sector: e.target.value, name: '' })}>
                       <option value="">Selecionar setor</option>
-                      {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                      {SETORES_COM_PAINEL.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
                     </select>
                     {newResponsible.sector && (
                       <select style={{ ...S.select, marginBottom: 10 }} value={newResponsible.name} onChange={e => setNewResponsible(r => ({ ...r, name: e.target.value }))}>

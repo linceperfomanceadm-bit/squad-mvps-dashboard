@@ -16,6 +16,9 @@ import ClienteForm from '../cadastro/ClienteForm';
  * e "Editar cadastro" do cliente em Kick Off/Onboarding, na CS).
  * `acoes.salvarFluxo` libera, para cliente que ainda não entrou na
  * base, a correção de setores, site, ID Visual e CS.
+ * `acoes.indicarDireto` (CS) troca a pessoa do TikTok Shop de cliente
+ * que já está na base — precisa de `collaborators` para listar quem é
+ * do setor.
  */
 export default function ClienteFicha({ client, acoes = {}, collaborators = [], onClose, toast, editar = false, etapaInicial }) {
   const [editando, setEditando] = useState(editar);
@@ -38,6 +41,7 @@ export default function ClienteFicha({ client, acoes = {}, collaborators = [], o
         onSalvarEquipe={comEquipe ? (responsibles) => acoes.salvarEquipe(client.id, responsibles) : undefined}
         onRemoverIdv={acoes.removerIdv ? (motivo) => acoes.removerIdv(client.id, motivo) : undefined}
         onSalvarFluxo={acoes.salvarFluxo ? (dados) => acoes.salvarFluxo(client.id, dados) : undefined}
+        onIndicarDireto={acoes.indicarDireto ? (sector, nomes) => acoes.indicarDireto(client.id, sector, nomes) : undefined}
       />
     );
   }

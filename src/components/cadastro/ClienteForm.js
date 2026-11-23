@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Paperclip, FileCheck2, X, FolderOpen, ExternalLink, Lock } from 'lucide-react';
 import {
   SECTORS, SALE_SERVICES, PAYMENT_METHODS, SERVICE_SECTOR_MAP, WD_SERVICE_CONFIG, WD_WEB_SERVICES,
-  CADASTRO_PENDENCIAS, normalizaLink, linkValido, stageOf,
+  CADASTRO_PENDENCIAS, SETORES_INDICADOS_PELA_CS, normalizaLink, linkValido, stageOf,
 } from '../../lib/firebase';
 import {
   cadastroPendencias, inicioNovaVersao, mesChave, rotuloMes, versoesDoEscopo, aplicarCorrecoesNoMes,
 } from '../../lib/entregas';
 import {
   UFS, formVazio, formDoCliente, sensiveisDoCliente, contaFinanceiro, itensDoEscopo, errosPorEtapa,
-  montarClienteNovo, dadosAlterados, fluxoAlterado, briefingExigido,
+  montarClienteNovo, dadosAlterados, fluxoAlterado, briefingExigido, diretosDoForm, diretosAlterados,
 } from '../../lib/cadastro';
 import { asArray } from '../../lib/wdJobs';
 import { Overlay, ModalHeader, MODAL, LBL, INP, fmtDate, money } from '../commercial/ui';
@@ -46,6 +46,12 @@ import { Bloco, Campo, CampoSensivel, CampoBriefing, Selecao, Chip, Responsaveis
  *                              Antes isso só era possível com o cliente
  *                              na base, e um setor marcado por engano
  *                              travava o quadro pedindo responsável.
+ *
+ * Setor sem líder (TikTok Shop, `SETORES_INDICADOS_PELA_CS`): quem não
+ * tem a aba Equipe (a CS) escolhe a pessoa na aba Serviços — no
+ * cadastro novo e no cliente em fluxo vai junto com o resto; com o
+ * cliente na base, pelo `onIndicarDireto`. Com uma pessoa só no setor,
+ * ela já vem marcada.
  *
  * No cadastro novo as abas funcionam como etapas (Continuar confere a
  * etapa); na edição dá para pular direto para a aba que interessa.
@@ -86,6 +92,7 @@ export default function ClienteForm({
   onSalvarEquipe,   // editar, admin: (responsibles) => { success }
   onRemoverIdv,     // editar, CS/líder/admin: (motivo) => { success }
   onSalvarFluxo,    // editar, cliente em fluxo: (dados) => { success, fechou, reabriu }
+  onIndicarDireto,  // editar, CS, cliente na base: (setor, nomes) => { success }
 }) {
   const novo = modo === 'novo';
   // Na edição a aba Equipe depende de ter onde salvar (só o admin recebe).
@@ -131,11 +138,34 @@ export default function ClienteForm({
     ...csAtivas.map(c => ({ value: c.name, label: c.name })),
     ...(inicial.csResponsible && !csAtivas.some(c => c.name === inicial.csResponsible) ? [{ value: inicial.csResponsible, label: inicial.csResponsible }] : []),
   ];
+  // Setor sem líder: a CS indica a pessoa aqui mesmo (o admin, pela
+  // aba Equipe). Na base, o bloco aparece se o cliente tem o setor, a
+  // pessoa ou o serviço — cliente antigo de TikTok Shop não tem o setor
+  // em `staffing.sectors`.
+  const pessoasDe = (sid) => collaborators.filter(c => c.sector === sid && c.active !== false);
+  const comPessoa = SETORES_INDICADOS_PELA_CS.filter(sid => pessoasDe(sid).length > 0);
+  const naBase = !novo && !emFluxo;
+  const indicaDireto = !comEquipe && (novo || emFluxo || !!onIndicarDireto);
+  const diretosVisiveis = !indicaDireto ? [] : SETORES_INDICADOS_PELA_CS.filter(sid => f.sectors.includes(sid)
+    || (naBase && (asArray(client?.responsibles?.[sid]).length > 0 || Object.keys(f.servicos).some(id => SERVICE_SECTOR_MAP[id] === sid))));
   const erros = errosPorEtapa(f, {
     novo, admin: comEquipe, financeiroAberto, briefingInicial: inicial.briefing,
     fluxo: emFluxo ? { comEquipe, idvAgora } : null,
+    comPessoa,
   });
 
+  // Setor sem líder que acabou de entrar e tem uma pessoa só: ela já
+  // vem marcada (a CS só confere). Com o admin, a equipe é na aba Equipe.
+  const comPadraoDireto = (x) => {
+    if (comEquipe) return x;
+    const resp = { ...x.responsibles };
+    let mudou = false;
+    diretosDoForm(x).forEach(sid => {
+      const gente = pessoasDe(sid);
+      if (!asArray(resp[sid]).length && gente.length === 1) { resp[sid] = [gente[0].name]; mudou = true; }
+    });
+    return mudou ? { ...x, responsibles: resp } : x;
+  };
   // Marcar um serviço sugere o setor dele; desmarcar não tira, porque o
   // setor pode estar ali por outro serviço ou de propósito.
   const toggleServico = (id) => setF(x => {
@@ -144,9 +174,10 @@ export default function ClienteForm({
     s[id] = '';
     const setor = SERVICE_SECTOR_MAP[id];
     const sectors = (novo || emFluxo) && setor && !x.sectors.includes(setor) ? [...x.sectors, setor] : x.sectors;
-    return { ...x, servicos: s, sectors };
+    return comPadraoDireto({ ...x, servicos: s, sectors });
   });
-  const toggleSetor = (id) => setF(x => ({ ...x, sectors: x.sectors.includes(id) ? x.sectors.filter(s => s !== id) : [...x.sectors, id] }));
+  const toggleSetor = (id) => setF(x => comPadraoDireto({ ...x, sectors: x.sectors.includes(id) ? x.sectors.filter(s => s !== id) : [...x.sectors, id] }));
+  const setDireto = (sid, arr) => setF(x => ({ ...x, responsibles: { ...x.responsibles, [sid]: arr } }));
   // Pipeline próprio puxa o setor dono dele.
   const setWd = (v) => setF(x => ({ ...x, wdService: v, sectors: v && !x.sectors.includes('webdesign') ? [...x.sectors, 'webdesign'] : x.sectors }));
   const toggleIdv = () => setF(x => ({ ...x, hasIdVisual: !x.hasIdVisual, sectors: !x.hasIdVisual && !x.sectors.includes('design') ? [...x.sectors, 'design'] : x.sectors }));
@@ -209,8 +240,12 @@ export default function ClienteForm({
     const equipeMudou = comEquipe && JSON.stringify(equipe) !== JSON.stringify(equipeIni);
     const fluxo = emFluxo ? fluxoAlterado(f, inicial, { comEquipe, idvAgora }) : {};
     const fluxoMudou = Object.keys(fluxo).length > 0;
+    // Cliente na base: pessoa do TikTok Shop trocada pela CS. Em fluxo
+    // ela já foi no `fluxo.diretos`.
+    const diretosNaBase = naBase && onIndicarDireto ? diretosAlterados(f, inicial, diretosVisiveis) : {};
+    const diretosMudou = Object.keys(diretosNaBase).length > 0;
 
-    if (!mudouNome && !Object.keys(dados).length && !escopoMudou && !equipeMudou && !fluxoMudou) { onClose(); return; }
+    if (!mudouNome && !Object.keys(dados).length && !escopoMudou && !equipeMudou && !fluxoMudou && !diretosMudou) { onClose(); return; }
 
     setSalvando(true);
     const falha = (msg) => { setSalvando(false); setErro(msg); };
@@ -237,6 +272,10 @@ export default function ClienteForm({
       if (!r?.success) return falha(r?.error || 'Não foi possível salvar as entregas.');
       desde = r.desde;
       corrigiuAtual = !!r.corrigiuAtual;
+    }
+    for (const [sid, nomes] of Object.entries(diretosNaBase)) {
+      const r = await onIndicarDireto(sid, nomes);
+      if (!r?.success) return falha(r?.error || `Não foi possível salvar quem cuida de ${SECTORS[sid]?.label || sid}.`);
     }
     if (equipeMudou) {
       const r = await onSalvarEquipe(equipe);
@@ -265,6 +304,28 @@ export default function ClienteForm({
   };
 
   // ── Render ────────────────────────────────────────────────
+  // Quem cuida dos setores sem líder (TikTok Shop), escolhido pela CS.
+  const blocoDiretos = () => diretosVisiveis.map(sid => {
+    const label = SECTORS[sid]?.label || sid;
+    const obrigatorio = !naBase && comPessoa.includes(sid);
+    return (
+      <Bloco
+        key={`direto-${sid}`}
+        titulo={`QUEM CUIDA DO ${label.toUpperCase()}${obrigatorio ? ' *' : ''}`}
+        hint={naBase
+          ? `${label} não tem líder: a troca da pessoa vale assim que você salvar.`
+          : `${label} não tem líder para indicar: a pessoa escolhida aqui já entra no quadro de responsáveis.`}
+      >
+        <ResponsaveisSetor sectorId={sid} collaborators={collaborators} selected={f.responsibles[sid]} onChange={(arr) => setDireto(sid, arr)} />
+        {!comPessoa.includes(sid) && (
+          <p style={{ ...S.hint, color: 'var(--amber)' }}>
+            Ninguém cadastrado em {label} ainda. Peça ao admin para cadastrar a pessoa; até lá o setor fica pendente no quadro e você indica depois.
+          </p>
+        )}
+      </Bloco>
+    );
+  });
+
   const titulo = novo ? (admin ? 'Novo cliente' : 'Cadastrar cliente') : `Cadastro · ${client.name}`;
   const ultima = idx === etapas.length - 1;
   const erroDaEtapa = tentou ? erros[etapa] : '';
@@ -419,6 +480,8 @@ export default function ClienteForm({
                 </Bloco>
               )}
 
+              {novo && blocoDiretos()}
+
               {novo && (
                 <Bloco titulo="SITE E ID VISUAL" hint="Abrem acompanhamento próprio no painel do time e contam como entrega quando o serviço é finalizado. Podem ser marcados juntos.">
                   <Selecao label="Serviço de WebDesign" value={f.wdService} onChange={setWd} vazio="Nenhum" opcoes={WD_WEB_SERVICES.map(k => ({ value: k, label: WD_SERVICE_CONFIG[k]?.label || k }))} />
@@ -454,6 +517,8 @@ export default function ClienteForm({
                 </Bloco>
               )}
 
+              {emFluxo && blocoDiretos()}
+
               {emFluxo && (
                 <Bloco titulo="SITE E ID VISUAL" hint="Abrem acompanhamento próprio no painel do time e contam como entrega quando o serviço é finalizado.">
                   {wdEditavel ? (
@@ -482,6 +547,8 @@ export default function ClienteForm({
                   )}
                 </Bloco>
               )}
+
+              {naBase && blocoDiretos()}
 
               {!novo && <IdVisualCadastro client={client} onRemover={onRemoverIdv} />}
               {!novo && !emFluxo && (

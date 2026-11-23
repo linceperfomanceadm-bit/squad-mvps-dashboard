@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Plus, Trash2, Archive } from 'lucide-react';
-import { TASK_PRIORITIES, SECTORS, isInativo } from '../../lib/firebase';
+import { TASK_PRIORITIES, SETORES_COM_PAINEL, isInativo } from '../../lib/firebase';
 
 const porNome = (a, b) => (a.name || '').localeCompare(b.name || '');
 
@@ -182,7 +182,7 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
               <label style={S.label}>SETOR RESPONSÁVEL *</label>
               <select style={S.select} value={form.responsibleSector} onChange={e => { set('responsibleSector', e.target.value); set('responsibleNames', []); }}>
                 <option value="">Selecionar setor</option>
-                {Object.values(SECTORS).map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {SETORES_COM_PAINEL.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
               </select>
             </div>
             <div style={S.field}>

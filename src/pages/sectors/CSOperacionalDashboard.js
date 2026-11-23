@@ -28,7 +28,7 @@ import ClienteFicha from '../../components/entregas/ClienteFicha';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { cadastroPendencias, entregasDoMes, resumoMes, mesChave } from '../../lib/entregas';
 import { Aderencia } from '../../components/entregas/EntregasKit';
-import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, stageOf, driveDoCliente } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, SETORES_INDICADOS_PELA_CS, stageOf, driveDoCliente } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
   HEALTH_LEVELS_4, HEALTH_ORDER_4,
@@ -121,14 +121,15 @@ export default function CSOperacionalDashboard() {
   // `corrigirFluxo`: com o cliente ainda fora da base, corrige também
   // setores envolvidos, site, ID Visual e CS.
   const acoesEntregas = acoesDeEntregas(
-    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, idvRemover, corrigirFluxo },
+    { saveCadastro, saveEscopo, uploadClientFile, marcarEntrega, ajustarMesEntregas, idvRemover, corrigirFluxo, setSectorResponsibles },
     me, toast
   );
   // Setores que esta pessoa pode preencher: os que ela lidera (e todos,
-  // se for admin). Sem isso, o quadro do card é só leitura.
+  // se for admin), mais os setores sem líder, que a CS indica direto
+  // (TikTok Shop). Sem isso, o quadro do card é só leitura.
   const mySectors = user?.isAdmin
     ? Object.keys(SECTORS)
-    : (Array.isArray(user?.leaderOf) ? user.leaderOf : []);
+    : [...new Set([...(Array.isArray(user?.leaderOf) ? user.leaderOf : []), ...SETORES_INDICADOS_PELA_CS])];
 
   const activeClients = useMemo(
     () => clients.filter(c => c.active !== false),
@@ -287,7 +288,11 @@ export default function CSOperacionalDashboard() {
 
   const confirmarKickoff = async (c) => {
     const r = await confirmKickoffCall(c.id, me);
-    if (r.success) toast(`Kick Off de ${c.name} concluído! Os líderes já podem indicar o time. 🚀`);
+    if (r.success) {
+      toast(r.fechou
+        ? `Kick Off de ${c.name} concluído! O quadro já está completo — agende a call de onboarding.`
+        : `Kick Off de ${c.name} concluído! Os líderes já podem indicar o time. 🚀`);
+    }
     else toast(r.error, 'e');
     return r;
   };
@@ -749,6 +754,7 @@ export default function CSOperacionalDashboard() {
         <ClienteFicha
           client={editarFluxoClient}
           acoes={acoesEntregas}
+          collaborators={collaborators}
           toast={toast}
           editar
           etapaInicial="servicos"
@@ -758,7 +764,7 @@ export default function CSOperacionalDashboard() {
 
       {/* Contrato, cadastro e entregas do cliente (aberto pelo drawer). */}
       {fichaClient && (
-        <ClienteFicha client={fichaClient} acoes={acoesEntregas} toast={toast} onClose={() => setFichaId(null)} />
+        <ClienteFicha client={fichaClient} acoes={acoesEntregas} collaborators={collaborators} toast={toast} onClose={() => setFichaId(null)} />
       )}
 
       {healthTarget && ReactDOM.createPortal(
@@ -877,6 +883,9 @@ function FlowCard({ client, pendentes, meus = [], onOpen, onSchedule, onConfirm,
   const passou = at && new Date(at) < new Date();
   const dias = diasDesde(client.staffing?.startedAt || client.kickoffCall?.confirmedAt);
   const atrasado = !completo && dias != null && dias >= STAFFING_ALERT_DAYS;
+  // Setor sem líder (TikTok Shop) não tem quem cobrar: a CS indica
+  // pelo botão "Indicar responsáveis".
+  const cobraveis = pendentes.filter(sid => !SETORES_INDICADOS_PELA_CS.includes(sid));
 
   const borda = atrasado ? 'var(--neon-border)'
     : !at ? 'var(--amber-b)'
@@ -948,14 +957,14 @@ function FlowCard({ client, pendentes, meus = [], onOpen, onSchedule, onConfirm,
         {!completo && dias != null && (
           <p style={{ fontSize: 11, color: atrasado ? 'var(--neon)' : 'var(--dim)', fontFamily: 'var(--fm)', marginTop: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Clock size={11} /> Kick Off há {dias} dia{dias !== 1 ? 's' : ''}
-            {atrasado ? ' · vale cobrar o líder' : ''}
+            {atrasado && cobraveis.length ? ' · vale cobrar o líder' : ''}
           </p>
         )}
       </button>
 
-      {pendentes.length > 0 && (
+      {cobraveis.length > 0 && (
         <div style={{ marginTop: 12, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {pendentes.map(sid => {
+          {cobraveis.map(sid => {
             const cobrado = client.staffing?.nudges?.[sid];
             const quando = cobrado?.at ? fmtDate(cobrado.at) : null;
             return (

@@ -86,7 +86,20 @@ export const SECTORS = {
   videomaker:  { id: 'videomaker',  label: 'VideoMaker',    color: '#3636D1', c2: '#7C5CFF', on: '#ffffff', light: { color: '#3232C4', c2: '#6247E3' }, emoji: '🎬', logo: '/logos/videomaker.png' },
   cs:          { id: 'cs',          label: 'CS',            color: '#3EFFFF', c2: '#4DA6FF', on: '#052226', light: { color: '#0A7588', c2: '#1E63C4' }, emoji: '🎧', logo: '/logos/cs.png' },
   trafego:     { id: 'trafego',     label: 'Tráfego Pago',  color: '#FFC107', c2: '#FF7A3D', on: '#1a1400', light: { color: '#9C6500', c2: '#C94A17' }, emoji: '📊', logo: '/logos/trafego.png' },
+  // TikTok Shop (nov/2026): uma pessoa só cuida dessa frente, então o
+  // setor existe para mostrar quem é o responsável no cliente — não tem
+  // painel, rota nem cartão na tela inicial (`semPainel`), e não tem
+  // líder: quem indica a pessoa é a CS, no cadastro (`indicadoPelaCs`).
+  // Cores da marca TikTok (rosa → ciano); no claro, versões escurecidas.
+  tiktokshop:  { id: 'tiktokshop',  label: 'TikTok Shop',   color: '#F50645', c2: '#02EEEA', on: '#ffffff', light: { color: '#C8043A', c2: '#0A8A87' }, emoji: '🛍️', logo: null, semPainel: true, indicadoPelaCs: true },
 };
+
+// Setores que recebem task. Setor sem painel fica de fora da criação e
+// da atribuição de tasks: a pessoa não teria onde ver nem entregar.
+export const SETORES_COM_PAINEL = Object.values(SECTORS).filter(s => !s.semPainel);
+// Setores sem líder: a CS indica o responsável direto (cadastro, edição
+// e quadro de responsáveis), em vez de cobrar um líder que não existe.
+export const SETORES_INDICADOS_PELA_CS = Object.values(SECTORS).filter(s => s.indicadoPelaCs).map(s => s.id);
 
 // Entrada do Admin (não é um "setor" comum, mas a tela de login usa).
 export const ADMIN_CONFIG = { id: 'admin', label: 'Admin', color: '#EE3363', c2: '#FF7A3D', on: '#ffffff', light: { color: '#D4224F', c2: '#E0521F' }, emoji: '👑', logo: '/logos/admin.png' };
@@ -336,8 +349,9 @@ export const SERVICE_SECTOR_MAP = {
   webdesign:      'webdesign',
   video:          'videomaker',
   design:         'design',
-  // TikTok Shop roda pelo GMV Max (anúncio) — sugere Tráfego.
-  tiktok_shop:    'trafego',
+  // Desde nov/2026 o TikTok Shop tem setor próprio: o cliente só de
+  // TikTok não precisa mais de Tráfego, Social ou Web marcados.
+  tiktok_shop:    'tiktokshop',
 };
 
 // ─── Pasta do cliente no Drive ────────────────────────────────
@@ -529,8 +543,8 @@ export const SALE_SERVICES = [
 ];
 
 // ─── TikTok Shop ──────────────────────────────────────────────
-// Não é setor nem flag à parte: é um serviço contratado como os outros
-// (contrato.servicos). Assim a CS marca no cadastro, corrige pela
+// O que foi vendido é um serviço contratado como os outros
+// (contrato.servicos); quem cuida é o setor `tiktokshop` (ver SECTORS). Assim a CS marca no cadastro, corrige pela
 // edição (marcar em cliente antigo ou desmarcar cadastro errado) e o
 // app inteiro lê do mesmo lugar. `services` é o espelho legado no topo
 // do doc; cliente antigo pode ter só ele, e em formato não-array.

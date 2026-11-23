@@ -5,7 +5,8 @@
  *
  *   acoesDeEntregas(useClientsResult, me, toast)            → tudo (CS, líder, admin)
  *     (renomear e salvarEquipe só existem se a tela passar renameClient
- *     e updateClient — hoje só o admin passa)
+ *     e updateClient — hoje só o admin passa; indicarDireto, se passar
+ *     setSectorResponsibles — hoje só a CS)
  *   acoesDeEntregas(useClientsResult, me, toast, { soMarcar: true }) → quem produz
  *
  * Ação que não vem no objeto some da tela (sem botão).
@@ -52,6 +53,12 @@ export function acoesDeEntregas(fns, me, toast, { soMarcar = false } = {}) {
     // só mostra esses campos com o cliente em fluxo.
     salvarFluxo: fns.corrigirFluxo
       ? async (clientId, dados) => fns.corrigirFluxo(clientId, dados, me)
+      : undefined,
+    // Pessoa do setor sem líder (TikTok Shop) em cliente que já está na
+    // base. Em fluxo isso vai junto no `salvarFluxo`; aqui é a mesma
+    // indicação do líder (`setSectorResponsibles`), feita pela CS.
+    indicarDireto: fns.setSectorResponsibles
+      ? async (clientId, sector, nomes) => fns.setSectorResponsibles(clientId, sector, nomes, me)
       : undefined,
     // Só o admin recebe estas duas (formulário único: nome e equipe).
     // O nome vai pelo renameClient porque está copiado em tasks,
