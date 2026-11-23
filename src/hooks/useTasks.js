@@ -195,6 +195,60 @@ export async function updateTaskResponsibles(task, people, byName, bySector) {
   } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
 }
 
+// ─── Troca do aprovador (só admin) ────────────────────────────
+// Task já na coluna de aprovação parada com quem não vai aprovar
+// (férias, saiu da agência, mandaram para a pessoa errada): o admin
+// passa para outra pessoa. Em aprovação o "responsável" da task É o
+// aprovador (ver moveToApproval), então a troca reescreve os mesmos
+// campos. Nada do resto muda: a entrega, quem entregou e o carimbo de
+// "no prazo" continuam os da primeira entrega; o prazo segue congelado
+// (`approvalStartedAt` não muda) e o evento `approver_changed` divide o
+// tempo de aprovação entre quem saiu e quem entrou (taskTime.js).
+// Quem recebe ganha o aviso de "Task aguardando sua aprovação" pelo
+// NotificationCenter, porque a task passou a ser dele.
+export async function trocarAprovador(task, novo, byName, bySector) {
+  try {
+    if (!task || !task.id) return { success: false, error: 'Task não encontrada.' };
+    if (task.status !== 'approval') return { success: false, error: 'Só dá para trocar o aprovador com a task em aprovação.' };
+    const nome = String(novo?.name || '').trim();
+    const setor = novo?.sector || null;
+    if (!nome || !setor) return { success: false, error: 'Escolha quem vai aprovar.' };
+    const anterior = task.responsibleName
+      || (Array.isArray(task.responsibleNames) ? task.responsibleNames[0] : '')
+      || null;
+    if (nome === anterior) return { success: true, unchanged: true };
+
+    const now = new Date().toISOString();
+    const timeline = [...(task.timeline || []), {
+      action: 'approver_changed',
+      by: byName || null,
+      sector: bySector || null,
+      from: anterior,
+      to: nome,
+      toSector: setor,
+      at: now,
+    }];
+    const comments = [...(task.comments || []), {
+      id: `c_${Date.now()}`,
+      author: byName || null,
+      sector: bySector || null,
+      text: `Aprovação transferida${anterior ? ` de ${anterior}` : ''} para ${nome}.`,
+      createdAt: now,
+      isSystem: true,
+    }];
+
+    await updateDoc(doc(db, 'tasks', task.id), {
+      responsibleName: nome,
+      responsibleSector: setor,
+      responsibleNames: [nome],
+      responsibleSectors: [setor],
+      timeline,
+      comments,
+    });
+    return { success: true, de: anterior, para: nome };
+  } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
+}
+
 // ─── O que cada painel acompanha ao vivo ──────────────────────
 // Até 22/out/2026 todo painel ouvia a coleção `tasks` inteira, com o
 // histórico desde o começo do app. Cada abertura do app (e cada volta

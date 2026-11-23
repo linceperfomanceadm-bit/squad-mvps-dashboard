@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
-import { X, Send, Plus, Trash2, ExternalLink, Star } from 'lucide-react';
+import { X, Send, Plus, Trash2, ExternalLink, Star, UserCog } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TASK_PRIORITIES, TASK_COLUMNS, SECTORS, SETORES_COM_PAINEL } from '../../lib/firebase';
-import { updateTaskResponsibles } from '../../hooks/useTasks';
+import { updateTaskResponsibles, trocarAprovador } from '../../hooks/useTasks';
 import {
   parseLocalDate, resolveTimeStats, taskTimeStats, deadlineState,
   formatBusinessDuration, businessMsBetween, taskCreatedAt, isTaskOnTime,
@@ -117,6 +117,11 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   const [respPick, setRespPick] = useState({ sector: '', name: '' });
   const [respBusy, setRespBusy] = useState(false);
   const [respError, setRespError] = useState('');
+  // Troca do aprovador (só admin, task já em aprovação).
+  const [showTrocaAprov, setShowTrocaAprov] = useState(false);
+  const [trocaAprov, setTrocaAprov] = useState({ sector: '', name: '' });
+  const [trocaBusy, setTrocaBusy] = useState(false);
+  const [trocaErro, setTrocaErro] = useState('');
   const chatEndRef = useRef(null);
   const commentRef = useRef(null);
 
@@ -183,6 +188,19 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
     setShowApprovalForm(false);
   };
 
+  // Admin passa a aprovação para outra pessoa sem tirar a task da
+  // coluna — ver trocarAprovador no useTasks.
+  const handleTrocarAprovador = async () => {
+    if (!trocaAprov.name || !trocaAprov.sector) return;
+    setTrocaBusy(true);
+    setTrocaErro('');
+    const r = await trocarAprovador(task, trocaAprov, currentUser, currentUserSector);
+    setTrocaBusy(false);
+    if (!r?.success) { setTrocaErro(r?.error || 'Não foi possível trocar o aprovador.'); return; }
+    setShowTrocaAprov(false);
+    setTrocaAprov({ sector: '', name: '' });
+  };
+
   const handleApprove = async () => {
     await onApprove(task.id);
     setShowCompletion(true);
@@ -240,7 +258,8 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
   // abaixo de prazo, tempo, responsáveis e links — no notebook o "Concluí"
   // e o "Aprovar" (o que a pessoa mais usa) ficavam fora da tela.
   const podeAgir = !readOnly && task.status !== 'done' && (isAdmin || isResponsible);
-  const temAcoes = (podeAgir && ['todo', 'doing', 'approval'].includes(task.status)) || showApprovalForm || showRejectForm;
+  const podeTrocarAprovador = isAdmin && !readOnly && task.status === 'approval';
+  const temAcoes = (podeAgir && ['todo', 'doing', 'approval'].includes(task.status)) || showApprovalForm || showRejectForm || showTrocaAprov;
 
   const content = (
     <div
@@ -582,7 +601,44 @@ export default function TaskModal({ task, currentUser, currentUserSector, collab
                     {!showRejectForm && (
                       <button style={S.actionBtn('var(--red)')} onClick={() => setShowRejectForm(true)}>✕ Reprovar — Solicitar Ajuste</button>
                     )}
+                    {podeTrocarAprovador && !showTrocaAprov && !showRejectForm && (
+                      <button
+                        style={{ ...S.cancelBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                        onClick={() => { setTrocaErro(''); setShowTrocaAprov(true); }}
+                        title="Passar a aprovação para outra pessoa — a task continua na coluna de aprovação"
+                      >
+                        <UserCog size={14} /> Trocar aprovador
+                      </button>
+                    )}
                   </>
+                )}
+
+                {showTrocaAprov && (
+                  <div style={{ background: 'var(--amber-dim)', border: '1px solid var(--amber-b)', borderRadius: 10, padding: 14 }}>
+                    <p style={{ fontSize: 12, color: 'var(--amber)', marginBottom: 4, fontWeight: 600 }}>Quem vai aprovar no lugar de {principalName || 'quem está hoje'}?</p>
+                    <p style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 10, lineHeight: 1.5 }}>
+                      A task continua em aprovação e o prazo segue congelado. A troca fica registrada no chat.
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <select style={S.select} value={trocaAprov.sector} onChange={e => setTrocaAprov({ sector: e.target.value, name: '' })}>
+                        <option value="">Selecionar setor</option>
+                        {SETORES_COM_PAINEL.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                      </select>
+                      {trocaAprov.sector && (
+                        <select style={S.select} value={trocaAprov.name} onChange={e => setTrocaAprov(a => ({ ...a, name: e.target.value }))}>
+                          <option value="">Selecionar colaborador</option>
+                          {sectorCollabs(trocaAprov.sector).filter(c => c.name !== principalName).map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                        </select>
+                      )}
+                      {trocaErro && <p style={{ fontSize: 12, color: 'var(--red)' }}>{trocaErro}</p>}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button style={{ ...S.actionBtn('var(--amber)', true), flex: 1 }} onClick={handleTrocarAprovador} disabled={!trocaAprov.name || trocaBusy}>
+                          {trocaBusy ? 'Trocando...' : 'Confirmar troca'}
+                        </button>
+                        <button style={S.cancelBtn} onClick={() => setShowTrocaAprov(false)}>Cancelar</button>
+                      </div>
+                    </div>
+                  </div>
                 )}
 
                 {showRejectForm && (

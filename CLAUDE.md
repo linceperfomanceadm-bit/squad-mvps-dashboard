@@ -177,6 +177,8 @@ As guardas do front são só UX — a barreira real são as regras do Firestore.
 
 **"No prazo" tem uma resposta só: `isTaskOnTime(task)`.** Quem decide é a *primeira* entrega (envio para aprovação), carimbada em `firstDeliveredAt` / `firstDeliveredOnTime`; a espera do aprovador e as rodadas de ajuste nunca viram atraso — ajuste é `reworkMs`. `deliveredOnTime` (última rodada) é só informação. TV, Relatórios, Extrato, badge e tela de conclusão leem essa função; não recrie a regra comparando `completedAt` com `deadline`.
 
+**Troca de aprovador (nov/2026).** Com a task já na coluna de aprovação, o admin passa a aprovação para outra pessoa pelo modal da task (`trocarAprovador` em `useTasks.js`). Em aprovação o responsável da task é o aprovador, então a troca reescreve `responsibleName(s)`/`responsibleSector(s)` e nada mais: entrega, `deliveredBy*` e o carimbo de "no prazo" ficam os da primeira entrega, e o prazo segue congelado (`approvalStartedAt` não muda). O evento `approver_changed` na timeline é de posse (`OWNERSHIP_ACTIONS`): o tempo de aprovação até a troca fica com quem saiu e o resto com quem entrou. Quem recebe ganha o aviso de "Task aguardando sua aprovação" pelo `NotificationCenter`.
+
 O mesmo relógio mede o SLA do Reporte da CS (`REQUEST_SLA_HOURS`, de 4h urgente a 72h baixa). Ele ordena a fila e sinaliza estouro; não bloqueia nada. O SLA de produção de Design/Vídeo (`SLA_DAYS`) é visível só no admin, nunca para o colaborador.
 
 ### Ciclo de vida do cliente

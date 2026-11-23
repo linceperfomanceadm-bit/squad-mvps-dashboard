@@ -164,7 +164,11 @@ export function formatBusinessDuration(ms) {
 // mudança de prazo e troca de responsáveis extras NÃO cortam o
 // intervalo — era esse o furo do cálculo antigo, que jogava fora o
 // tempo restante toda vez que alguém mexia em algo no meio.
-const OWNERSHIP_ACTIONS = ['created', 'started', 'sent_for_approval', 'rejected', 'completed'];
+// `approver_changed` (nov/2026): o admin passa a aprovação para outra
+// pessoa com a task já na coluna de aprovação. Continua sendo fase de
+// aprovação, só muda quem está com ela — a espera até a troca fica com
+// quem saía, o resto com quem entrou.
+const OWNERSHIP_ACTIONS = ['created', 'started', 'sent_for_approval', 'approver_changed', 'rejected', 'completed'];
 
 // `responsibles_changed` não troca a FASE da task (execução, aprovação,
 // retrabalho), mas troca QUEM está com ela. Por isso entra como corte de
@@ -179,6 +183,7 @@ const segmentFor = (event) => {
     case 'started':
       return { owner: event.by || null, sector: event.sector || null, kind: 'work' };
     case 'sent_for_approval':
+    case 'approver_changed':
       return { owner: event.to || null, sector: null, kind: 'approval' };
     case 'rejected':
       return { owner: event.newResponsible || null, sector: null, kind: 'rework' };
