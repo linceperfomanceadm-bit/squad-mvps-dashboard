@@ -1,6 +1,6 @@
 {
   "rewrites": [{ "source": "/(.*)", "destination": "/" }],
-  "buildCommand": "npm run build",
+  "buildCommand": "REACT_APP_VERSAO=$VERCEL_GIT_COMMIT_SHA REACT_APP_BUILD_EM=$(date -u +%Y-%m-%dT%H:%M:%SZ) npm run build",
   "outputDirectory": "build",
   "framework": "create-react-app"
 }

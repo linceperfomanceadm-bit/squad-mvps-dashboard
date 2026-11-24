@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useTheme, useSectorTheme, useBrandLogo } from '../../contexts/ThemeContext';
 import { SECTORS, ADMIN_CONFIG } from '../../lib/firebase';
 import { useDesktopNotifications } from '../../hooks/useDesktopNotifications';
+import { VERSAO_ROTULO, VERSAO_COMMIT, VERSAO_DETALHE } from '../../lib/versao';
 
 // ─── AppShell ─────────────────────────────────────────────────
 // Casca única de todos os painéis (admin e setores):
@@ -157,6 +158,7 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
           <button className="sb-item compacta" onClick={logout} title="Sair">
             <LogOut size={16} />
           </button>
+          <span style={{ ...S.versao, textAlign: 'center' }} title={VERSAO_DETALHE}>{VERSAO_COMMIT}</span>
         </div>
       </aside>
     );
@@ -209,6 +211,9 @@ export function Aside({ sectorId, navItems, activeKey, onNav, onAddClient, addCl
         <button className="sb-item" onClick={logout}>
           <LogOut size={16} /> Sair
         </button>
+        {/* Versão do app (lib/versao.js): serve para conferir se a pessoa
+            está com o último deploy ou com uma aba antiga aberta. */}
+        <span style={S.versao} title={VERSAO_DETALHE}>{VERSAO_ROTULO}</span>
       </div>
     </aside>
   );
@@ -403,6 +408,7 @@ const S = {
   pontoAtivo: { width: 6, height: 6, borderRadius: '50%', background: 'var(--c)', flexShrink: 0 },
   subLista: { display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0 6px 19px', paddingLeft: 9, borderLeft: '1px solid var(--border)' },
   subItem: { padding: '7px 10px', fontSize: 13, gap: 9 },
+  versao: { display: 'block', padding: '2px 8px 0', fontFamily: 'var(--fm)', fontSize: 9.5, color: 'var(--dim)', letterSpacing: '.02em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'default', userSelect: 'all' },
   foot: { paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 6 },
   badge: { position: 'absolute', top: 4, right: 3, minWidth: 16, height: 16, padding: '0 4px', borderRadius: 99, background: 'var(--c)', color: 'var(--on)', fontFamily: 'var(--fm)', fontSize: 9.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' },
   panel: { position: 'absolute', top: 44, right: 0, width: 340, background: 'var(--bg2)', border: '1px solid var(--border-h)', borderRadius: 16, boxShadow: '0 20px 50px -20px rgba(0,0,0,.5), var(--shadow)', zIndex: 60, overflow: 'hidden' },

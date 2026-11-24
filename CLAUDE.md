@@ -17,6 +17,8 @@ Não há testes nem script de lint. O lint é só o `eslintConfig: ["react-app"]
 
 **Deploy:** a Vercel publica automaticamente a partir da `main` (`vercel.json`: rewrite de tudo para `/`, saída `build/`). O build roda com `CI=true`, então **qualquer warning de ESLint derruba o deploy** — import ou variável sem uso, dependência de hook faltando, `no-loop-func`. `functions/` é publicado à parte pelo Firebase CLI e não entra no build da Vercel.
 
+**Versão no rodapé:** o `buildCommand` do `vercel.json` grava `REACT_APP_VERSAO` (commit) e `REACT_APP_BUILD_EM` (hora do build) antes do `npm run build`; `src/lib/versao.js` formata e o rodapé da sidebar (`Aside`, no `AppShell`) mostra "v 24/11 10:45 · d83e99c". Serve para conferir se alguém está com uma aba antiga aberta — já aconteceu de uma aba de antes de um deploy rodar código velho por dias e desfazer o trabalho dos outros. No `npm start` aparece "dev".
+
 Variáveis obrigatórias: as seis `REACT_APP_FIREBASE_*` — sem elas o `initializeApp` recebe config indefinida e o app abre em branco.
 
 > A CONFIRMAR: o comando de deploy das functions foi inferido de `firebase.json`; não há `.firebaserc` nem project id versionado.
