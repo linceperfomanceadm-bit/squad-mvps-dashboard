@@ -182,17 +182,53 @@ export const onboardingAgendado = (c) => {
 };
 
 /*
- * Cliente inativo — saiu da base, mas o histórico fica.
+ * Cliente fora da base — pausado ou encerrado. O histórico fica.
  *
- * Inativar grava `active: false` (o que já tira o cliente de toda
+ * Tirar da base grava `active: false` (o que já tira o cliente de toda
  * visão geral, métrica, carteira e da TV, sem mexer em tela nenhuma) e
- * o bloco `inativo = { at, by, motivo }`, que é o que diferencia o
- * inativo do cliente que só está correndo o fluxo de entrada — os dois
- * gravam `active: false`. Reativar apaga o bloco e volta `active: true`.
- * Só cliente já na base (`live`) pode ser inativado; desistência no
+ * o bloco `inativo = { at, by, motivo, tipo }`, que é o que diferencia
+ * quem saiu da base do cliente que só está correndo o fluxo de entrada
+ * — os dois gravam `active: false`. Reativar apaga o bloco e volta
+ * `active: true`. Só cliente já na base (`live`) sai; desistência no
  * meio do fluxo continua sendo exclusão.
+ *
+ * Duas situações (nov/2026 — antes era tudo "Inativo"):
+ *   · Pausado   — o cliente parou e deve voltar. O contrato continua
+ *                 aberto e não conta como churn.
+ *   · Encerrado — saiu de vez. O contrato é encerrado junto e entra no
+ *                 churn do mês da TV comercial.
+ *
+ * O campo continua se chamando `inativo` de propósito (mesma lógica do
+ * `kickoff{}`): renomear exigiria migrar a base sem ganho. Docs de antes
+ * da divisão não têm `tipo`; a situação sai do contrato — quem saiu com
+ * o contrato encerrado é Encerrado, quem desmarcou "encerrar o contrato"
+ * (o modal antigo dizia "desmarque se o cliente só pausou") é Pausado.
+ *
+ * `isInativo` segue valendo "fora da base" (pausado ou encerrado) e é o
+ * que as carteiras, o Kanban e as entregas usam. Para saber qual dos
+ * dois, use `situacaoFora`.
  */
 export const isInativo = (c) => !!c?.inativo?.at;
+
+export const CLIENTE_FORA = {
+  pausado: {
+    id: 'pausado', label: 'Pausado', plural: 'Pausados', desde: 'Pausado desde',
+    cor: 'var(--amber)', fundo: 'var(--amber-dim)', borda: 'var(--amber-b)',
+  },
+  encerrado: {
+    id: 'encerrado', label: 'Encerrado', plural: 'Encerrados', desde: 'Encerrado em',
+    cor: 'var(--muted)', fundo: 'var(--bg3)', borda: 'var(--border)',
+  },
+};
+
+export const situacaoFora = (c) => {
+  if (!isInativo(c)) return null;
+  const tipo = c.inativo.tipo;
+  if (tipo === 'pausado' || tipo === 'encerrado') return tipo;
+  return contractState(c).status === 'closed' ? 'encerrado' : 'pausado';
+};
+export const isPausado   = (c) => situacaoFora(c) === 'pausado';
+export const isEncerrado = (c) => situacaoFora(c) === 'encerrado';
 
 /*
  * Cliente que já pertence à carteira de alguém.

@@ -322,7 +322,9 @@ export default function AdminDashboard() {
             onInativar={async (id, opcoes) => {
               const nome = clients.find(c => c.id === id)?.name || 'Cliente';
               const r = await inativarCliente(id, opcoes, user?.name);
-              if (r.success) toast(`${nome} inativado. Ele está na aba Inativos.`);
+              if (r.success) toast(opcoes?.tipo === 'pausado'
+                ? `${nome} pausado. Ele está na aba Pausados.`
+                : `${nome} encerrado. Ele está na aba Encerrados.`);
               else toast(r.error, 'e');
               return r;
             }}

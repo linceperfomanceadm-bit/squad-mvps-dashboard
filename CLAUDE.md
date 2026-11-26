@@ -44,7 +44,7 @@ Create React App (JavaScript, sem TypeScript, sem biblioteca de estado, sem fram
 - **SDK** — `db`, `auth`, `storage`, `functions`
 - **Login** — `AUTH_EMAIL_DOMAIN`, `loginIdToEmail`
 - **Identidade** — `SECTORS`, `ADMIN_CONFIG`, `sectorTheme`, `CS_ROLES`, `SETORES_COM_PAINEL`, `SETORES_INDICADOS_PELA_CS`
-- **Ciclo de vida do cliente** — `CLIENT_STAGES`, `stageOf`, `isStaffing`, `onboardingAgendado`, `naCarteira`, `STAFFING_ALERT_DAYS`
+- **Ciclo de vida do cliente** — `CLIENT_STAGES`, `stageOf`, `isStaffing`, `onboardingAgendado`, `naCarteira`, `STAFFING_ALERT_DAYS`, e a saída da base: `isInativo`, `CLIENTE_FORA`, `situacaoFora`, `isPausado`, `isEncerrado`
 - **Contrato** — `CONTRACT_ALERT_DAYS`, `CONTRACT_STATUS`, `addMonths`, `contractState`, `contractNeedsAttention`
 - **Cadastro / venda** — `SERVICE_SECTOR_MAP`, `SALE_SERVICES`, `PAYMENT_METHODS`, `RECURRENCE_SERVICES`, `REQUESTING_SECTORS`, `TIKTOK_SHOP`, `temTiktokShop`, `TIKTOK_SHOP_CORES`
 - **WebDesign e ID Visual** — `WD_SERVICE_CONFIG`, `WD_WEB_SERVICES`, `ID_VISUAL_CONFIG`
@@ -193,6 +193,8 @@ A CS conduz tudo; os líderes de setor só indicam os responsáveis.
 - `live` — call de onboarding realizada. Só é possível marcar a call como realizada com o quadro completo.
 
 Até a call de onboarding ser **agendada**, o cliente grava `active: false` — é isso que o esconde das visões gerais (métricas, TV, listas), porque o app filtra por `active !== false` em vez de checar estágio em dezenas de lugares. O agendamento (`scheduleOnboarding` em `useClients.js`) vira `active: true`. Quem já foi indicado responsável vê o cliente antes disso, pela regra de `naCarteira`. `onboardingAgendado(c)` diz se há call marcada e não realizada, valendo para `staffing` e `onboarding`. O prazo de onboarding do WebDesign segue a data dessa call.
+
+**Saída da base — Pausado ou Encerrado (nov/2026, antes "Inativo").** Só cliente `live` sai, pelo admin (aba Clientes → `inativarCliente` com `tipo`). Grava `active: false` + `inativo = { at, by, motivo, tipo }` — o campo manteve o nome antigo de propósito. **Pausado**: deve voltar, contrato segue aberto, não é churn. **Encerrado**: encerra o contrato junto e entra no churn do mês. Pausado pode virar Encerrado (guarda `pausadoEm`); o caminho de volta é sempre Reativar. Docs sem `tipo` são lidos pelo contrato: encerrado → Encerrado, aberto → Pausado. `isInativo` continua sendo "fora da base" (é o que carteiras, Kanban e entregas usam); para saber qual dos dois, `situacaoFora`. A CS vê os dois nos filtros de saída da Carteira — "Todos" é só a carteira ativa.
 
 Leia o estágio sempre por `stageOf(client)`: ele deriva o estágio efetivo e encaixa clientes do fluxo antigo de uma call só (`stage: 'live'` + `kickoff.pending: true`) em `onboarding`. Cliente sem `stage` conta como `live`. Ainda há comparações diretas `c.stage === 'staffing'` em `AdminClients.js`, `AdminDashboard.js`, `GenericSectorDashboard.js` e `useClients.js` (e `it.stage === 'live'` em `CSCarteira.js`) — funcionam porque `staffing` nunca é derivado, mas código novo deve usar `stageOf()`.
 

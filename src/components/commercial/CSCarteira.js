@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck, ShoppingBag } from 'lucide-react';
 import {
-  SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS,
-  stageOf, naCarteira, contractState, temTiktokShop,
+  SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS, CLIENTE_FORA,
+  stageOf, naCarteira, isInativo, situacaoFora, contractState, temTiktokShop,
 } from '../../lib/firebase';
 import { SeloTiktokShop, bordaTiktok } from '../shared/ui';
 import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
@@ -15,7 +15,9 @@ const COLOR = 'var(--c)';
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
 const EM_ENTRADA = ['kickoff', 'staffing', 'onboarding'];
 
-// Filtros de etapa/contrato sobre a carteira escolhida.
+// Filtros de etapa/contrato sobre a carteira escolhida. Os de saída
+// (pausados e encerrados) ficam à parte: são os únicos que mostram quem
+// saiu da base — "Todos" é a carteira ativa (base + entrando).
 const STATUS_FILTERS = [
   { id: 'all',     label: 'Todos' },
   { id: 'live',    label: 'Na base' },
@@ -24,6 +26,7 @@ const STATUS_FILTERS = [
   { id: 'vencendo', label: 'Contrato vencendo' },
   { id: 'incompleto', label: 'Cadastro incompleto' },
 ];
+const FORA_FILTERS = Object.values(CLIENTE_FORA).map(f => ({ id: f.id, label: f.plural }));
 
 // 'YYYY-MM-DD' comparado como texto — mesma regra do Kanban, sem a
 // armadilha do fuso no new Date('2026-08-25').
@@ -59,6 +62,9 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
   const [soTiktok, setSoTiktok] = useState(false);
 
   const carteira = useMemo(() => clients.filter(naCarteira), [clients]);
+  // Carteira ativa + quem saiu da base (pausado ou encerrado), que só
+  // aparece nos filtros de saída.
+  const universo = useMemo(() => clients.filter(c => naCarteira(c) || isInativo(c)), [clients]);
 
   // Lista de CSs para o seletor: ativas no cadastro + quem aparece
   // como responsável em algum cliente (cobre quem saiu da agência e
@@ -80,7 +86,7 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
 
   // Enriquecimento: calculado uma vez por cliente e reaproveitado no
   // filtro, no resumo e no card.
-  const itens = useMemo(() => carteira.map(c => {
+  const itens = useMemo(() => universo.map(c => {
     const abertas = tasks
       .filter(t => t.clientId === c.id && t.status !== 'done')
       .sort((a, b) => {
@@ -90,10 +96,14 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       });
     const atrasadas = abertas.filter(t => t.deadline && t.deadline < hoje);
     const stage = stageOf(c);
-    const entregas = stage === 'live' ? entregasDoMes(c, mes) : [];
+    const fora = situacaoFora(c);
+    // Fora da base não tem entrega esperada nem cadastro a cobrar.
+    const naBase = stage === 'live' && !fora;
+    const entregas = naBase ? entregasDoMes(c, mes) : [];
     return {
       client: c,
-      stage: stageOf(c),
+      stage,
+      fora,
       abertas,
       atrasadas,
       aprovacao: abertas.filter(t => t.status === 'approval').length,
@@ -102,9 +112,9 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       contrato: contractState(c),
       entregas,
       entregasResumo: resumoMes(entregas),
-      pendencias: stage === 'live' ? cadastroPendencias(c) : [],
+      pendencias: naBase ? cadastroPendencias(c) : [],
     };
-  }), [carteira, tasks, hoje, mes]);
+  }), [universo, tasks, hoje, mes]);
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -117,6 +127,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         return cs.includes(csFilter);
       })
       .filter(it => {
+        if (CLIENTE_FORA[statusFilter]) return it.fora === statusFilter;
+        if (it.fora) return false;
         if (statusFilter === 'live') return it.stage === 'live';
         if (statusFilter === 'entrada') return EM_ENTRADA.includes(it.stage);
         if (statusFilter === 'atraso') return it.atrasadas.length > 0;
@@ -179,19 +191,22 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       </div>
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-        {STATUS_FILTERS.map(f => (
-          <button
-            key={f.id}
-            onClick={() => setStatusFilter(f.id)}
-            style={{
-              padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              background: statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)',
-              color: statusFilter === f.id ? COLOR : 'var(--muted)',
-              border: `1px solid ${statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 33%, transparent)` : 'var(--border)'}`,
-            }}
-          >
-            {f.label}
-          </button>
+        {[...STATUS_FILTERS, null, ...FORA_FILTERS].map(f => (f
+          ? (
+            <button
+              key={f.id}
+              onClick={() => setStatusFilter(f.id)}
+              style={{
+                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                background: statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)',
+                color: statusFilter === f.id ? COLOR : 'var(--muted)',
+                border: `1px solid ${statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 33%, transparent)` : 'var(--border)'}`,
+              }}
+            >
+              {f.label}
+            </button>
+          )
+          : <span key="sep" style={{ width: 1, alignSelf: 'stretch', margin: '4px 2px', background: 'var(--border)' }} />
         ))}
       </div>
 
@@ -209,7 +224,9 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
       </div>
 
       {filtrados.length === 0
-        ? <Empty msg={csFilter === '__me__' ? 'Nenhum cliente na sua carteira com esse filtro.' : 'Nenhum cliente com esse filtro.'} />
+        ? <Empty msg={CLIENTE_FORA[statusFilter]
+          ? `Nenhum cliente ${CLIENTE_FORA[statusFilter].label.toLowerCase()} ${csFilter === '__me__' ? 'na sua carteira' : 'nessa seleção'}.`
+          : csFilter === '__me__' ? 'Nenhum cliente na sua carteira com esse filtro.' : 'Nenhum cliente com esse filtro.'} />
         : (
           <div style={GRID}>
             {filtrados.map(it => (
@@ -232,7 +249,8 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
 
 function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFicha }) {
   const [aberto, setAberto] = useState(false);
-  const { client, stage, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, pendencias } = item;
+  const { client, stage, fora, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, pendencias } = item;
+  const foraCfg = fora ? CLIENTE_FORA[fora] : null;
   const opsLv = HEALTH_LEVELS_4[ops.level];
   const manLv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const ctSt = CONTRACT_STATUS[contrato.status] || CONTRACT_STATUS.unknown;
@@ -249,10 +267,17 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
       <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
           <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
-          {stage !== 'live' && (
-            <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
-          )}
+          {foraCfg
+            ? <Tag text={foraCfg.label.toUpperCase()} color={foraCfg.cor} />
+            : stage !== 'live' && (
+              <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
+            )}
         </div>
+        {foraCfg && (
+          <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.45 }}>
+            {foraCfg.desde} {fmtDate(client.inativo.at)}{client.inativo.motivo ? ` · ${client.inativo.motivo}` : ''}
+          </p>
+        )}
         {tiktok && <SeloTiktokShop altura={16} style={{ marginTop: 8 }} />}
         {contato && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>👤 {contato}</p>}
         {mostraCs && (
@@ -291,7 +316,7 @@ function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFic
         )}
 
         {/* Contrato */}
-        {stage === 'live' && (
+        {stage === 'live' && !fora && (
           <p style={{ fontSize: 11, color: ctSt.color, fontFamily: 'var(--fm)', marginTop: 10 }}>
             📄 {ctSt.label}
             {contrato.endAt && contrato.status !== 'closed' && ` · até ${fmtDate(contrato.endAt)}`}

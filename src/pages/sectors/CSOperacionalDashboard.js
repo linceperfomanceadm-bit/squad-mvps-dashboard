@@ -28,7 +28,7 @@ import ClienteFicha from '../../components/entregas/ClienteFicha';
 import { acoesDeEntregas } from '../../components/entregas/acoes';
 import { cadastroPendencias, entregasDoMes, resumoMes, mesChave } from '../../lib/entregas';
 import { Aderencia } from '../../components/entregas/EntregasKit';
-import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, SETORES_INDICADOS_PELA_CS, stageOf, driveDoCliente } from '../../lib/firebase';
+import { SECTORS, STAFFING_ALERT_DAYS, CADASTRO_PENDENCIAS, SETORES_INDICADOS_PELA_CS, CLIENTE_FORA, stageOf, situacaoFora, driveDoCliente } from '../../lib/firebase';
 import {
   computeOpsHealth, resolveClientHealth, isCritical,
   HEALTH_LEVELS_4, HEALTH_ORDER_4,
@@ -1137,11 +1137,23 @@ function ClientDrawer({ client, health, manual, onClose, onSetHealth, onOpenFich
   const lv = HEALTH_LEVELS_4[health.level];
   const mlv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
   const sectors = Object.entries(client.responsibles || {}).filter(([, v]) => v && (Array.isArray(v) ? v.length : true));
+  // Pausado ou encerrado: a CS abre pela Carteira (filtros de saída) e
+  // precisa ver logo de cara por que o cliente saiu da base.
+  const fora = CLIENTE_FORA[situacaoFora(client)];
 
   return (
     <Overlay onClose={onClose}>
       <div style={{ ...MODAL, maxWidth: 560 }}>
         <ModalHeader title={client.name} onClose={onClose} />
+
+        {fora && (
+          <div style={{ background: fora.fundo, border: `1px solid ${fora.borda}`, borderRadius: 10, padding: '10px 12px', marginBottom: 14 }}>
+            <p style={{ fontSize: 12.5, fontWeight: 600, color: fora.cor }}>
+              {fora.desde} {fmtDate(client.inativo.at)}{client.inativo.by ? ` por ${client.inativo.by}` : ''}
+            </p>
+            {client.inativo.motivo && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.5 }}>{client.inativo.motivo}</p>}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
           <div style={{ background: `color-mix(in srgb, ${lv.color} 7%, transparent)`, border: `1px solid color-mix(in srgb, ${lv.color} 25%, transparent)`, borderRadius: 10, padding: 12 }}>

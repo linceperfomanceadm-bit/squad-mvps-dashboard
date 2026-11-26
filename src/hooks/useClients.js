@@ -3,7 +3,7 @@ import { collection, onSnapshot, doc, serverTimestamp, query, orderBy, where, ge
 // Gravações passam pela trava contra loop (lib/gravacoes.js).
 import { addDoc, updateDoc, deleteDoc, writeBatch, runTransaction } from '../lib/gravacoes';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, WD_WEB_SERVICES, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, isInativo, SETORES_INDICADOS_PELA_CS } from '../lib/firebase';
+import { db, mensagemDeErro, storage, WD_SERVICE_CONFIG, WD_WEB_SERVICES, ID_VISUAL_CONFIG, contractState, stageOf, normalizaLink, situacaoFora, CLIENTE_FORA, SETORES_INDICADOS_PELA_CS } from '../lib/firebase';
 import { wdJobsOf, WD_ACTIVE_STATUSES, wdConclusao } from '../lib/wdJobs';
 import { versoesDoEscopo, inicioNovaVersao, novoIdItem, aplicarCorrecoesNoMes, mesChave } from '../lib/entregas';
 import { linhaEndereco } from '../lib/cadastro';
@@ -1390,26 +1390,37 @@ export function useClients() {
     } catch (err) { return { success: false, error: mensagemDeErro(err) }; }
   };
 
-  // ── Inativar / reativar ─────────────────────────────────────
-  // Tira o cliente da base sem apagar nada (ver `isInativo` em
-  // firebase.js). O encerramento do contrato é opcional porque nem
-  // toda saída é churn: cliente que pausa volta com o mesmo contrato.
-  // Quando encerra, grava igual ao `closeContract` — é o que o churn do
-  // mês da TV comercial lê.
-  const inativarCliente = async (clientId, { motivo = '', encerrarContrato = false } = {}, byName = null) => {
+  // ── Pausar / encerrar / reativar ────────────────────────────
+  // Tira o cliente da base sem apagar nada (ver `isInativo` e
+  // `situacaoFora` em firebase.js). Duas saídas:
+  //   · pausado   — contrato continua aberto, não é churn;
+  //   · encerrado — encerra o contrato junto, gravando igual ao
+  //                 `closeContract` (é o que o churn do mês da TV
+  //                 comercial lê).
+  // Pausado pode virar encerrado depois (o cliente não voltou); o
+  // contrário não, porque desfaria o churn — para isso existe reativar.
+  // A data da pausa fica em `inativo.pausadoEm` e tudo vai para o
+  // `inativoLog`.
+  const inativarCliente = async (clientId, { motivo = '', tipo = 'encerrado' } = {}, byName = null) => {
     const client = clients.find(c => c.id === clientId);
     if (!client) return { success: false, error: 'Cliente não encontrado.' };
-    if (isInativo(client)) return { success: false, error: `${client.name} já está inativo.` };
-    if (stageOf(client) !== 'live') return { success: false, error: 'Só cliente que já está na base pode ser inativado.' };
+    if (!CLIENTE_FORA[tipo]) return { success: false, error: 'Situação inválida.' };
+    const atual = situacaoFora(client);
+    if (atual === 'encerrado') return { success: false, error: `${client.name} já está encerrado.` };
+    if (atual === 'pausado' && tipo === 'pausado') return { success: false, error: `${client.name} já está pausado.` };
+    if (!atual && stageOf(client) !== 'live') return { success: false, error: 'Só cliente que já está na base pode ser pausado ou encerrado.' };
     const agora = new Date().toISOString();
     const texto = String(motivo || '').trim();
     const patch = {
       active: false,
-      inativo: { at: agora, by: byName || null, motivo: texto },
-      inativoLog: arrayUnion({ acao: 'inativado', at: agora, by: byName || null, motivo: texto }),
+      inativo: {
+        at: agora, by: byName || null, motivo: texto, tipo,
+        ...(atual === 'pausado' ? { pausadoEm: client.inativo.at } : null),
+      },
+      inativoLog: arrayUnion({ acao: tipo, at: agora, by: byName || null, motivo: texto }),
     };
     const ct = contractState(client);
-    if (encerrarContrato && ct.status !== 'closed') {
+    if (tipo === 'encerrado' && ct.status !== 'closed') {
       Object.assign(patch, {
         'contract.status': 'closed',
         'contract.baseMonths': ct.baseMonths || 0,

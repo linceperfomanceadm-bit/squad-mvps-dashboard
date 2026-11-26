@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import ReactDOM from 'react-dom';
 import { X, Plus, Trash2, Archive } from 'lucide-react';
-import { TASK_PRIORITIES, SETORES_COM_PAINEL, isInativo } from '../../lib/firebase';
+import { TASK_PRIORITIES, SETORES_COM_PAINEL, CLIENTE_FORA, isInativo, situacaoFora } from '../../lib/firebase';
 
 const porNome = (a, b) => (a.name || '').localeCompare(b.name || '');
 
@@ -25,17 +25,16 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
   const sectorCollabs = (sectorId) => collaborators.filter(c => c.sector === sectorId && c.active !== false);
 
   // Os dashboards passam a base inteira e a regra de quem entra fica
-  // aqui. Ativos aparecem normalmente; inativos (contrato encerrado,
-  // bloco `inativo`) vêm num grupo à parte porque ainda podem ter
-  // demanda residual — último relatório, entrega de arquivos, ajuste
-  // final. Quem só está correndo o fluxo de entrada (também
+  // aqui. Ativos aparecem normalmente; pausados e encerrados (bloco
+  // `inativo`) vêm num grupo à parte porque ainda podem ter demanda
+  // residual — último relatório, entrega de arquivos, ajuste final. Quem só está correndo o fluxo de entrada (também
   // `active: false`, mas sem `inativo`) continua fora: ainda não tem
   // operação para receber task.
   const { ativos, inativos } = useMemo(() => ({
     ativos:   clients.filter(c => c.active !== false && !isInativo(c)).sort(porNome),
     inativos: clients.filter(isInativo).sort(porNome),
   }), [clients]);
-  const clienteInativo = form.clientId && inativos.some(c => c.id === form.clientId);
+  const foraEscolhido = form.clientId ? situacaoFora(inativos.find(c => c.id === form.clientId)) : null;
 
   const addLink = () => setLinks(l => [...l, { name: '', url: '' }]);
   const updateLink = (i, field, val) => setLinks(l => l.map((x, idx) => idx === i ? { ...x, [field]: val } : x));
@@ -133,8 +132,8 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
                       <optgroup label="Clientes ativos">
                         {ativos.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </optgroup>
-                      <optgroup label="Inativos (demandas finais)">
-                        {inativos.map(c => <option key={c.id} value={c.id}>{c.name} (inativo)</option>)}
+                      <optgroup label="Pausados e encerrados (demandas finais)">
+                        {inativos.map(c => <option key={c.id} value={c.id}>{c.name} ({CLIENTE_FORA[situacaoFora(c)].label.toLowerCase()})</option>)}
                       </optgroup>
                     </>
                   )}
@@ -146,10 +145,10 @@ export default function CreateTaskModal({ clients, collaborators, currentUser, c
             </div>
           </div>
 
-          {clienteInativo && (
+          {foraEscolhido && (
             <div style={S.aviso}>
               <Archive size={14} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>Cliente inativo. Use só para demandas que ficaram do contrato encerrado — a task segue o fluxo normal do Kanban.</span>
+              <span>Cliente {CLIENTE_FORA[foraEscolhido].label.toLowerCase()}. Use só para demandas que ficaram pendentes — a task segue o fluxo normal do Kanban.</span>
             </div>
           )}
 

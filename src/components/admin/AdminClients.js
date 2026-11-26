@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX, ShoppingBag } from 'lucide-react';
-import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, stageOf, isStaffing, isInativo, contractState, temTiktokShop } from '../../lib/firebase';
+import { Plus, X, Search, Trash2, Check, Edit2, ClipboardCheck, UserMinus, RotateCcw, UserX, ShoppingBag, PauseCircle } from 'lucide-react';
+import { SECTORS, WD_SERVICE_CONFIG, CADASTRO_PENDENCIAS, CLIENTE_FORA, stageOf, isStaffing, isInativo, situacaoFora, contractState, temTiktokShop } from '../../lib/firebase';
 import { SeloTiktokShop } from '../shared/ui';
 import { cadastroPendencias } from '../../lib/entregas';
 import { exColaboradores } from '../../lib/responsaveis';
@@ -16,22 +16,43 @@ export function asArray(val) {
 }
 
 /*
- * Inativar: o cliente sai da base ativa sem apagar nada. Encerrar o
- * contrato junto é escolha de quem inativa — pausa não é churn.
+ * Tirar da base: o cliente sai sem apagar nada. Quem tira escolhe a
+ * situação — Pausado (deve voltar, contrato aberto, não é churn) ou
+ * Encerrado (saiu de vez, contrato encerrado, conta no churn do mês).
+ * Cliente já pausado só pode ser encerrado daqui; voltar é Reativar.
  */
-function InativarModal({ client, tasksAbertas, onClose, onConfirm }) {
+const OPCOES_SAIDA = [
+  {
+    id: 'pausado', Icone: PauseCircle,
+    texto: 'O cliente parou e deve voltar. O contrato continua aberto e não conta como churn.',
+    placeholder: 'Ex: pausou por 3 meses, aguardando verba, volta em março...',
+  },
+  {
+    id: 'encerrado', Icone: UserMinus,
+    texto: 'Saiu de vez. O contrato é encerrado e conta como churn do mês.',
+    placeholder: 'Ex: encerrou o contrato, trocou de agência, fechou a loja...',
+  },
+];
+
+function SaidaModal({ client, tasksAbertas, onClose, onConfirm }) {
+  const jaPausado = situacaoFora(client) === 'pausado';
   const contratoAberto = contractState(client).status !== 'closed';
+  // Sem situação marcada de saída: é uma decisão, então nada vem
+  // pré-escolhido (exceto o pausado, que só tem um caminho).
+  const [tipo, setTipo] = useState(jaPausado ? 'encerrado' : null);
   const [motivo, setMotivo] = useState('');
-  const [encerrar, setEncerrar] = useState(contratoAberto);
   const [busy, setBusy] = useState(false);
+  const opcoes = jaPausado ? OPCOES_SAIDA.filter(o => o.id === 'encerrado') : OPCOES_SAIDA;
+  const escolhida = OPCOES_SAIDA.find(o => o.id === tipo);
 
   return (
     <Overlay onClose={onClose}>
-      <div style={{ ...MODAL, maxWidth: 480 }}>
-        <ModalHeader title={`Inativar ${client.name}`} onClose={onClose} />
+      <div style={{ ...MODAL, maxWidth: 500 }}>
+        <ModalHeader title={jaPausado ? `Encerrar ${client.name}` : `Pausar ou encerrar ${client.name}`} onClose={onClose} />
         <p style={MS2.texto}>
-          O cliente sai da base ativa: some das carteiras, das métricas, das entregas do mês e do Painel de TV.
-          Nada é apagado — dá para reativar depois, com os mesmos responsáveis.
+          {jaPausado
+            ? `Pausado desde ${fmtDate(client.inativo.at)}. Encerrar marca que o cliente não volta.`
+            : 'O cliente sai da base ativa: some das carteiras, das métricas, das entregas do mês e do Painel de TV. Nada é apagado — dá para reativar depois, com os mesmos responsáveis.'}
         </p>
         {tasksAbertas > 0 && (
           <p style={MS2.aviso}>
@@ -39,36 +60,54 @@ function InativarModal({ client, tasksAbertas, onClose, onConfirm }) {
           </p>
         )}
 
+        <div style={{ display: 'grid', gridTemplateColumns: opcoes.length > 1 ? '1fr 1fr' : '1fr', gap: 10, marginTop: 14 }}>
+          {opcoes.map(({ id, Icone, texto }) => {
+            const cfg = CLIENTE_FORA[id];
+            const on = tipo === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTipo(id)}
+                style={{
+                  ...MS2.opcao,
+                  borderColor: on ? 'var(--c-border)' : 'var(--border)',
+                  background: on ? 'var(--c-dim)' : 'var(--bg3)',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
+                  <Icone size={15} color={on ? 'var(--c)' : 'var(--muted)'} /> {id === 'pausado' ? 'Pausar' : 'Encerrar'}
+                </span>
+                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', lineHeight: 1.5, marginTop: 5 }}>
+                  {id === 'encerrado' && !contratoAberto ? 'Saiu de vez. O contrato já está encerrado.' : texto}
+                </span>
+                <span style={{ display: 'inline-block', marginTop: 8, fontSize: 9.5, fontWeight: 700, fontFamily: 'var(--fm)', letterSpacing: '.04em', padding: '2px 7px', borderRadius: 6, background: cfg.fundo, color: cfg.cor, border: `1px solid ${cfg.borda}` }}>
+                  {cfg.label.toUpperCase()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
         <p style={{ ...LBL, marginTop: 14 }}>MOTIVO</p>
         <textarea
           rows={3}
           value={motivo}
           onChange={e => setMotivo(e.target.value)}
-          placeholder="Ex: encerrou o contrato, pausou por 3 meses, trocou de agência..."
+          placeholder={escolhida?.placeholder || 'Escolha Pausar ou Encerrar acima.'}
           style={{ ...INP, marginTop: 6, resize: 'vertical' }}
         />
-
-        {contratoAberto && (
-          <label style={MS2.check}>
-            <input type="checkbox" checked={encerrar} onChange={e => setEncerrar(e.target.checked)} />
-            <span>
-              Encerrar o contrato também
-              <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
-                Conta como churn do mês. Desmarque se o cliente só pausou.
-              </span>
-            </span>
-          </label>
-        )}
 
         <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
           <button
             type="button"
             className="ui-btn primary"
-            style={{ flex: 1, justifyContent: 'center' }}
-            disabled={busy}
-            onClick={async () => { setBusy(true); await onConfirm({ motivo, encerrarContrato: encerrar }); setBusy(false); }}
+            style={{ flex: 1, justifyContent: 'center', opacity: tipo ? 1 : 0.5 }}
+            disabled={busy || !tipo}
+            onClick={async () => { setBusy(true); await onConfirm({ motivo, tipo }); setBusy(false); }}
           >
-            <UserMinus size={14} /> {busy ? 'Inativando...' : 'Inativar cliente'}
+            {tipo === 'pausado' ? <PauseCircle size={14} /> : <UserMinus size={14} />}
+            {busy ? 'Salvando...' : tipo === 'pausado' ? 'Pausar cliente' : tipo === 'encerrado' ? 'Encerrar cliente' : 'Escolha uma opção'}
           </button>
           <button type="button" className="ui-btn" onClick={onClose}>Cancelar</button>
         </div>
@@ -80,8 +119,8 @@ function InativarModal({ client, tasksAbertas, onClose, onConfirm }) {
 function ReativarModal({ client, onClose, onConfirm }) {
   const ct = contractState(client);
   const fechado = ct.status === 'closed';
-  // Contrato encerrado no mesmo gesto da inativação volta junto por
-  // padrão; encerrado antes disso é outra história e fica desmarcado.
+  // Contrato encerrado no mesmo gesto da saída volta junto por padrão;
+  // encerrado antes disso é outra história e fica desmarcado.
   const [reabrir, setReabrir] = useState(fechado && !!client.inativo?.at && ct.closedAt === client.inativo.at);
   const [busy, setBusy] = useState(false);
 
@@ -94,7 +133,7 @@ function ReativarModal({ client, onClose, onConfirm }) {
         </p>
         {client.inativo?.at && (
           <p style={{ ...MS2.texto, marginTop: 8 }}>
-            Inativo desde {fmtDate(client.inativo.at)}{client.inativo.by ? ` por ${client.inativo.by}` : ''}
+            {CLIENTE_FORA[situacaoFora(client)]?.desde} {fmtDate(client.inativo.at)}{client.inativo.by ? ` por ${client.inativo.by}` : ''}
             {client.inativo.motivo ? ` · ${client.inativo.motivo}` : ''}.
           </p>
         )}
@@ -137,9 +176,10 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
   const editar = editarId ? clients.find(c => c.id === editarId) : null;
   const [search, setSearch] = useState('');
   const [delConfirm, setDelConfirm] = useState(null);
-  // Aba da lista: a base (ativos e em fluxo) ou os inativos.
+  // Aba da lista: a base (ativos e em fluxo), os pausados ou os
+  // encerrados (as chaves de CLIENTE_FORA).
   const [aba, setAba] = useState('base');
-  const [inativarId, setInativarId] = useState(null);
+  const [saidaId, setSaidaId] = useState(null);
   const [reativarId, setReativarId] = useState(null);
   const [showLimpeza, setShowLimpeza] = useState(false);
   // Soma aos outros filtros (aba e busca): mostra só quem tem TikTok Shop.
@@ -152,13 +192,16 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
   const existe = collaborators?.length ? new Set(collaborators.map(c => c.name)) : null;
   const clientesComOrfao = new Set(orfaos.flatMap(o => o.clientes.map(c => c.id))).size;
 
-  const inativos = clients.filter(isInativo);
-  const daAba = clients.filter(c => (aba === 'inativos' ? isInativo(c) : !isInativo(c)));
+  const contaFora = {
+    pausado: clients.filter(c => situacaoFora(c) === 'pausado').length,
+    encerrado: clients.filter(c => situacaoFora(c) === 'encerrado').length,
+  };
+  const daAba = clients.filter(c => (aba === 'base' ? !isInativo(c) : situacaoFora(c) === aba));
   const tiktokNaAba = daAba.filter(temTiktokShop).length;
   const filtered = daAba
     .filter(c => !soTiktok || temTiktokShop(c))
     .filter(c => c.name?.toLowerCase().includes(search.toLowerCase()));
-  const clienteInativar = inativarId ? clients.find(c => c.id === inativarId) : null;
+  const clienteSaida = saidaId ? clients.find(c => c.id === saidaId) : null;
   const clienteReativar = reativarId ? clients.find(c => c.id === reativarId) : null;
 
   const wdStatusLabel = s => ({ onboarding:'Onboarding', production:'Produção', inactive:'Inativo', recurrence:'Recorrência', finished:'Finalizado' }[s] || s);
@@ -170,7 +213,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
         <div>
           <h1 style={{ fontSize: 21, fontWeight: 500, color: 'var(--text)', letterSpacing: '-.01em', marginBottom: 4 }}>Clientes</h1>
           <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-            {clients.filter(c => c.active !== false).length} ativos · {clients.filter(isStaffing).length} aguardando responsáveis · {inativos.length} {inativos.length === 1 ? 'inativo' : 'inativos'}
+            {clients.filter(c => c.active !== false).length} ativos · {clients.filter(isStaffing).length} aguardando responsáveis · {contaFora.pausado} {contaFora.pausado === 1 ? 'pausado' : 'pausados'} · {contaFora.encerrado} {contaFora.encerrado === 1 ? 'encerrado' : 'encerrados'}
           </p>
         </div>
         <button onClick={() => setShowAdd(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--grad)', border: 'none', borderRadius: 10, padding: '10px 18px', color: 'var(--on)', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 20px rgba(238,51,99,.35)', cursor: 'pointer' }}>
@@ -184,9 +227,11 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
           <input style={{ ...S.input, paddingLeft: 38, width: '100%' }} placeholder="Buscar cliente..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <button type="button" className={`ui-btn small ${aba === 'base' ? 'on' : ''}`} onClick={() => setAba('base')}>Base ativa</button>
-        <button type="button" className={`ui-btn small ${aba === 'inativos' ? 'on' : ''}`} onClick={() => setAba('inativos')}>
-          Inativos <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: inativos.length ? 'var(--text)' : 'var(--dim)' }}>{inativos.length}</span>
-        </button>
+        {Object.values(CLIENTE_FORA).map(f => (
+          <button key={f.id} type="button" className={`ui-btn small ${aba === f.id ? 'on' : ''}`} onClick={() => setAba(f.id)}>
+            {f.plural} <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: contaFora[f.id] ? 'var(--text)' : 'var(--dim)' }}>{contaFora[f.id]}</span>
+          </button>
+        ))}
         <span style={{ width: 1, height: 20, background: 'var(--border)' }} />
         <button type="button" className={`ui-btn small ${soTiktok ? 'on' : ''}`} onClick={() => setSoTiktok(v => !v)} title="Mostrar só os clientes com TikTok Shop contratado">
           <ShoppingBag size={13} /> TikTok Shop <span style={{ fontFamily: 'var(--fm)', fontSize: 11, color: tiktokNaAba ? 'var(--text)' : 'var(--dim)' }}>{tiktokNaAba}</span>
@@ -224,14 +269,17 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                         AGUARDANDO RESPONSÁVEIS
                       </span>
                     )}
-                    {isInativo(c) && (
-                      <span
-                        title={[c.inativo.by ? `por ${c.inativo.by}` : '', c.inativo.motivo].filter(Boolean).join(' · ') || undefined}
-                        style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: 'var(--red-dim)', color: 'var(--red)', fontFamily: 'var(--fm)', verticalAlign: 'middle', cursor: c.inativo.motivo ? 'help' : 'default' }}
-                      >
-                        INATIVO DESDE {fmtDate(c.inativo.at)}
-                      </span>
-                    )}
+                    {isInativo(c) && (() => {
+                      const fora = CLIENTE_FORA[situacaoFora(c)];
+                      return (
+                        <span
+                          title={[c.inativo.by ? `por ${c.inativo.by}` : '', c.inativo.motivo].filter(Boolean).join(' · ') || undefined}
+                          style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6, marginLeft: 8, background: fora.fundo, color: fora.cor, border: `1px solid ${fora.borda}`, fontFamily: 'var(--fm)', verticalAlign: 'middle', cursor: c.inativo.motivo ? 'help' : 'default' }}
+                        >
+                          {fora.desde.toUpperCase()} {fmtDate(c.inativo.at)}
+                        </span>
+                      );
+                    })()}
                     {c.active !== false && cadastroPendencias(c).length > 0 && (
                       <span
                         title={`Falta: ${cadastroPendencias(c).map(p => CADASTRO_PENDENCIAS[p]?.label || p).join(', ')}`}
@@ -283,7 +331,12 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                         </button>
                       )}
                       {onInativar && !isInativo(c) && stageOf(c) === 'live' && (
-                        <button style={S.iconBtn} onClick={() => setInativarId(c.id)} title="Inativar cliente (sai da base ativa)">
+                        <button style={S.iconBtn} onClick={() => setSaidaId(c.id)} title="Pausar ou encerrar (sai da base ativa)">
+                          <PauseCircle size={13} />
+                        </button>
+                      )}
+                      {onInativar && situacaoFora(c) === 'pausado' && (
+                        <button style={S.iconBtn} onClick={() => setSaidaId(c.id)} title="Encerrar cliente (não vai voltar)">
                           <UserMinus size={13} />
                         </button>
                       )}
@@ -304,7 +357,7 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
                 </tr>
               ))}
               {filtered.length === 0 && (
-                <tr><td colSpan={Object.keys(SECTORS).length + 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{soTiktok && !search ? 'Nenhum cliente com TikTok Shop aqui.' : aba === 'inativos' && !search ? 'Nenhum cliente inativo.' : 'Nenhum cliente encontrado.'}</td></tr>
+                <tr><td colSpan={Object.keys(SECTORS).length + 4} style={{ padding: '32px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>{soTiktok && !search ? 'Nenhum cliente com TikTok Shop aqui.' : aba !== 'base' && !search ? `Nenhum cliente ${CLIENTE_FORA[aba].label.toLowerCase()}.` : 'Nenhum cliente encontrado.'}</td></tr>
               )}
             </tbody>
           </table>
@@ -344,14 +397,14 @@ export default function AdminClients({ clients, collaborators, tasks = [], me, o
       {ficha && (
         <ClienteFicha client={ficha} acoes={acoesEntregas} collaborators={collaborators} toast={toast} onClose={() => setFichaId(null)} />
       )}
-      {clienteInativar && (
-        <InativarModal
-          client={clienteInativar}
-          tasksAbertas={tasks.filter(t => t.clientId === clienteInativar.id && t.status !== 'done').length}
-          onClose={() => setInativarId(null)}
+      {clienteSaida && (
+        <SaidaModal
+          client={clienteSaida}
+          tasksAbertas={tasks.filter(t => t.clientId === clienteSaida.id && t.status !== 'done').length}
+          onClose={() => setSaidaId(null)}
           onConfirm={async (opcoes) => {
-            const r = await onInativar(clienteInativar.id, opcoes);
-            if (r?.success) setInativarId(null);
+            const r = await onInativar(clienteSaida.id, opcoes);
+            if (r?.success) setSaidaId(null);
           }}
         />
       )}
@@ -440,5 +493,6 @@ const MS2 = {
   texto: { fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 },
   aviso: { fontSize: 12, color: 'var(--amber)', background: 'var(--amber-dim)', border: '1px solid var(--amber-b)', borderRadius: 10, padding: '9px 12px', marginTop: 12, lineHeight: 1.5 },
   check: { display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: 'var(--text)', marginTop: 14, cursor: 'pointer' },
+  opcao: { textAlign: 'left', padding: '12px 13px', borderRadius: 'var(--r)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--f)' },
 };
 
