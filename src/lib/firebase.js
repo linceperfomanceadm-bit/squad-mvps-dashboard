@@ -143,11 +143,13 @@ export const CS_ROLES = [
 // foi indicado vê o cliente antes disso, pela regra de `naCarteira`.
 //
 // Cliente antigo, sem o campo `stage`, conta como 'live'.
+// `curto` é o rótulo de selo (card da Carteira da CS), onde o nome
+// longo tomaria o espaço do nome do cliente.
 export const CLIENT_STAGES = {
-  staffing:   { id: 'staffing',   label: 'Aguardando responsáveis', color: '#f59e0b' },
-  kickoff:    { id: 'kickoff',    label: 'Kick Off',                color: '#a78bfa' },
-  onboarding: { id: 'onboarding', label: 'Onboarding',              color: '#3EFFFF' },
-  live:       { id: 'live',       label: 'Ativo',                   color: '#22c55e' },
+  staffing:   { id: 'staffing',   label: 'Aguardando responsáveis', curto: 'Staffing',   color: '#f59e0b' },
+  kickoff:    { id: 'kickoff',    label: 'Kick Off',                curto: 'Kick Off',   color: '#a78bfa' },
+  onboarding: { id: 'onboarding', label: 'Onboarding',              curto: 'Onboarding', color: '#3EFFFF' },
+  live:       { id: 'live',       label: 'Ativo',                   curto: 'Na base',    color: '#22c55e' },
 };
 
 /*

@@ -148,6 +148,22 @@ export function Trio({ items }) {
   );
 }
 
+// Faixa de números lado a lado num card só — o resumo de uma lista
+// sem gastar a altura de uma fileira de KPIs (tela de notebook).
+// `cor` só quando o número é informação (atraso, atenção).
+export function Faixa({ items, style }) {
+  return (
+    <div className="ui-card" style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))`, padding: 0, ...style }}>
+      {items.map(({ label, value, cor }, i) => (
+        <div key={label} style={{ padding: '13px 18px', borderLeft: i ? '1px solid var(--border)' : 'none', minWidth: 0 }}>
+          <b style={{ display: 'block', fontSize: 22, fontWeight: 500, letterSpacing: '-.02em', lineHeight: 1.1, fontFamily: 'var(--fm)', color: cor || 'var(--text)' }}>{value}</b>
+          <small style={{ display: 'block', fontSize: 12, color: 'var(--muted)', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Etiqueta de status.
 export function Tag({ tone, children, style }) {
   const map = {

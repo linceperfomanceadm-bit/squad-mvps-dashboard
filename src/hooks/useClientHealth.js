@@ -18,11 +18,13 @@ import { deadlineState } from '../lib/taskTime';
  * Crítica" considera vermelho em qualquer um dos dois.
  */
 
+// `cor` é a variável do tema (acompanha claro/escuro); `color` é o hex
+// antigo, que as telas anteriores ainda leem. Tela nova usa `cor`.
 export const HEALTH_LEVELS_4 = {
-  green:  { id: 'green',  label: 'Em dia',   color: '#22c55e', emoji: '🟢' },
-  yellow: { id: 'yellow', label: 'Atenção',  color: '#f59e0b', emoji: '🟡' },
-  orange: { id: 'orange', label: 'Alerta',   color: '#fb923c', emoji: '🟠' },
-  red:    { id: 'red',    label: 'Crítico',  color: '#ef4444', emoji: '🔴' },
+  green:  { id: 'green',  label: 'Em dia',   color: '#22c55e', cor: 'var(--green)',  emoji: '🟢' },
+  yellow: { id: 'yellow', label: 'Atenção',  color: '#f59e0b', cor: 'var(--amber)',  emoji: '🟡' },
+  orange: { id: 'orange', label: 'Alerta',   color: '#fb923c', cor: 'var(--orange)', emoji: '🟠' },
+  red:    { id: 'red',    label: 'Crítico',  color: '#ef4444', cor: 'var(--red)',    emoji: '🔴' },
 };
 
 export const HEALTH_ORDER_4 = { red: 0, orange: 1, yellow: 2, green: 3 };

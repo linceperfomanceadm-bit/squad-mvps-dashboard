@@ -214,7 +214,9 @@ O código tolera formatos legados em vez de migrar: nunca use `c.active` (use `c
 1. **Saúde operacional — automática.** Derivada das tarefas atrasadas: 0 → verde, 1 → amarelo, 2 → laranja, 3+ → vermelho (`computeOpsHealth`).
 2. **Saúde do cliente — manual.** Alimentada pela CS a partir do relacionamento, gravada como `clientHealth = { level, note, by, at }` (`resolveClientHealth`).
 
-Use a API de **4 níveis** — `HEALTH_LEVELS_4`, `HEALTH_ORDER_4`, `computeOpsHealth`, `resolveClientHealth`, `isCritical`. A API antiga de 3 níveis (`HEALTH_LEVELS`, `computeAutoHealth`, `resolveHealth`) só é usada por `components/commercial/CSHealth.js`, **que nada importa** — é código morto; não construa em cima dele.
+Use a API de **4 níveis** — `HEALTH_LEVELS_4`, `HEALTH_ORDER_4`, `computeOpsHealth`, `resolveClientHealth`, `isCritical`. Em tela nova, a cor do nível é `HEALTH_LEVELS_4[x].cor` (variável do tema); `color` é o hex antigo.
+
+**Card da Carteira da CS (`CSCarteira.js`, nov/2026): hierarquia fixa.** Todos os cards têm o mesmo tamanho e as mesmas cinco linhas, na mesma ordem: identificação + selo (saúde manual na base, etapa em entrada, Pausado/Encerrado fora), aviso de uma linha (`avisoDo`: o item mais grave pinta a linha — atraso e contrato vencido em vermelho, ação pendente em âmbar, "Tudo em dia" neutro), contadores de tasks, equipe + contrato, ações. Muda o conteúdo, nunca a estrutura. A lista de tasks abre numa gaveta lateral (`Gaveta`), não dentro do card. A saúde operacional não tem selo próprio no card: ela é a contagem de atrasadas, que já aparece no aviso e no contador. A API antiga de 3 níveis (`HEALTH_LEVELS`, `computeAutoHealth`, `resolveHealth`) só é usada por `components/commercial/CSHealth.js`, **que nada importa** — é código morto; não construa em cima dele.
 
 > A CONFIRMAR: `CSHealth.js` volta para algum painel ou é apagado junto com a API de 3 níveis?
 
@@ -252,7 +254,7 @@ Persistência em `useDocuments.js`: o documento inteiro (dados, slides extras, s
 - Entregas únicas (site, ID Visual) **não** têm checklist novo: `entregasUnicas` lê `wdJobsOf` e o bloco `idv`.
 - `cadastroPendencias` aponta o que falta no cadastro (clientes antigos) — é o selo "cadastro incompleto". Contam só prazo, serviços e escopo; arquivo do contrato e briefing são opcionais. Completar é o formulário único de cadastro (ver abaixo).
 - Escrita no `useClients`: `saveCadastro`, `saveEscopo`, `ajustarMesEntregas`, `marcarEntrega` (transação), `transferirCS`. As telas recebem essas funções já embrulhadas por `acoesDeEntregas` (`components/entregas/acoes.js`); ação ausente esconde o botão.
-- Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin; na CS o acompanhamento fica no card da Carteira de Clientes, por decisão de produto), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
+- Telas: `EntregasSetor` (aba "Entregas do Mês" de quem produz), `EntregasPainel` (lista "Entregas × Contrato" do admin; na CS o acompanhamento abre pelo botão "Contrato e entregas" do card da Carteira de Clientes — o card não mostra mais a barra do mês, só o resumo do topo traz o percentual geral), `ClienteFicha` (card de contrato e entregas + formulário de cadastro), `EntregasKit` (barra, situação, linha com − / +).
 
 ### Planejamento de conteúdo e calendário
 
@@ -336,7 +338,7 @@ Modais sempre via `ReactDOM.createPortal` no `document.body` — o `transform` r
 Antes de criar card, KPI, modal, campo, tag ou estado vazio à mão, use os kits:
 
 - **`src/components/shared/AppShell.js`** — casca única de todos os painéis: sidebar de 224px (`SIDEBAR_WIDTH`), ou só ícones no notebook (`SIDEBAR_COMPACTA`), com o item ativo no gradiente do setor e barra superior com Agenda, tema, notificações e perfil. Exporta `AppShell` e `Aside`.
-- **`src/components/shared/ui.js`** — kit do Layout 01, usado pelas visões gerais (admin, Social Media, WebDesign, Criativos, CS): `PageHeader`, `Card`, `Grid`, `Kpi`, `Breakdown`, `MiniBars`, `Goal`, `HBars`, `Pills`, `Trio`, `Tag`, `Row`, `Empty`. Tudo neutro; cor do painel por `var(--c)`/`var(--grad)`, semântica por `--green`/`--red`. **É o padrão para tela nova.**
+- **`src/components/shared/ui.js`** — kit do Layout 01, usado pelas visões gerais (admin, Social Media, WebDesign, Criativos, CS): `PageHeader`, `Card`, `Grid`, `Kpi`, `Faixa` (resumo de números numa faixa só, sem gastar a altura de uma fileira de KPIs), `Breakdown`, `MiniBars`, `Goal`, `HBars`, `Pills`, `Trio`, `Tag`, `Row`, `Empty`. Tudo neutro; cor do painel por `var(--c)`/`var(--grad)`, semântica por `--green`/`--red`. **É o padrão para tela nova.**
 - **`src/components/planejamento/kit.js`** — peças do conteúdo: `Pill`/`Dot` de status (ponto oco = ainda não andou), `KpiFiltro` (KPI clicável, com ícone ou anel), `Linha`, `Sigla`, `MiniCalendario`, `MesNav`, `ChipsClientes`, `Midia`, `Janela` e `Gaveta` (portais com Esc) e os estilos `JANELA`/`BTN`.
 - **`src/components/commercial/ui.js`** — kit mais antigo, usado pelas telas da CS e por modais: constantes de estilo (`CARD`, `GRID`, `MODAL`, `LBL`, `INP`, `BTN_PRIMARY`, `BTN_GREEN`, `BTN_CANCEL`, `ICON_BTN`), componentes (`Overlay`, `ModalHeader`, `ConfirmModal`, `ScheduleModal`, `Field`, `Stat`, `Tag`, `Empty`, `Spinner`, `Section`, `RO`) e formatadores (`money`, `fmtDate`, `fmtDateTime`, `toLocalInput`). Para modal e formulário ainda é a peça certa. O comentário do topo cita SDR/Closer, que já não existem.
 

@@ -1,15 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, AlertTriangle, ClipboardCheck, ShoppingBag } from 'lucide-react';
 import {
-  SECTORS, TASK_COLUMNS, CLIENT_STAGES, CONTRACT_STATUS, CLIENTE_FORA,
-  stageOf, naCarteira, isInativo, situacaoFora, contractState, temTiktokShop,
+  Search, ShoppingBag, AlertTriangle, CheckCircle2, CalendarDays, PauseCircle, Archive,
+  ClipboardCheck, ListChecks, FileText, ArrowRight,
+} from 'lucide-react';
+import {
+  SECTORS, TASK_COLUMNS, CLIENT_STAGES, CLIENTE_FORA, CADASTRO_PENDENCIAS,
+  stageOf, naCarteira, isInativo, situacaoFora, onboardingAgendado, contractState, temTiktokShop, sectorTheme,
 } from '../../lib/firebase';
-import { SeloTiktokShop, bordaTiktok } from '../shared/ui';
-import { computeOpsHealth, resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
+import { SeloTiktokShop, bordaTiktok, Faixa } from '../shared/ui';
+import { useTheme } from '../../contexts/ThemeContext';
+import { resolveClientHealth, HEALTH_LEVELS_4 } from '../../hooks/useClientHealth';
 import { parseLocalDate } from '../../lib/taskTime';
-import { CARD, GRID, Tag, Empty, Stat, fmtDate } from './ui';
+import { GRID, Empty, fmtDate } from './ui';
 import { mesChave, entregasDoMes, resumoMes, cadastroPendencias } from '../../lib/entregas';
-import { BarraEntrega, Aderencia } from '../entregas/EntregasKit';
+import { Gaveta, BotaoFechar, JANELA, Sigla } from '../planejamento/kit';
 
 const COLOR = 'var(--c)';
 const asArray = (v) => (Array.isArray(v) ? v : v ? [v] : []);
@@ -28,6 +32,9 @@ const STATUS_FILTERS = [
 ];
 const FORA_FILTERS = Object.values(CLIENTE_FORA).map(f => ({ id: f.id, label: f.plural }));
 
+// Avatares da equipe que cabem no rodapé do card; o resto vira "+N".
+const MAX_AVATARES = 6;
+
 // 'YYYY-MM-DD' comparado como texto — mesma regra do Kanban, sem a
 // armadilha do fuso no new Date('2026-08-25').
 const hojeYmd = () => {
@@ -35,31 +42,118 @@ const hojeYmd = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// "Casa Aurora" → "CA"; nome de uma palavra só → duas primeiras letras.
+const siglaDe = (nome = '') => {
+  const partes = String(nome).trim().split(/\s+/).filter(Boolean);
+  if (!partes.length) return '?';
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+  return (partes[0][0] + partes[1][0]).toUpperCase();
+};
+
+// "03/12 às 14:00" — data e hora de call, sem o ano.
+const quando = (iso) => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+};
+
+const plural = (n, um, varios) => (n === 1 ? um : varios);
+
+/*
+ * Linha de aviso do card — uma só, sempre no mesmo lugar.
+ *
+ * Junta o que antes ficava espalhado (farol de operação, contrato,
+ * cadastro incompleto, etapa de entrada) numa frase, pintada pelo item
+ * mais grave: vermelho para atraso e contrato vencido, âmbar para o que
+ * pede ação, neutro para informação. Sem nada a apontar, "Tudo em dia".
+ * A saúde operacional (que é só a contagem de atrasadas) aparece aqui e
+ * no contador de atrasadas, não num selo próprio.
+ */
+const AVISO = {
+  ok:        { cor: 'var(--muted)', fundo: 'var(--bg3)',       Icone: CheckCircle2 },
+  info:      { cor: 'var(--muted)', fundo: 'var(--bg3)',       Icone: CalendarDays },
+  atencao:   { cor: 'var(--amber)', fundo: 'var(--amber-dim)', Icone: AlertTriangle },
+  erro:      { cor: 'var(--red)',   fundo: 'var(--red-dim)',   Icone: AlertTriangle },
+  pausado:   { cor: 'var(--amber)', fundo: 'var(--amber-dim)', Icone: PauseCircle },
+  encerrado: { cor: 'var(--muted)', fundo: 'var(--bg3)',       Icone: Archive },
+};
+const PESO = { info: 1, atencao: 2, erro: 3 };
+
+function avisoDo({ client, stage, fora, atrasadas, contrato, pendencias, vagas }) {
+  if (fora) {
+    const cfg = CLIENTE_FORA[fora];
+    return { tipo: fora, texto: [`${cfg.desde} ${fmtDate(client.inativo.at)}`, client.inativo.motivo].filter(Boolean).join(' · ') };
+  }
+  const itens = [];
+  if (atrasadas.length) itens.push(['erro', `${atrasadas.length} ${plural(atrasadas.length, 'task atrasada', 'tasks atrasadas')}`]);
+  if (stage === 'live') {
+    if (contrato.status === 'expired') itens.push(['erro', 'contrato com prazo vencido']);
+    else if (contrato.status === 'ending') {
+      const d = contrato.daysLeft;
+      itens.push(['atencao', d <= 0 ? 'contrato vence hoje' : `contrato vence em ${d} ${plural(d, 'dia', 'dias')}`]);
+    }
+    if (pendencias.length) {
+      itens.push(['atencao', `cadastro incompleto · falta ${pendencias.map(p => (CADASTRO_PENDENCIAS[p]?.label || p).toLowerCase()).join(', ')}`]);
+    }
+  } else {
+    if (vagas.length) itens.push(['atencao', `falta indicar ${vagas.map(sid => SECTORS[sid]?.label || sid).join(', ')}`]);
+    if (stage === 'kickoff') {
+      itens.push(client.kickoffCall?.at ? ['info', `Kick Off · ${quando(client.kickoffCall.at)}`] : ['atencao', 'agendar o Kick Off']);
+    } else {
+      itens.push(onboardingAgendado(client) ? ['info', `call de onboarding · ${quando(client.kickoff.at)}`] : ['atencao', 'agendar a call de onboarding']);
+    }
+  }
+  if (!itens.length) return { tipo: 'ok', texto: 'Tudo em dia' };
+  const pior = itens.reduce((m, [t]) => (PESO[t] > PESO[m] ? t : m), 'info');
+  const texto = itens.map(([, t]) => t).join(' · ');
+  return { tipo: pior, texto: texto.charAt(0).toUpperCase() + texto.slice(1) };
+}
+
+// Rodapé: o prazo do contrato em poucas letras.
+function contratoDo({ stage, fora, contrato: ct }) {
+  const neutro = 'var(--muted)';
+  if (fora === 'encerrado' || ct.status === 'closed') return { txt: 'encerrado', cor: neutro };
+  if (stage !== 'live') {
+    // Em entrada o relógio ainda não começou: mostra a duração vendida.
+    const m = ct.baseMonths;
+    return { txt: m ? `${m} ${plural(m, 'mês', 'meses')}` : 'sem prazo', cor: neutro };
+  }
+  if (!ct.endAt) return { txt: 'sem prazo', cor: neutro };
+  if (ct.status === 'expired') return { txt: `venceu ${fmtDate(ct.endAt)}`, cor: 'var(--red)' };
+  if (ct.status === 'ending') return { txt: `vence ${fmtDate(ct.endAt)}`, cor: 'var(--amber)' };
+  return { txt: `até ${fmtDate(ct.endAt)}`, cor: neutro };
+}
+
 /*
  * CARTEIRA DE CLIENTES — visão da CS sobre quem ela atende.
  *
  * Abre na carteira de quem está logado; o seletor troca para a de
- * outra CS, para os clientes sem CS definida ou para todas. Cada card
- * junta o que antes ficava espalhado em várias abas: etapa, time do
- * projeto, os dois faróis de saúde, prazo do contrato e as tasks em
- * aberto (puxadas do Kanban em tempo real).
+ * outra CS, para os clientes sem CS definida ou para todas. Entram os
+ * clientes da base e os que ainda estão entrando (Kick Off, staffing,
+ * onboarding) — a CS já é dona deles desde o cadastro. Pausados e
+ * encerrados só aparecem nos filtros de saída.
  *
- * Entram os clientes da base e os que ainda estão entrando (Kick Off,
- * staffing, onboarding) — a CS já é dona deles desde o cadastro.
- *
- * Entregas do contrato: cada card da base mostra o que o escopo prevê
- * no mês contra o que já foi marcado, e o selo de cadastro incompleto.
- * "Contrato e entregas" abre a ficha completa (histórico, entregas
- * únicas, completar cadastro). Foi decisão de produto deixar isso aqui
- * e não numa aba separada: é na Carteira que a CS já olha cada cliente.
+ * Card com hierarquia fixa (decisão de nov/2026): todos têm o mesmo
+ * tamanho e as mesmas cinco linhas, na mesma ordem — identificação com
+ * selo, aviso, contadores de tasks, equipe e contrato, ações. O que muda
+ * é o conteúdo de cada linha, nunca a estrutura, para a CS bater o olho
+ * na mesma posição em todos. Por isso a lista de tasks abre numa gaveta
+ * lateral em vez de esticar o card, e as entregas do mês ficam no
+ * "Contrato e entregas" (o card mostrava a barra, mas a CS abre a ficha
+ * de qualquer forma para ver o detalhe); o resumo do topo mantém o
+ * percentual geral da seleção.
  */
-export default function CSCarteira({ clients, tasks, collaborators, me, onOpenClient, onOpenTask, onOpenFicha, csInicial = '__me__' }) {
+export default function CSCarteira({ clients, tasks, collaborators, me, onOpenClient, onOpenTask, onOpenFicha, onAvaliarSaude, csInicial = '__me__' }) {
+  const { theme } = useTheme();
   // O líder da CS abre em "Todas as CSs"; a CS, na própria carteira.
   const [csFilter, setCsFilter] = useState(csInicial);
   const [statusFilter, setStatusFilter] = useState('all');
   const [busca, setBusca] = useState('');
   // Soma aos outros filtros (CS, etapa e busca): só quem tem TikTok Shop.
   const [soTiktok, setSoTiktok] = useState(false);
+  // Cliente cuja lista de tasks está aberta na gaveta (só o id, para
+  // ler as tasks ao vivo).
+  const [tasksDe, setTasksDe] = useState(null);
 
   const carteira = useMemo(() => clients.filter(naCarteira), [clients]);
   // Carteira ativa + quem saiu da base (pausado ou encerrado), que só
@@ -100,20 +194,24 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
     // Fora da base não tem entrega esperada nem cadastro a cobrar.
     const naBase = stage === 'live' && !fora;
     const entregas = naBase ? entregasDoMes(c, mes) : [];
-    return {
+    const it = {
       client: c,
       stage,
       fora,
       abertas,
       atrasadas,
       aprovacao: abertas.filter(t => t.status === 'approval').length,
-      ops: computeOpsHealth(c.id, tasks),
       manual: resolveClientHealth(c),
       contrato: contractState(c),
-      entregas,
       entregasResumo: resumoMes(entregas),
       pendencias: naBase ? cadastroPendencias(c) : [],
+      // Setores do cadastro ainda sem responsável (mesma regra do
+      // `pendingSectorsOf` do useClients). Só importa em entrada.
+      vagas: EM_ENTRADA.includes(stage)
+        ? (c.staffing?.sectors || []).filter(sid => !asArray(c.responsibles?.[sid]).length)
+        : [],
     };
+    return { ...it, aviso: avisoDo(it), prazo: contratoDo(it) };
   }), [universo, tasks, hoje, mes]);
 
   const filtrados = useMemo(() => {
@@ -147,18 +245,19 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
     clientes: filtrados.length,
     abertas: filtrados.reduce((s, it) => s + it.abertas.length, 0),
     atrasadas: filtrados.reduce((s, it) => s + it.atrasadas.length, 0),
-    vencendo: filtrados.filter(it => ['ending', 'expired'].includes(it.contrato.status)).length,
+    vencendo: filtrados.filter(it => !it.fora && ['ending', 'expired'].includes(it.contrato.status)).length,
     combinado: filtrados.reduce((s, it) => s + it.entregasResumo.combinado, 0),
     entregue: filtrados.reduce((s, it) => s + it.entregasResumo.entregue, 0),
   }), [filtrados]);
   const pctEntregas = resumo.combinado ? Math.round((resumo.entregue / resumo.combinado) * 100) : null;
 
-  const mostraCs = csFilter === '__all__';
+  const mostraCs = csFilter === '__all__' || csFilter === '__none__';
+  const gaveta = tasksDe ? itens.find(it => it.client.id === tasksDe) : null;
 
   return (
     <div className="fade-up">
       {/* Filtros */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 14 }}>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 }}>
         <select
           value={csFilter}
           onChange={e => setCsFilter(e.target.value)}
@@ -176,6 +275,7 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente..."
+            aria-label="Buscar cliente"
             style={{ ...S.input, width: '100%', paddingLeft: 32 }}
           />
         </div>
@@ -190,38 +290,43 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 16 }}>
         {[...STATUS_FILTERS, null, ...FORA_FILTERS].map(f => (f
           ? (
             <button
               key={f.id}
+              type="button"
               onClick={() => setStatusFilter(f.id)}
+              aria-pressed={statusFilter === f.id}
               style={{
-                padding: '7px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                background: statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 13%, transparent)` : 'var(--surface)',
+                ...S.chip,
+                background: statusFilter === f.id ? 'var(--c-dim)' : 'var(--surface)',
                 color: statusFilter === f.id ? COLOR : 'var(--muted)',
-                border: `1px solid ${statusFilter === f.id ? `color-mix(in srgb, ${COLOR} 33%, transparent)` : 'var(--border)'}`,
+                borderColor: statusFilter === f.id ? 'var(--c-border)' : 'var(--border)',
               }}
             >
               {f.label}
             </button>
           )
-          : <span key="sep" style={{ width: 1, alignSelf: 'stretch', margin: '4px 2px', background: 'var(--border)' }} />
+          : <span key="sep" style={{ width: 1, height: 20, margin: '0 4px', background: 'var(--border-h)' }} />
         ))}
       </div>
 
       {/* Resumo da seleção */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(170px,1fr))', gap: 12, marginBottom: 18 }}>
-        <Stat label="Clientes" value={resumo.clientes} color={COLOR} />
-        <Stat label="Tasks em aberto" value={resumo.abertas} color="var(--blue)" />
-        <Stat label="Tasks atrasadas" value={resumo.atrasadas} color={resumo.atrasadas > 0 ? 'var(--red)' : 'var(--muted)'} />
-        <Stat label="Contratos vencendo" value={resumo.vencendo} color={resumo.vencendo > 0 ? 'var(--amber)' : 'var(--muted)'} />
-        <Stat
-          label="Entregue do combinado no mês"
-          value={pctEntregas == null ? '—' : `${pctEntregas}%`}
-          color={pctEntregas == null ? 'var(--muted)' : pctEntregas >= 100 ? 'var(--green)' : pctEntregas >= 70 ? 'var(--amber)' : 'var(--red)'}
-        />
-      </div>
+      <Faixa
+        style={{ marginBottom: 16 }}
+        items={[
+          { label: 'Clientes', value: resumo.clientes },
+          { label: 'Tasks em aberto', value: resumo.abertas },
+          { label: 'Tasks atrasadas', value: resumo.atrasadas, cor: resumo.atrasadas ? 'var(--red)' : undefined },
+          { label: 'Contratos vencendo', value: resumo.vencendo, cor: resumo.vencendo ? 'var(--amber)' : undefined },
+          {
+            label: 'Entregue do combinado no mês',
+            value: pctEntregas == null ? '—' : `${pctEntregas}%`,
+            cor: pctEntregas >= 100 ? 'var(--green)' : undefined,
+          },
+        ]}
+      />
 
       {filtrados.length === 0
         ? <Empty msg={CLIENTE_FORA[statusFilter]
@@ -233,165 +338,202 @@ export default function CSCarteira({ clients, tasks, collaborators, me, onOpenCl
               <CarteiraCard
                 key={it.client.id}
                 item={it}
-                mostraCs={mostraCs || csFilter === '__none__'}
-                hoje={hoje}
+                theme={theme}
+                mostraCs={mostraCs}
                 onOpen={() => onOpenClient(it.client)}
-                onOpenTask={onOpenTask}
+                onTasks={() => setTasksDe(it.client.id)}
                 onOpenFicha={onOpenFicha ? () => onOpenFicha(it.client) : undefined}
-                mes={mes}
+                onAvaliar={onAvaliarSaude ? () => onAvaliarSaude(it.client) : undefined}
               />
             ))}
           </div>
         )}
+
+      {gaveta && (
+        <TasksGaveta
+          item={gaveta}
+          hoje={hoje}
+          onClose={() => setTasksDe(null)}
+          onOpenTask={(id) => { setTasksDe(null); onOpenTask(id); }}
+        />
+      )}
     </div>
   );
 }
 
-function CarteiraCard({ item, mostraCs, hoje, mes, onOpen, onOpenTask, onOpenFicha }) {
-  const [aberto, setAberto] = useState(false);
-  const { client, stage, fora, abertas, atrasadas, aprovacao, ops, manual, contrato, entregas, entregasResumo, pendencias } = item;
-  const foraCfg = fora ? CLIENTE_FORA[fora] : null;
-  const opsLv = HEALTH_LEVELS_4[ops.level];
-  const manLv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
-  const ctSt = CONTRACT_STATUS[contrato.status] || CONTRACT_STATUS.unknown;
-  const cs = asArray(client.responsibles?.cs);
-  const time = Object.entries(client.responsibles || {})
-    .filter(([sid, v]) => sid !== 'cs' && asArray(v).length);
-  const contato = client.contrato?.contactName || client.contactName;
+function CarteiraCard({ item, theme, mostraCs, onOpen, onTasks, onOpenFicha, onAvaliar }) {
+  const { client, stage, fora, abertas, atrasadas, aprovacao, pendencias, aviso, prazo } = item;
   const tiktok = temTiktokShop(client);
+  const contato = client.contrato?.contactName || client.contactName;
+  const av = AVISO[aviso.tipo] || AVISO.ok;
+
+  // Equipe: um avatar por pessoa, com a cor do setor no tema atual. A CS
+  // só entra quando a seleção mistura carteiras (todas / sem CS).
+  const equipe = Object.entries(client.responsibles || {})
+    .filter(([sid]) => mostraCs || sid !== 'cs')
+    .flatMap(([sid, v]) => asArray(v).map(nome => ({
+      sid, nome,
+      cor: sectorTheme(sid, theme).color,
+      dica: `${SECTORS[sid]?.label || sid} · ${nome}`,
+    })));
+  const visiveis = equipe.slice(0, MAX_AVATARES);
+  const resto = equipe.slice(MAX_AVATARES);
+
+  // Segunda ação: entrada abre o fluxo; cadastro incompleto puxa para
+  // completar; o resto vai para contrato e entregas.
+  const acao = EM_ENTRADA.includes(stage) && !fora
+    ? { label: 'Abrir fluxo', Icone: ArrowRight, destaque: true, onClick: onOpen }
+    : onOpenFicha
+      ? (pendencias.length
+        ? { label: 'Completar cadastro', Icone: ClipboardCheck, destaque: true, onClick: onOpenFicha }
+        : { label: 'Contrato e entregas', Icone: ClipboardCheck, destaque: false, onClick: onOpenFicha })
+      : { label: 'Ver cliente', Icone: ArrowRight, destaque: false, onClick: onOpen };
 
   return (
-    // TikTok Shop ganha o contorno da marca; o atraso continua visível
-    // no farol de Operação e no contador de Atrasadas.
-    <div style={{ ...CARD, ...(tiktok ? bordaTiktok('var(--bg2)') : { border: `1px solid ${atrasadas.length ? `color-mix(in srgb, ${opsLv.color} 30%, transparent)` : 'var(--border)'}` }) }}>
-      <button onClick={onOpen} style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left', width: '100%', cursor: 'pointer' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
-          {foraCfg
-            ? <Tag text={foraCfg.label.toUpperCase()} color={foraCfg.cor} />
-            : stage !== 'live' && (
-              <Tag text={(CLIENT_STAGES[stage]?.label || stage).toUpperCase()} color={CLIENT_STAGES[stage]?.color || COLOR} />
-            )}
-        </div>
-        {foraCfg && (
-          <p style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.45 }}>
-            {foraCfg.desde} {fmtDate(client.inativo.at)}{client.inativo.motivo ? ` · ${client.inativo.motivo}` : ''}
-          </p>
-        )}
-        {tiktok && <SeloTiktokShop altura={16} style={{ marginTop: 8 }} />}
-        {contato && <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5 }}>👤 {contato}</p>}
-        {mostraCs && (
-          <p style={{ fontSize: 11, color: COLOR, fontFamily: 'var(--fm)', marginTop: 5 }}>
-            🎧 {cs.length ? cs.join(', ') : 'sem CS definida'}
-          </p>
-        )}
+    // TikTok Shop ganha o contorno da marca; o resto do card é igual.
+    <div style={{ ...S.card, ...(tiktok ? bordaTiktok('var(--bg2)') : null), ...(fora === 'encerrado' ? { opacity: 0.85 } : null) }}>
 
-        {/* Faróis */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-          <span title="Saúde operacional (automática, por tasks em atraso)" style={{ ...S.pill, color: opsLv.color, borderColor: `color-mix(in srgb, ${opsLv.color} 30%, transparent)` }}>
-            {opsLv.emoji} Operação
+      {/* 1 · Identificação + selo */}
+      <div style={S.topo}>
+        <button type="button" onClick={onOpen} style={S.identidade} title={client.name}>
+          <Sigla size={36} style={{ borderRadius: 10, fontSize: 12, fontWeight: 600, fontFamily: 'var(--f)' }}>{siglaDe(client.name)}</Sigla>
+          <span style={{ minWidth: 0, flex: 1 }}>
+            <span style={S.nome}>{client.name}</span>
+            <span style={S.sub}>
+              {tiktok && <SeloTiktokShop altura={13} />}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{contato || 'Sem contato no cadastro'}</span>
+            </span>
           </span>
-          <span title={manual.note || 'Saúde do cliente (manual, da CS)'} style={{ ...S.pill, color: manLv ? manLv.color : 'var(--muted)', borderColor: manLv ? `color-mix(in srgb, ${manLv.color} 30%, transparent)` : 'var(--border)' }}>
-            {manLv ? `${manLv.emoji} Cliente` : '— Cliente sem avaliação'}
-          </span>
-        </div>
-
-        {/* Tasks */}
-        <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-          <Mini label="Abertas" value={abertas.length} color={abertas.length ? 'var(--blue)' : 'var(--muted)'} />
-          <Mini label="Atrasadas" value={atrasadas.length} color={atrasadas.length ? 'var(--neon)' : 'var(--muted)'} />
-          <Mini label="Aprovação" value={aprovacao} color={aprovacao ? 'var(--amber)' : 'var(--muted)'} />
-        </div>
-
-        {/* Time do projeto */}
-        {time.length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            {time.map(([sid, v]) => (
-              <div key={sid} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
-                <span style={{ fontSize: 11.5, color: SECTORS[sid]?.color || 'var(--text)' }}>{SECTORS[sid]?.emoji} {SECTORS[sid]?.label || sid}</span>
-                <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--fm)', textAlign: 'right' }}>{asArray(v).join(', ')}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Contrato */}
-        {stage === 'live' && !fora && (
-          <p style={{ fontSize: 11, color: ctSt.color, fontFamily: 'var(--fm)', marginTop: 10 }}>
-            📄 {ctSt.label}
-            {contrato.endAt && contrato.status !== 'closed' && ` · até ${fmtDate(contrato.endAt)}`}
-            {contrato.daysLeft != null && contrato.status === 'ending' && ` (${contrato.daysLeft}d)`}
-          </p>
-        )}
-
-        {/* Entregas do mês (escopo do contrato) */}
-        {stage === 'live' && entregas.length > 0 && (
-          <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--border)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 7 }}>
-              <span style={{ fontSize: 11.5, color: 'var(--muted)', flex: 1 }}>Entregas do mês</span>
-              <span style={{ fontSize: 11.5, fontFamily: 'var(--fm)', color: 'var(--text)' }}>{entregasResumo.entregue}/{entregasResumo.combinado}</span>
-              <Aderencia pct={entregasResumo.pct} />
-            </div>
-            <BarraEntrega feito={entregasResumo.entregue} qtd={entregasResumo.combinado} />
-          </div>
-        )}
-        {pendencias.length > 0 && (
-          <p style={{ fontSize: 11, color: 'var(--amber)', marginTop: 10, lineHeight: 1.45 }}>
-            Cadastro incompleto · falta {pendencias.length} {pendencias.length === 1 ? 'item' : 'itens'}
-          </p>
-        )}
-      </button>
-
-      {stage === 'live' && onOpenFicha && (
-        <button onClick={onOpenFicha} style={{ ...S.toggle, color: pendencias.length ? 'var(--c)' : 'var(--muted)', borderColor: pendencias.length ? 'var(--c-border)' : 'var(--border)' }}>
-          <ClipboardCheck size={13} />
-          {pendencias.length ? 'Completar cadastro e ver entregas' : 'Contrato e entregas'}
         </button>
-      )}
+        <Selo item={item} onAvaliar={onAvaliar} />
+      </div>
 
-      {abertas.length > 0 && (
-        <button onClick={() => setAberto(v => !v)} style={S.toggle}>
-          {aberto ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-          {aberto ? 'Esconder tasks' : `Ver tasks em aberto (${abertas.length})`}
-        </button>
-      )}
+      {/* 2 · Aviso */}
+      <div title={aviso.texto} style={{ ...S.aviso, color: av.cor, background: av.fundo }}>
+        <av.Icone size={13} style={{ flexShrink: 0 }} />
+        <span style={S.reticencias}>{aviso.texto}</span>
+      </div>
 
-      {aberto && (
-        <div style={{ marginTop: 8 }} className="fade-in">
-          {abertas.map(t => {
-            const col = TASK_COLUMNS.find(c => c.id === t.status);
-            const atrasada = t.deadline && t.deadline < hoje;
-            const prazo = t.deadline ? parseLocalDate(t.deadline) : null;
-            return (
-              <button key={t.id} onClick={() => onOpenTask(t.id)} style={S.taskRow}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <p style={{ fontSize: 12, color: 'var(--text)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {t.isRework && <span style={{ color: 'var(--amber)' }}>🔄 </span>}{t.name}
-                  </p>
-                  <p style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
-                    <span style={{ color: col?.color }}>{col?.label || t.status}</span>
-                    {' · '}{t.responsibleName || '—'}
-                  </p>
-                </div>
-                <span style={{ fontSize: 10.5, fontFamily: 'var(--fm)', color: atrasada ? 'var(--neon)' : 'var(--muted)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {atrasada && <AlertTriangle size={10} />}
-                  {prazo ? prazo.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'sem prazo'}
-                </span>
-              </button>
-            );
-          })}
+      {/* 3 · Tasks */}
+      <div style={S.contas}>
+        {[
+          { n: abertas.length, label: 'abertas', cor: 'var(--text)' },
+          { n: atrasadas.length, label: 'atrasadas', cor: 'var(--red)' },
+          { n: aprovacao, label: 'em aprovação', cor: 'var(--amber)' },
+        ].map((k, i) => (
+          <div key={k.label} style={{ padding: '7px 10px', borderLeft: i ? '1px solid var(--border)' : 'none', minWidth: 0 }}>
+            <b style={{ display: 'block', fontFamily: 'var(--fm)', fontSize: 15, fontWeight: 600, lineHeight: 1.2, color: k.n ? k.cor : 'var(--dim)' }}>{k.n}</b>
+            <small style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginTop: 1, whiteSpace: 'nowrap' }}>{k.label}</small>
+          </div>
+        ))}
+      </div>
+
+      {/* 4 · Equipe e contrato */}
+      <div style={S.rodape}>
+        <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 4, minWidth: 0 }}>
+          {equipe.length === 0 && <span style={{ marginLeft: -4, fontSize: 11, color: 'var(--muted)' }}>Equipe a definir</span>}
+          {visiveis.map(p => (
+            <span key={`${p.sid}-${p.nome}`} title={p.dica} style={{ ...S.avatar, borderColor: p.cor, color: p.cor }}>{siglaDe(p.nome)}</span>
+          ))}
+          {resto.length > 0 && (
+            <span title={resto.map(p => p.dica).join('\n')} style={{ ...S.avatar, borderColor: 'var(--border-h)', color: 'var(--muted)' }}>+{resto.length}</span>
+          )}
         </div>
-      )}
+        <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontFamily: 'var(--fm)', color: prazo.cor, whiteSpace: 'nowrap' }}>
+          <FileText size={12} /> {prazo.txt}
+        </span>
+      </div>
+
+      {/* 5 · Ações */}
+      <div style={S.acoes}>
+        <button type="button" onClick={onTasks} disabled={!abertas.length} style={{ ...S.botao, color: abertas.length ? 'var(--muted)' : 'var(--dim)' }}>
+          <ListChecks size={13} /> {abertas.length ? `Tasks (${abertas.length})` : 'Sem tasks'}
+        </button>
+        <button
+          type="button"
+          onClick={acao.onClick}
+          style={{ ...S.botao, ...(acao.destaque ? { color: COLOR, background: 'var(--c-dim)', borderColor: 'var(--c-border)' } : null) }}
+        >
+          <acao.Icone size={13} /> {acao.label}
+        </button>
+      </div>
     </div>
   );
 }
 
-function Mini({ label, value, color }) {
+// Selo do canto: situação de quem saiu, etapa de quem está entrando ou
+// a saúde do cliente (avaliação manual da CS) de quem está na base.
+function Selo({ item, onAvaliar }) {
+  const { stage, fora, manual } = item;
+  if (fora) {
+    const cfg = CLIENTE_FORA[fora];
+    return <span style={{ ...S.selo, color: cfg.cor, background: cfg.fundo, borderColor: cfg.borda }}>{cfg.label}</span>;
+  }
+  if (stage !== 'live') {
+    return (
+      <span title={CLIENT_STAGES[stage]?.label} style={{ ...S.selo, color: COLOR, background: 'var(--c-dim)', borderColor: 'var(--c-border)' }}>
+        {CLIENT_STAGES[stage]?.curto || CLIENT_STAGES[stage]?.label || stage}
+      </span>
+    );
+  }
+  const lv = manual.level ? HEALTH_LEVELS_4[manual.level] : null;
+  if (!lv) {
+    return onAvaliar
+      ? <button type="button" onClick={onAvaliar} title="Ainda sem avaliação da CS — clique para avaliar" style={{ ...S.selo, color: 'var(--muted)', background: 'transparent', borderStyle: 'dashed', borderColor: 'var(--border-h)', cursor: 'pointer' }}>Avaliar</button>
+      : <span style={{ ...S.selo, color: 'var(--muted)', background: 'transparent', borderStyle: 'dashed', borderColor: 'var(--border-h)' }}>Sem avaliação</span>;
+  }
   return (
-    <div>
-      <p style={{ fontSize: 9, letterSpacing: '.1em', color: 'var(--muted)', fontFamily: 'var(--fm)' }}>{label.toUpperCase()}</p>
-      <p style={{ fontSize: 19, fontWeight: 600, color }}>{value}</p>
-    </div>
+    <span title={manual.note || 'Saúde do cliente (avaliação da CS)'} style={{ ...S.selo, color: lv.cor, background: `color-mix(in srgb, ${lv.cor} 11%, transparent)` }}>
+      <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />
+      {lv.label}
+    </span>
+  );
+}
+
+// Tasks em aberto do cliente, numa gaveta lateral (o card não estica).
+const COR_STATUS = { todo: 'var(--dim)', doing: 'var(--blue)', approval: 'var(--amber)' };
+
+function TasksGaveta({ item, hoje, onClose, onOpenTask }) {
+  const { client, abertas, atrasadas } = item;
+  return (
+    <Gaveta onClose={onClose} label={`Tasks em aberto de ${client.name}`}>
+      <div style={JANELA.h}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 16, fontWeight: 600, color: 'var(--text)' }}>{client.name}</p>
+          <p style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 3 }}>
+            {abertas.length} {plural(abertas.length, 'task em aberto', 'tasks em aberto')}
+            {atrasadas.length > 0 && <span style={{ color: 'var(--red)' }}> · {atrasadas.length} {plural(atrasadas.length, 'atrasada', 'atrasadas')}</span>}
+          </p>
+        </div>
+        <BotaoFechar onClick={onClose} />
+      </div>
+      <div style={{ ...JANELA.b, gap: 6 }}>
+        {abertas.length === 0 && <p style={JANELA.aviso}>Nenhuma task em aberto.</p>}
+        {abertas.map(t => {
+          const col = TASK_COLUMNS.find(c => c.id === t.status);
+          const atrasada = t.deadline && t.deadline < hoje;
+          const prazo = t.deadline ? parseLocalDate(t.deadline) : null;
+          return (
+            <button key={t.id} type="button" onClick={() => onOpenTask(t.id)} style={S.taskRow}>
+              <span style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: COR_STATUS[t.status] || col?.color || 'var(--dim)' }} />
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ ...S.reticencias, fontSize: 13, color: 'var(--text)', fontWeight: 500 }}>{t.name}</span>
+                  {t.isRework && <span style={S.ajuste}>Ajuste</span>}
+                </span>
+                <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>
+                  {col?.label || t.status} · {t.responsibleName || '—'}
+                </span>
+              </span>
+              <span style={{ fontSize: 11, fontFamily: 'var(--fm)', color: atrasada ? 'var(--red)' : 'var(--muted)', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}>
+                {atrasada && <AlertTriangle size={11} />}
+                {prazo ? prazo.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'sem prazo'}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Gaveta>
   );
 }
 
@@ -401,18 +543,46 @@ const S = {
     padding: '9px 13px', color: 'var(--text)', fontSize: 13, outline: 'none', fontFamily: 'var(--f)',
   },
   inputActive: { borderColor: 'var(--c)', background: 'var(--c-dim)', fontWeight: 600 },
-  pill: {
-    fontSize: 10.5, fontWeight: 600, padding: '3px 9px', borderRadius: 20,
-    border: '1px solid var(--border)', background: 'var(--surface)', fontFamily: 'var(--fm)',
+  chip: {
+    height: 30, padding: '0 12px', borderRadius: 20, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    border: '1px solid var(--border)', fontFamily: 'var(--f)',
   },
-  toggle: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, width: '100%',
-    marginTop: 12, padding: '8px', borderRadius: 9, background: 'var(--surface)',
-    border: '1px solid var(--border)', color: 'var(--muted)', fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
+  card: {
+    background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 'var(--r)', boxShadow: 'var(--shadow)',
+    padding: '15px 16px', display: 'flex', flexDirection: 'column', gap: 12, minWidth: 0,
+  },
+  topo: { display: 'flex', alignItems: 'center', gap: 10, height: 38 },
+  identidade: {
+    display: 'flex', alignItems: 'center', gap: 11, flex: 1, minWidth: 0, padding: 0,
+    background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', color: 'var(--text)',
+  },
+  nome: { display: 'block', fontSize: 14.5, fontWeight: 600, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  sub: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden' },
+  selo: {
+    display: 'inline-flex', alignItems: 'center', gap: 5, height: 22, padding: '0 9px', borderRadius: 99,
+    fontSize: 11, fontWeight: 500, whiteSpace: 'nowrap', flexShrink: 0, border: '1px solid transparent', fontFamily: 'var(--f)',
+  },
+  aviso: { display: 'flex', alignItems: 'center', gap: 7, height: 34, padding: '0 10px', borderRadius: 10, fontSize: 12, minWidth: 0 },
+  reticencias: { minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  contas: { display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', borderRadius: 10, border: '1px solid var(--border)' },
+  rodape: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, height: 26, marginTop: 'auto' },
+  avatar: {
+    width: 25, height: 25, marginLeft: -4, borderRadius: '50%', background: 'var(--bg2)', border: '1.5px solid',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9.5, fontWeight: 700, flexShrink: 0,
+  },
+  acoes: { display: 'flex', gap: 6, paddingTop: 12, borderTop: '1px solid var(--border)' },
+  botao: {
+    flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 32,
+    borderRadius: 9, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--muted)',
+    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--f)', whiteSpace: 'nowrap',
   },
   taskRow: {
     display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-    padding: '8px 10px', marginBottom: 5, borderRadius: 8, cursor: 'pointer',
-    background: 'var(--bg3)', border: '1px solid var(--border)',
+    padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+    background: 'var(--bg3)', border: '1px solid var(--border)', fontFamily: 'var(--f)',
+  },
+  ajuste: {
+    fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 6, flexShrink: 0,
+    color: 'var(--purple)', background: 'var(--purple-dim)',
   },
 };

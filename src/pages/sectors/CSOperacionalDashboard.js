@@ -433,6 +433,7 @@ export default function CSOperacionalDashboard() {
                 onOpenClient={(c) => (stageOf(c) === 'live' ? setOpenId(c.id) : setFlowId(c.id))}
                 onOpenTask={setTaskId}
                 onOpenFicha={(c) => setFichaId(c.id)}
+                onAvaliarSaude={(c) => setHealthTarget(c)}
                 csInicial={modoGestao ? '__all__' : '__me__'}
               />
             )}
